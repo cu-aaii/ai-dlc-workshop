@@ -1,0 +1,315 @@
+{
+  "name": "teams bot exploration",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "jdw5-teams-bot-exploration",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "44facbc5-9e72-40f9-93c6-942ea61478cf",
+      "name": "Receive Teams Activity",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        320
+      ],
+      "webhookId": "b256f048-cc94-482f-a401-409ff56384de"
+    },
+    {
+      "parameters": {
+        "respondWith": "noData",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ebd161b7-de19-4e71-990d-5e6d6c775221",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://login.botframework.com/v1/.well-known/keys",
+        "options": {}
+      },
+      "id": "c8422dba-6168-4e45-8c9c-6ddc34fb9fd5",
+      "name": "Fetch Bot Framework JWKS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        640,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const clientId = 'e6ee0253-8949-4eba-ba9f-f9d5da45fa1d';\n\nconst authHeader = $('Receive Teams Activity').first().json.headers.authorization || '';\nconst token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';\nif (!token) return [];\n\nconst parts = token.split('.');\nif (parts.length !== 3) return [];\n\nlet header, payload;\ntry {\n  header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));\n  payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));\n} catch (e) { return []; }\n\nconst now = Math.floor(Date.now() / 1000);\nif (payload.iss !== 'https://api.botframework.com') return [];\nif (payload.aud !== clientId) return [];\nif (payload.exp < now - 300) return [];\nif (payload.nbf > now + 300) return [];\n\nconst activityServiceUrl = $('Receive Teams Activity').first().json.body.serviceUrl;\nif (payload.serviceUrl && payload.serviceUrl !== activityServiceUrl) return [];\n\nconst jwks = $input.first().json;\nconst jwk = (jwks.keys || []).find(k => k.kid === header.kid);\nif (!jwk) return [];\n\ntry {\n  const subtle = require('crypto').webcrypto.subtle;\n  const publicKey = await subtle.importKey(\n    'jwk', jwk,\n    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },\n    false, ['verify']\n  );\n  const signingInput = Buffer.from(parts[0] + '.' + parts[1]);\n  const signatureBytes = Buffer.from(parts[2], 'base64url');\n  const isValid = await subtle.verify(\n    'RSASSA-PKCS1-v1_5', publicKey, signatureBytes, signingInput\n  );\n  if (!isValid) return [];\n} catch (e) { return []; }\n\nreturn [{ json: { _validated: true } }];"
+      },
+      "id": "a3f8db08-bb79-4960-87e2-ed2d393348d3",
+      "name": "Validate JWT",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Receive Teams Activity').item.json.body.type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "message",
+                    "id": "930860c8-79c9-40e4-8674-7c2fe62fd657"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "message"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Receive Teams Activity').item.json.body.type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "conversationUpdate",
+                    "id": "0bba2e5a-5d3d-4847-88ae-ce661e8db3fb"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "conversationUpdate"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Receive Teams Activity').item.json.body.type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "installationUpdate",
+                    "id": "35e3ec68-d315-4dbf-8c62-7d77a4879571"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "installationUpdate (ignored)"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1ca2886-60b9-442d-acad-deb7912f3eef",
+      "name": "Route by Activity Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1056,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Receive Teams Activity').item.json.body.serviceUrl + 'v3/conversations/' + $('Receive Teams Activity').item.json.body.conversation.id + '/activities/' + $('Receive Teams Activity').item.json.body.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: 'message', text: 'Hello from n8n! You said: ' + $('Receive Teams Activity').item.json.body.text }) }}",
+        "options": {}
+      },
+      "id": "c02cbe9c-1f97-4657-adda-0ea97ff4ed20",
+      "name": "Send Echo Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1264,
+        160
+      ],
+      "credentials": {
+        "microsoftTeamsOAuth2Api": {
+          "id": "Xb01FBFO72o67Vvk",
+          "name": "Microsoft Teams account 2"
+        },
+        "oAuth2Api": {
+          "id": "Q8Ywaguc3bXUnJBH",
+          "name": "JCB Teams Bot Experiment dev tenant"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Receive Teams Activity').first().json.body;\nconst humanAdded = (body.membersAdded || []).filter(m => !m.id.startsWith('28:'));\nconst humanRemoved = (body.membersRemoved || []).filter(m => !m.id.startsWith('28:'));\nlet text;\nif (humanAdded.length > 0) {\n  const name = humanAdded[0].name || 'there';\n  text = \"Hello, \" + name + \"! I'm the JCB Teams Bot. Send me a message and I'll echo it back.\";\n} else if (humanRemoved.length > 0) {\n  const name = humanRemoved[0].name || 'someone';\n  text = \"Goodbye, \" + name + \"! See you later.\";\n} else { return []; }\nreturn [{ json: { _replyText: text } }];"
+      },
+      "id": "54725d3e-730b-4723-b722-86a75c43ab76",
+      "name": "Build Greeting/Farewell",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Receive Teams Activity').item.json.body.serviceUrl + 'v3/conversations/' + $('Receive Teams Activity').item.json.body.conversation.id + '/activities' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: 'message', text: $('Build Greeting/Farewell').item.json._replyText }) }}",
+        "options": {}
+      },
+      "id": "fc8a8d49-65c1-42d8-a986-509ebbbcc6b7",
+      "name": "Send Welcome Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1472,
+        512
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "Q8Ywaguc3bXUnJBH",
+          "name": "JCB Teams Bot Experiment dev tenant"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive Teams Activity": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200 OK": {
+      "main": [
+        [
+          {
+            "node": "Fetch Bot Framework JWKS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Bot Framework JWKS": {
+      "main": [
+        [
+          {
+            "node": "Validate JWT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate JWT": {
+      "main": [
+        [
+          {
+            "node": "Route by Activity Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Activity Type": {
+      "main": [
+        [
+          {
+            "node": "Send Echo Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Greeting/Farewell",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Greeting/Farewell": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "2c921cfb-38c0-4aaa-8428-e8b3032b1c21",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "instanceId": "e9a449939e0a41ee10a44638b178d0c43295f8e77914b3bdcd7493d7347d7129"
+  },
+  "nodeGroups": [],
+  "id": "UpYSG156S63vb4HZ",
+  "tags": []
+}
