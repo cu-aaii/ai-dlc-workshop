@@ -51,6 +51,14 @@ By hand, for debugging, with the same backend the pipeline uses:
 ```sh
 cd blueprints/entra-probe/infra/azure
 
+# Terraform's AWS SDK refreshes SSO tokens differently from the CLI: with AWS_PROFILE alone
+# you get "No valid credential sources found ... InvalidGrantException" on the S3 backend even
+# while `aws sts get-caller-identity` works fine. Export real credentials instead.
+export AWS_PROFILE=ai-dlc-workshop
+eval "$(aws configure export-credentials --format env)"
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
 export ARM_TENANT_ID=...        # from the aidlc/main/azure/terraform-credentials secret
 export ARM_CLIENT_ID=...
 export ARM_CLIENT_SECRET=...
