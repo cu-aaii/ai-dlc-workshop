@@ -74,3 +74,13 @@ pipeline's role, and the pipeline acts only on merge.
 stage deploys [`infra/builder-mcp.yml`](infra/builder-mcp.yml) with the image pinned by
 digest. Runbook and review points: [`deploy/HANDOFF.md`](deploy/HANDOFF.md); post-deploy
 proof: `uv run python deploy/verify.py`.
+
+## Validation harness
+
+`deploy/validate_endpoints.py` exercises all eight tools iteratively (default 10 calls
+each, mutating tools always `dry_run=true`) and reports ok/degraded/failed counts plus
+min/median/p95/max latency per tool — the speed-check numbers for the BACKLOG
+"Verification & performance" item (no targets yet; it measures, never asserts).
+Local: `uv run python deploy/validate_endpoints.py`. Deployed:
+add `--url <runtime endpoint> --bearer-env BUILDER_MCP_TOKEN` (env var holds the Entra
+bearer token). `--markdown PATH` writes the same table as a report file.

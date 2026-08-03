@@ -80,8 +80,12 @@ EXPECTED_TOOL_COUNT = 8  # SPEC C3: blueprint_search, deployment_create/read/upd
 
 
 async def exercise(url: str, token: str) -> None:
-    headers = {"Authorization": f"Bearer {token}"}
-    async with streamable_http_client(url, headers=headers) as (read, write):
+    # streamable_http_client takes no headers kwarg in the pinned SDK; auth rides on the
+    # underlying httpx client instead (same pattern as validate_endpoints.py).
+    from mcp.client.streamable_http import create_mcp_http_client
+
+    http_client = create_mcp_http_client(headers={"Authorization": f"Bearer {token}"})
+    async with streamable_http_client(url, http_client=http_client) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             tools = await session.list_tools()
