@@ -14,6 +14,34 @@ team controls. Builders get PR-only write access — no AWS account, no console.
 Everyone works in this one repo during the workshop, so `main` staying green matters more than
 usual: **every merge to `main` deploys to a shared AWS account.**
 
+## The AI-DLC workflow rules
+
+`aidlc-rules/` is a **verbatim vendored copy** of that directory from
+[awslabs/aidlc-workflows](https://github.com/awslabs/aidlc-workflows) — the AI-DLC methodology
+the workshop teaches. Provenance and re-sync instructions are in `README.md`.
+
+Keep it byte-identical to upstream — **do not edit anything under `aidlc-rules/`**, including to
+fix a lint or a typo. Local changes are what make the next upstream release impossible to take
+cleanly, and the re-sync is a delete-and-replace that would silently discard them. Anything this
+repo needs to say about the rules goes here or in `README.md`.
+
+**When the user invokes AI-DLC, read and follow `aidlc-rules/aws-aidlc-rules/core-workflow.md`,
+and resolve its rule-detail references against `aidlc-rules/aws-aidlc-rule-details/`.** That
+second half is required: `core-workflow.md` resolves rule details from four hardcoded paths
+(`.aidlc/aidlc-rules/aws-aidlc-rule-details/`, `.aidlc-rule-details/`, `.kiro/…`, `.amazonq/…`)
+and **none of them exists here**, so without that mapping every `common/…` and `inception/…`
+reference in it dangles.
+
+Do **not** load it otherwise. It opens by asserting priority over all other instructions, and
+loading it for ordinary work here — editing `pipeline.yml`, adding a blueprint — would override
+the constraints below with rules that know nothing about them. It is invocation-gated on
+purpose; that also keeps ~340K of rules out of sessions that don't need them.
+
+The constraints in this file still bind during an AI-DLC workflow. The vendored rules have no
+concept of `cornell:*` tags, the stack-naming convention, `pipeline/stacks.yml`, or the fact
+that a merge to `main` deploys to a shared account — so a workflow that produces AWS resources
+still has to satisfy everything below.
+
 ## Hard constraints
 
 These come from the platform design, not from preference. Don't relax them to make something
