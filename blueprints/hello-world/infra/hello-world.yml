@@ -50,7 +50,7 @@ Resources:
   # find and so the deploy path is proven against an actual resource creation.
 
   HelloWorldBucket:
-    Type: 'AWS::S3::Bucket'
+    Type: 'AWS::S3::Buckettt'
     Properties:
       BucketName: !Sub '${Application}-${Environment}-hello-world-${AWS::AccountId}'
       BucketEncryption:
