@@ -65,6 +65,12 @@ complaint. Same for the CodeBuild project name prefix.
 checks lint, and `pipeline/validate_stacks.py` fails the build on an unregistered template as
 well as a registered one that doesn't exist. Add the entry in the same PR as the template.
 
+**A `deployed_by: pipeline` entry needs a matching action in `pipeline.yml`.** Registering a
+blueprint is only step 2 of three — without the action the stack deploys nothing, and it fails
+*silently*: green PR, all stages `Succeeded`, no stack. `validate_stacks.py` now fails on this
+in both directions, so it is a review-time error rather than a mystery, but the mirroring is
+still done by hand on purpose.
+
 **Pass every parameter explicitly from the pipeline.** Template defaults exist so a stack can be
 deployed by hand for debugging — they are not the real values. A blueprint should deploy
 identically by hand and by pipeline.

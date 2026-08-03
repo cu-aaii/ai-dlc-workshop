@@ -26,7 +26,7 @@ bootstrap/                  account baseline — deployed BY HAND, once per acco
 pipeline/                   the deploy path
   pipeline.yml                CodePipeline / CodeBuild / ECR / IAM
   stacks.yml                  registry of every CloudFormation template in the repo
-  validate_stacks.py          enforces registry ↔ filesystem agreement (run by PR checks)
+  validate_stacks.py          enforces registry ↔ filesystem ↔ pipeline agreement (PR checks)
   codebuild.yml               container image buildspec (ready, not yet wired to a stage)
 blueprints/
   hello-world/                trivial tagged stack; proves the pipeline, and the demo floor
@@ -116,8 +116,10 @@ cosmetic: the pipeline role scopes its CloudFormation permissions to
 `stack/${Application}-${Environment}*`, so a stack named outside the convention cannot be
 deployed.
 
-**Register every template** in `pipeline/stacks.yml`. That is what makes it linted, and PR
-checks fail on an unregistered template.
+**Register every template** in `pipeline/stacks.yml`, and give every `deployed_by: pipeline`
+entry a matching action in `pipeline.yml`. Registering is what makes a template linted, and PR
+checks fail on an unregistered template — or on a registered one that no pipeline action
+deploys, which would otherwise deploy nothing while reporting success.
 
 **Pass every parameter explicitly** from the pipeline. Template defaults exist so a stack can
 be deployed by hand for debugging, not to be the real values.
