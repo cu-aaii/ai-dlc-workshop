@@ -14,7 +14,7 @@ C) Both cost and inventory, cross-referenced by `cornell:deployment-id`
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: C, plus other metrics to be defined later
 
 ## Question 2 — Cost data source
 Two AWS mechanisms can supply cost data, with very different setup cost and latency:
@@ -40,7 +40,7 @@ C) Don't decide yet — build the inventory side first (Resource Groups Tagging 
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: C
 
 ## Question 3 — Presentation
 How should the dashboard be consumed?
@@ -55,7 +55,7 @@ C) No live service — a scheduled job (EventBridge + Lambda) that snapshots cos
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ## Question 4 — Update cadence
 If a compute/data component is involved, how fresh does the data need to be?
@@ -69,7 +69,7 @@ C) Not applicable to my Question 3 answer
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ## Question 5 — Access / audience
 Who should be able to view this dashboard, and how should that be controlled?
@@ -83,7 +83,7 @@ C) Not public at all — internal only, e.g. workshop organizers query it direct
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: B
 
 ## Question 6 — Relationship to the existing `blueprints/dashboard/infra/hello-world.yml`
 That file is a leftover copy-paste of the `hello-world` blueprint (same bucket/SSM-parameter shape,
@@ -96,7 +96,7 @@ B) Keep it as the seed for one of the new stack's resources (e.g. rename it into
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: B
 
 ## Question: Security Extensions
 Should security extension rules be enforced for this project?
@@ -107,7 +107,7 @@ B) No — skip all SECURITY rules (suitable for PoCs, prototypes, and experiment
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ## Question: Property-Based Testing Extension
 Should property-based testing (PBT) rules be enforced for this project?
@@ -123,7 +123,7 @@ C) No — skip all PBT rules (suitable for simple CRUD applications, UI-only pro
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ## Question: Resiliency Extensions
 Should the resiliency baseline be applied to this project?
@@ -137,4 +137,4 @@ B) No — skip the resiliency baseline (suitable for PoCs, prototypes, and exper
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A

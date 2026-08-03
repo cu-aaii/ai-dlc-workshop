@@ -33,15 +33,29 @@
 - Process: user explicitly opted into the formal AI-DLC workflow.
 
 ## Extension Configuration
-- **security-baseline**: Pending opt-in (asked in Requirements Analysis)
-- **property-based-testing**: Pending opt-in (asked in Requirements Analysis)
-- **resiliency-baseline**: Pending opt-in (asked in Requirements Analysis)
+| Extension | Enabled | Decided At |
+|---|---|---|
+| security-baseline | Yes | Requirements Analysis |
+| property-based-testing | Yes | Requirements Analysis |
+| resiliency-baseline | Yes | Requirements Analysis |
+
+Full rule files loaded for all three (deferred rule loading, Step 5.1): `security-baseline.md`
+(SECURITY-01..15), `property-based-testing.md` (PBT-01..10, full enforcement — answer A, not
+partial), `resiliency-baseline.md` (RESILIENCY-01..15). All are blocking constraints.
+
+### Resiliency decision points deferred to NFR/Application Design
+Per the resiliency extension's own scoping, these user decisions are asked at NFR Design rather
+than Requirements, and are NOT blocking requirements.md:
+- RESILIENCY-04: CI/CD tooling, rollback mechanism, deployment style
+- RESILIENCY-14: resiliency testing approach
+- RESILIENCY-15: incident response process
 
 ## Stage Progress
+### 🔵 INCEPTION PHASE
 - [x] Workspace Detection
 - [ ] Reverse Engineering (SKIPPED — see rationale above)
-- [ ] Requirements Analysis (IN PROGRESS)
-- [ ] User Stories
+- [x] Requirements Analysis
+- [ ] User Stories (WILL EXECUTE — new user-facing UI, multiple personas, multiple components)
 - [ ] Workflow Planning
 - [ ] Application Design
 - [ ] Units Generation
