@@ -140,6 +140,19 @@ mirroring, then cfn-lint. `uv` is its only prerequisite.
 the linter validates nothing inside it, so a misspelled key passes clean and fails at deploy in
 the shared account. Treat edits inside that block as untested.
 
+**And a malformed connector body HANGS the deploy rather than failing it.** Bedrock marks the data
+source `FAILED` in under a second; CloudFormation keeps reporting `CREATE_IN_PROGRESS` — observed
+for over twenty minutes. So the shared pipeline stalls instead of going red, which blocks every
+other track, and none of the verifier's five assertions help because the data source it waits on
+never reaches `AVAILABLE`. Any edit inside `ConnectorParameters` needs a by-hand `Environment=test`
+rehearsal, and the status has to be read from `aws bedrock-agent list-data-sources`, not from the
+stack.
+
+**`connectionConfiguration.bucketOwnerAccountId` is required, always.** The AWS connector reference
+calls it conditional and cross-account-only; that is wrong. Omitting it fails validation with
+*"Member must not be null"* for a same-account bucket — via the hang above. It is
+`!Ref 'AWS::AccountId'` and should stay there.
+
 After that: push the branch, watch the pipeline, read the verdict. A green `BlueprintDeploy` means
 the acceptance test passed — that is the design, because it is the only design that works without
 CLI access.

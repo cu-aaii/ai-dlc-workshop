@@ -2,6 +2,51 @@
 
 Things that will cost someone time or money. Roughly in order of how likely they are to bite.
 
+## A bad data source HANGS the deploy instead of failing it
+
+**Read this before editing `ConnectorParameters`.** It is the worst failure mode in this blueprint,
+and it is worse than the red pipeline everything else here is designed around.
+
+A malformed connector body does not fail the stack. Bedrock marks the data source `FAILED` within a
+second, and **CloudFormation keeps reporting `CREATE_IN_PROGRESS`** — observed for over twenty
+minutes against a data source that had already failed. The CloudFormation handler does not appear to
+treat `FAILED` as terminal.
+
+So the deploy does not go red. It sits there. `BlueprintDeploy` stalls, and because every track
+shares this pipeline, **nobody's blueprint deploys until it times out or someone with account access
+intervenes.** The verifier never runs, so none of its five assertions help — the data source it
+depends on never reaches `AVAILABLE`.
+
+The only way to see it is from outside CloudFormation:
+
+```sh
+aws bedrock-agent list-data-sources --knowledge-base-id <id>          # status: FAILED
+aws bedrock-agent get-data-source --knowledge-base-id <id> \
+  --data-source-id <ds> --query 'dataSource.failureReasons'
+```
+
+Which is exactly what nobody on this track can do. Hence: **rehearse any `ConnectorParameters` edit
+with a by-hand `Environment=test` deploy, and check the data source status in Bedrock rather than
+trusting the stack.** `tools/check` cannot see inside that block at all.
+
+## `bucketOwnerAccountId` is required, and the docs say otherwise
+
+The AWS managed-connector reference marks `connectionConfiguration.bucketOwnerAccountId`
+**"Conditional — required for cross-account access."** That is wrong. Omitting it for a bucket in
+the *same* account fails validation:
+
+```
+1 validation error detected: Value at 'connectionConfiguration.bucketOwnerAccountId'
+failed to satisfy constraint: Member must not be null
+```
+
+An earlier version of this blueprint omitted it deliberately, with a paragraph in
+`docs/decisions.md` explaining why omitting it was correct. Every AWS example includes it; that was
+the signal, and reasoning from the reference table beat reading the examples. It is now
+`!Ref 'AWS::AccountId'` and should stay there.
+
+This failed via the hang above, not via a red stack.
+
 ## The verifier is deliberately load-bearing — do not soften it
 
 `IngestionVerifier` is the only thing standing between "green pipeline" and "empty knowledge

@@ -225,11 +225,21 @@ Confirmed from AWS documentation rather than memory:
 
 - The service role does **not** need the `AmazonBedrockExecutionRoleForKnowledgeBase_` name prefix.
   That is only what the console generates, so the role follows this repo's naming convention.
-- Managed S3 connector body is exactly `type: S3`, `version: "1"`,
-  `connectionConfiguration.bucketName`. The connector reference marks `bucketOwnerAccountId`
-  **Conditional — "Required for cross-account access"**, so omitting it here is correct even
-  though every AWS example includes it. The bucket must be **General Purpose** and in the **same
-  region** as the knowledge base.
+- Managed S3 connector body is `type: S3`, `version: "1"`, and a `connectionConfiguration` holding
+  **both** `bucketName` and `bucketOwnerAccountId`. The bucket must be **General Purpose** and in
+  the **same region** as the knowledge base.
+
+  **Retraction.** An earlier version of this document said `bucketOwnerAccountId` could be omitted
+  for a same-account bucket, because the connector reference marks it *Conditional — "Required for
+  cross-account access"* — and it noted, without acting on it, that every AWS example includes it
+  anyway. The reference is wrong and the examples were right: omitting it fails validation with
+  *"Value at 'connectionConfiguration.bucketOwnerAccountId' failed to satisfy constraint: Member
+  must not be null."*
+
+  The lesson worth generalising: when a doc table and every worked example disagree, the examples
+  are evidence and the table is prose. This one cost a hung stack, because the failure mode is the
+  one described at the top of `warnings.md` — Bedrock fails the data source, CloudFormation does not
+  notice, and the deploy hangs instead of going red.
 - `deletionProtectionConfiguration` is a **sibling of** `connectorParameters`, not a member of it.
   The two AWS pages disagree on this; the CloudFormation schema agrees with the connector
   reference. Omitted here either way, which sidesteps the question.

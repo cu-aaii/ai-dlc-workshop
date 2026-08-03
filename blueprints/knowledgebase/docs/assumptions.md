@@ -13,9 +13,11 @@ only, so the first create would have failed, and a failed first create leaves `R
 which blocks every subsequent merge for every track. `aidlc-kb-ingestion-890349359349` was created
 in `us-east-1` with all four `cornell:*` tags and the syllabus copied into it.
 
-Same-account is what lets the template omit `bucketOwnerAccountId`. Pointing this at a bucket in
-another account means adding that property and revisiting the `aws:ResourceAccount` condition on
-`KnowledgeBaseRole`'s S3 statements; pointing it at another region does not work at all.
+The template passes `bucketOwnerAccountId: !Ref 'AWS::AccountId'`, so same-account is what makes that
+correct — it is a required property either way, not a cross-account one (see `warnings.md`). Pointing
+this at a bucket in another account means hardcoding that owner id and revisiting the
+`aws:ResourceAccount` condition on `KnowledgeBaseRole`'s S3 statements; pointing it at another region
+does not work at all.
 
 **It is a General Purpose bucket, not a Directory bucket.** The managed connector does not accept
 Express One Zone.

@@ -181,8 +181,7 @@ Resources:
   # Json - cfn-lint cannot validate a single key inside it. A typo here passes tools/check and
   # fails at deploy time, which is the main reason IngestionVerifier exists.
   #
-  # bucketOwnerAccountId is cross-account only and is correctly omitted: the bucket is in this
-  # account. This resource cannot be tagged - see DataSourceIdParameter for the SSM mirror.
+  # This resource cannot be tagged at all - see DataSourceIdParameter for the SSM mirror.
 
   DocumentDataSource:
     Type: 'AWS::Bedrock::DataSource'
@@ -196,11 +195,21 @@ Resources:
       DataSourceConfiguration:
         Type: 'MANAGED_KNOWLEDGE_BASE_CONNECTOR'
         ManagedKnowledgeBaseConnectorConfiguration:
+          # bucketOwnerAccountId is REQUIRED, always. The AWS connector reference marks it
+          # "Conditional -- required for cross-account access", and that is wrong: omitting it
+          # fails validation with "Member must not be null" even for a same-account bucket. Every
+          # AWS example includes it, which is the tell. Verified by a failed create, not inferred.
+          #
+          # Worse, that failure does not surface as a stack failure. Bedrock marks the data source
+          # FAILED within a second and CloudFormation keeps reporting CREATE_IN_PROGRESS for at
+          # least twenty minutes, so a malformed body here HANGS the deploy rather than reddening
+          # it -- which on the shared pipeline blocks every other track. See docs/warnings.md.
           ConnectorParameters:
             type: 'S3'
             version: '1'
             connectionConfiguration:
               bucketName: !Ref 'IngestionBucketName'
+              bucketOwnerAccountId: !Ref 'AWS::AccountId'
       VectorIngestionConfiguration:
         # SMART_PARSING is the only strategy a managed knowledge base accepts, and it is the
         # default - stated explicitly anyway because the AWS CLI example for this connector does,
