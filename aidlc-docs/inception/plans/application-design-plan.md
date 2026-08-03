@@ -274,68 +274,120 @@ begin until those are answered.
 ## Part B — Execution checklist (runs after you approve)
 
 ### B1. Preparation
-- [ ] Re-read `requirements.md` §3–§5 and `stories.md` to extract every component-level obligation
-- [ ] Run the mandatory Step 8 answer analysis: check every answer for vagueness, undefined terms,
+- [x] Re-read `requirements.md` §3–§5 and `stories.md` to extract every component-level obligation
+- [x] Run the mandatory Step 8 answer analysis: check every answer for vagueness, undefined terms,
       contradictions, missing detail, and option-merging; raise a follow-up question file if any
       is found, and do not proceed to approval until resolved (Step 9)
-- [ ] Consolidate the resolved answers into a decision table in this document, as was done for the
+- [x] Consolidate the resolved answers into a decision table in this document, as was done for the
       story plan's Part A2
 
 ### B2. `components.md` (mandatory artifact)
-- [ ] Component name, purpose, and responsibilities for each: collector, snapshot store, read API,
+- [x] Component name, purpose, and responsibilities for each: collector, snapshot store, read API,
       static UI, edge (CloudFront + WAF), and the deployment marker from FR-6
-- [ ] Component interfaces — what each exposes and what it consumes
-- [ ] Name the pure, AWS-free aggregation component explicitly, since §4.5 and PBT both depend on
+- [x] Component interfaces — what each exposes and what it consumes
+- [x] Name the pure, AWS-free aggregation component explicitly, since §4.5 and PBT both depend on
       its existence as a separable unit
-- [ ] Record which components are new vs. which are existing shared files being edited
+- [x] Record which components are new vs. which are existing shared files being edited
       (`pipeline/stacks.yml`, `pipeline/pipeline.yml`)
 
 ### B3. `component-methods.md` (mandatory artifact)
-- [ ] Method signatures with input/output types for each component
-- [ ] High-level purpose per method; **no** detailed business rules — those are Functional Design's
+- [x] Method signatures with input/output types for each component
+- [x] High-level purpose per method; **no** detailed business rules — those are Functional Design's
       output, and the boundary is stated in the document
-- [ ] Name the methods the PBT properties in `requirements.md` §4.2 attach to, so Functional Design
+- [x] Name the methods the PBT properties in `requirements.md` §4.2 attach to, so Functional Design
       inherits a concrete target rather than a category
-- [ ] Include pagination handling as an explicit method concern, since silent truncation is the
+- [x] Include pagination handling as an explicit method concern, since silent truncation is the
       failure US-02 guards against
 
 ### B4. `services.md` (mandatory artifact)
-- [ ] Service definitions and responsibilities
-- [ ] Orchestration: the scheduled collection flow, and the request-serving flow
-- [ ] State the invariant that read requests never trigger collection (FR-2.1, US-07)
-- [ ] Record where the degradation ladder from US-06 is decided and where it is rendered
+- [x] Service definitions and responsibilities
+- [x] Orchestration: the scheduled collection flow, and the request-serving flow
+- [x] State the invariant that read requests never trigger collection (FR-2.1, US-07)
+- [x] Record where the degradation ladder from US-06 is decided and where it is rendered
 
 ### B5. `component-dependency.md` (mandatory artifact)
-- [ ] Dependency matrix
-- [ ] Communication patterns, including the resolved answer to Question 4 (one distribution or two
+- [x] Dependency matrix
+- [x] Communication patterns, including the resolved answer to Question 4 (one distribution or two
       endpoints) and its consequence for CORS and for the number of allowlists
-- [ ] Data flow diagram: schedule → collector → Tagging API → snapshot store → API → UI, and the
+- [x] Data flow diagram: schedule → collector → Tagging API → snapshot store → API → UI, and the
       edge controls each hop sits behind
-- [ ] Mark the upstream dependency (Resource Groups Tagging API) and the RESILIENCY-10 obligations
+- [x] Mark the upstream dependency (Resource Groups Tagging API) and the RESILIENCY-10 obligations
       on it — explicit timeouts, bounded retries with backoff, graceful degradation
-- [ ] Record that nothing depends on this blueprint (RESILIENCY-01), so its blast radius is inward
+- [x] Record that nothing depends on this blueprint (RESILIENCY-01), so its blast radius is inward
 
 ### B6. `application-design.md` (mandatory artifact)
-- [ ] Consolidate B2–B5 into a single document, per the stage's Step 10
-- [ ] Include the resolved decision table and the reasoning for each choice
-- [ ] Carry forward the four accepted exceptions from `requirements.md` §4.6 so the design does not
+- [x] Consolidate B2–B5 into a single document, per the stage's Step 10
+- [x] Include the resolved decision table and the reasoning for each choice
+- [x] Carry forward the four accepted exceptions from `requirements.md` §4.6 so the design does not
       read as though they were forgotten
 
 ### B7. Validation and honest reporting
-- [ ] Validate design completeness against FR-1..FR-7 and against US-01..US-15
-- [ ] Validate internal consistency — no component with an unowned responsibility, no method
+- [x] Validate design completeness against FR-1..FR-7 and against US-01..US-15
+- [x] Validate internal consistency — no component with an unowned responsibility, no method
       without a caller, no dependency without a communication pattern
-- [ ] Confirm the design creates **no** VPC, subnet, VPN, Direct Connect, or Transit Gateway
+- [x] Confirm the design creates **no** VPC, subnet, VPN, Direct Connect, or Transit Gateway
       resource (FR-5.4)
-- [ ] Confirm the design implies **no** login, user pool, identity pool, or browser-side SigV4
+- [x] Confirm the design implies **no** login, user pool, identity pool, or browser-side SigV4
       (FR-4.5, SECURITY-13 exception)
-- [ ] Carry the container-build finding from the execution plan forward as an input to
+- [x] Carry the container-build finding from the execution plan forward as an input to
       Infrastructure Design rather than letting it lapse
-- [ ] Report anything that cannot be settled at this stage, naming the later stage that carries it,
+- [x] Report anything that cannot be settled at this stage, naming the later stage that carries it,
       instead of inventing a decision to look complete
 
 ### B8. Completion
-- [ ] Mark every step above `[x]`
-- [ ] Update `aidlc-docs/aidlc-state.md`
-- [ ] Log the approval prompt in `aidlc-docs/audit.md` with an ISO-8601 timestamp
+- [x] Mark every step above `[x]`
+- [x] Update `aidlc-docs/aidlc-state.md`
+- [x] Log the approval prompt in `aidlc-docs/audit.md` with an ISO-8601 timestamp
 - [ ] Present the `# 🏗️ Application Design Complete` message and wait for explicit approval
+
+---
+
+## Part A3 — Resolved decisions (Q9–Q11)
+
+Step 8 analysis of `application-design-plan-clarification.md`. All three are clean single selections
+with no vagueness, undefined terms, contradiction, missing detail, or option-merging. No third round
+of blocking follow-ups was needed.
+
+| # | Question | Answer | Effect on the design |
+|---|---|---|---|
+| Q9 | Framework and bundler | **B — React + Vite** | Diverges from my recommendation (A, Svelte + Vite). Fine: legibility to whoever picks this up after the workshop is a real criterion, and it was the stated reason option B existed. Cost is a larger dependency tree and a runtime shipped to the browser. |
+| Q10 | How built files reach S3 | **A — new Build stage action in the pipeline** | Confirms the coordination point: one `pipeline.yml` edit covering the container images *and* the Vite build + `s3 sync`, not two. Consistent with "everything deploys through the pipeline". |
+| Q11 | SECURITY-10 over npm | **B — pinning yes, scanning and SBOM no** | Lockfile committed with integrity hashes; no npm vulnerability scan, no npm SBOM. |
+
+### Recorded interactions
+
+1. **Q9 = B and Q11 = B compound.** React + Vite is, by the description in Q9 itself, the largest
+   dependency tree of the three options. Q11 = B is the answer that declines scanning and SBOM
+   coverage *of that tree*. So the blueprint's largest dependency surface gets its least scrutiny.
+   The posture is defensible — npm here is build-time only and invisible to a runtime image scan, and
+   exact pinning is the mitigation that matters most against a *changed* dependency — but the residual
+   risk is real: a build-time dependency compromised at a pinned version can inject arbitrary code
+   into the delivered bundle. Recorded in `application-design/application-design.md` §6.2 as a
+   decision on the record rather than an emergent property of two answers given in different rounds.
+   **No change requested.**
+
+2. **Q11 = B narrows two approved artifacts.** Q11's own text said option C would need recording in
+   `requirements.md` §4.6; option B declines two of SECURITY-10's four provisions for one ecosystem,
+   so the same logic partly applies. And **US-09's fourth acceptance criterion** is written
+   unqualified — under Q11 = B it is true of Python and container images and false of npm, so an
+   implementer reading only the story would build npm scanning the answer says not to build. Both are
+   approved artifacts, so amending either is the user's call. Raised as Q12/Q13 in
+   `application-design-plan-clarification-2.md`, explicitly **non-blocking** — the design is complete
+   and consistent under Q11 = B either way.
+
+3. **Q10 = A surfaces a real ordering problem, deferred not guessed.** The Build stage must precede
+   BlueprintDeploy so the images exist, but the site bucket is created *by* the stack BlueprintDeploy
+   deploys — so `aws s3 sync` targets a bucket that does not yet exist on a first deployment. Three
+   resolutions exist and choosing is an infrastructure-topology decision. Recorded in
+   `services.md` and `application-design.md` §6.4 as deferred to Infrastructure Design.
+
+4. **Q9 = B makes US-01's CSP obligation concrete.** Vite's modulepreload polyfill emits an inline
+   script by default, so it must be disabled or hash-allowlisted. Written into `components.md` in
+   those terms because "keep the CSP strict" is not actionable and "disable the polyfill" is. The CSP
+   is not being loosened to match the tooling.
+
+5. **The container-build finding is corroborated by `CLAUDE.md`, not only by my reading of the
+   template.** It states outright that `ContainerBuildProject`, `ContainerRepository` and
+   `pipeline/codebuild.yml` are defined and known-good but that no stage invokes them, and that wiring
+   one is a Build stage action plus a Dockerfile. Recorded so the execution plan's Medium risk rating
+   rests on documented fact.

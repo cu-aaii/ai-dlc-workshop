@@ -40,7 +40,7 @@ D) **You choose** — I pick, optimizing for the smallest dependency tree and th
 
 X) Other — name the framework and bundler you want
 
-[Answer]:
+[Answer]:B
 
 ## Question 10 — How do the built site files reach S3?
 
@@ -70,7 +70,7 @@ C) **A CloudFormation custom resource** (Lambda-backed) that writes the files du
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ## Question 11 — Does SECURITY-10 extend to the npm dependency tree?
 
@@ -95,7 +95,7 @@ C) **No — out of scope**, treated as build tooling like `uv` and `cfn-lint` ar
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:B
 
 ---
 

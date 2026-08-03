@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: INCEPTION - Application Design (plan + 8 questions issued, awaiting answers)
+- **Current Stage**: INCEPTION - Application Design (all five artifacts generated, awaiting approval)
 - **Execution Plan Approved**: 2026-08-03 — user response "Approve and Continue"
 - **User Stories Approved**: 2026-08-03 — user response "approve stories"
 - **Queued amendment (NOT blocking)**: 2026-08-03 — custom telemetry, answered in
@@ -99,8 +99,38 @@ Infrastructure Design and Code Generation rather than by a story amendment.
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations — PLACEHOLDER
 
+## Application Design decisions (Q1–Q11, all resolved)
+See `inception/plans/application-design-plan.md` Part A2 (Q1–Q8) and Part A3 (Q9–Q11).
+
+| # | Decision | Answer |
+|---|---|---|
+| Q1 | Snapshot store | Single versioned encrypted JSON object in S3 |
+| Q2 | Aggregation timing | Read time; snapshot holds raw inventory only |
+| Q3 | API front door | API Gateway HTTP API |
+| Q4 | Distribution topology | One CloudFront distribution, two origins, `/api/*` to the API |
+| Q5 | API surface | Distinct path per view |
+| Q6 | Health endpoint | Same Lambda, same API |
+| Q7 | UI build | A framework with a build step |
+| Q8 | Degraded-state signalling | HTTP status code **and** body status field |
+| Q9 | Framework and bundler | React + Vite |
+| Q10 | How built files reach S3 | New Build stage action in the pipeline |
+| Q11 | SECURITY-10 over npm | Pinning yes; scanning and SBOM no |
+
+### Open but NOT blocking
+- **Q12/Q13** in `inception/plans/application-design-plan-clarification-2.md` — whether
+  `requirements.md` §4.6 gains a fifth accepted exception for Q11 = B, and whether US-09's fourth
+  acceptance criterion is narrowed to name the ecosystems it applies to. Both are **approved**
+  artifacts, so amending them is a user decision. The design is complete and consistent either way.
+
+### Deferred to Infrastructure Design by this stage
+- `aws s3 sync` targets the site bucket, but the Build stage precedes the stack that creates it.
+  Three resolutions exist (split the bucket into its own stack / sync after BlueprintDeploy / resolve
+  the name by convention). Recorded rather than guessed — `application-design.md` §6.4.
+
 ## Current Status
 - **Lifecycle Phase**: INCEPTION
-- **Current Stage**: Application Design — Steps 1-6 complete
-- **Next Stage**: Application Design Steps 8-10 (answer analysis, then artifact generation)
-- **Status**: Awaiting answers in `inception/plans/application-design-plan.md`
+- **Current Stage**: Application Design — Steps 1-12 complete; all five mandatory artifacts generated
+  under `inception/application-design/` (`components.md`, `component-methods.md`, `services.md`,
+  `component-dependency.md`, `application-design.md`)
+- **Next Stage**: Units Generation (after approval)
+- **Status**: Awaiting explicit user approval of the Application Design
