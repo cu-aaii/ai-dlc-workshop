@@ -42,6 +42,12 @@ approved PR merged to main
 That is why `Environment=main` means "merges to main deploy". Deploying the pipeline with
 `Environment=test` gives a parallel pipeline with its own `aidlc-test-*` stacks.
 
+`Environment` is capped at `[a-z0-9]{1,4}` — four characters, no hyphens — in `pipeline.yml`
+and in every blueprint template, because it is part of each stack name and of the
+`stack/${Application}-${Environment}*` prefix `BuildPipelineRole` scopes to. A parallel
+environment therefore needs a short branch name; `staging` fails parameter validation. Widening
+it means editing every template that declares the parameter, not just the pipeline.
+
 `Application` is `aidlc`. Its `AllowedPattern` caps it at 10 characters, which is why it isn't
 the repo name.
 
@@ -64,6 +70,12 @@ complaint. Same for the CodeBuild project name prefix.
 **Register every CloudFormation template in `pipeline/stacks.yml`.** That registry is what PR
 checks lint, and `pipeline/validate_stacks.py` fails the build on an unregistered template as
 well as a registered one that doesn't exist. Add the entry in the same PR as the template.
+
+**A `deployed_by: pipeline` entry needs a matching action in `pipeline.yml`.** Registering a
+blueprint is only step 2 of three — without the action the stack deploys nothing, and it fails
+*silently*: green PR, all stages `Succeeded`, no stack. `validate_stacks.py` now fails on this
+in both directions, so it is a review-time error rather than a mystery, but the mirroring is
+still done by hand on purpose.
 
 **Pass every parameter explicitly from the pipeline.** Template defaults exist so a stack can be
 deployed by hand for debugging — they are not the real values. A blueprint should deploy
