@@ -43,6 +43,9 @@ Note: the catalog's home moving to a private repo is an agreed future change (tr
 BACKLOG.md, Catalog & search) that will change how consumers fetch manifests without
 changing the manifest contract itself.
 
+Note: the `cost` block covers per-blueprint cost only — the platform's own overhead is an
+open accounting gap (tracked in BACKLOG.md, Cost).
+
 ## C2 — Deployment shell (`deployment.yaml` in each deployment repo)
 
 **Consumers**: builder-mcp (`create_deployment` writes it, `export_spec` reads it),
@@ -69,7 +72,8 @@ Error contract: tools return `{"error": ...}` narratives, never raise to the tra
 (NFR7). Governance invariants (hold for every tool, forever): no merge, no push to a
 tracked branch, no CloudFormation Create/Update/Delete — merge is the only deploy
 trigger (D4). An agreed future guardrail caps `restart_deployment` at 3 restarts
-(tracked in BACKLOG.md, Operations & guardrails).
+(tracked in BACKLOG.md, Operations & guardrails). An agreed future addition adds a
+vector-store retrieval tool to the surface (tracked in BACKLOG.md, Catalog & search).
 
 ## C4 — Transport & runtime
 
