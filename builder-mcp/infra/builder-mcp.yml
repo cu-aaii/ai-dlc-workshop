@@ -1,0 +1,270 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Cornell Builder MCP server on Bedrock AgentCore Runtime: ECR repository, Cognito client-credentials authorizer, execution role, and the runtime itself. Deployed by hand this week (registered deployed_by: manual); promotion to a pipeline action is the P1 target.'
+
+Parameters:
+
+  # Metadata Parameters
+
+  Application:
+    Default: 'aidlc'
+    AllowedPattern: '[a-z0-9-]{1,10}'
+    Description: 'Name used for billing and other tracking/identification purposes'
+    Type: 'String'
+
+  Environment:
+    Default: 'main'
+    AllowedPattern: '[a-z0-9]{1,4}'
+    Description: 'Name of the deployment branch'
+    Type: 'String'
+
+  Owner:
+    Default: 'ai-sei'
+    AllowedPattern: '.{1,128}'
+    Description: 'Who owns this deployment (cornell:owner)'
+    Type: 'String'
+
+  BlueprintVersion:
+    Default: '0.1.0'
+    AllowedPattern: '[0-9]+\.[0-9]+\.[0-9]+'
+    Description: 'Version of the builder-mcp component (cornell:blueprint-version)'
+    Type: 'String'
+
+  # Deploy Parameters
+
+  ContainerImageUri:
+    Default: ''
+    AllowedPattern: '.{0,512}'
+    Description: 'ECR image URI (with tag) for the runtime. Empty on the first deploy, which creates the repository to push to; deploy again with the URI to create the runtime.'
+    Type: 'String'
+
+  GitHubTokenSecretName:
+    Default: 'aidlc/main/builder-mcp/github-token'
+    AllowedPattern: '.{1,256}'
+    Description: 'Secrets Manager secret holding the server-side GitHub token. The secret itself is created by hand and never appears in this repo.'
+    Type: 'String'
+
+Conditions:
+
+  # Two-phase deploy: ECR + Cognito + role exist first so there is somewhere to push the
+  # image and something to test auth against; the runtime lands on the second deploy.
+  HasImage: !Not [!Equals [!Ref 'ContainerImageUri', '']]
+
+Resources:
+
+  # Container Registry
+
+  BuilderMcpRepository:
+    Type: 'AWS::ECR::Repository'
+    Properties:
+      RepositoryName: !Sub '${Application}-${Environment}-builder-mcp'
+      ImageTagMutability: 'MUTABLE'
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'ecr-repository-builder-mcp'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'builder-mcp'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-builder-mcp'
+
+  # Inbound auth (P2-B): Cognito client-credentials. The client id/secret pair plays the
+  # role of "the builder's API key" until the Entra ID authorizer lands in P1.
+
+  BuilderUserPool:
+    Type: 'AWS::Cognito::UserPool'
+    Properties:
+      UserPoolName: !Sub '${Application}-${Environment}-builder-mcp'
+      # AWS::Cognito::UserPool takes tags as a map, like AWS::SSM::Parameter.
+      UserPoolTags:
+        Application: !Ref 'Application'
+        Environment: !Ref 'Environment'
+        Resource: 'cognito-user-pool-builder-mcp'
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'builder-mcp'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-builder-mcp'
+
+  BuilderUserPoolDomain:
+    Type: 'AWS::Cognito::UserPoolDomain'
+    Properties:
+      # Domain prefixes are global per region; the account id keeps it collision-free.
+      Domain: !Sub '${Application}-${Environment}-builder-${AWS::AccountId}'
+      UserPoolId: !Ref 'BuilderUserPool'
+
+  BuilderResourceServer:
+    Type: 'AWS::Cognito::UserPoolResourceServer'
+    Properties:
+      Identifier: 'cornell-builder'
+      Name: 'Cornell Builder MCP'
+      UserPoolId: !Ref 'BuilderUserPool'
+      Scopes:
+        - ScopeName: 'invoke'
+          ScopeDescription: 'Call the Cornell Builder MCP tools'
+
+  BuilderClient:
+    Type: 'AWS::Cognito::UserPoolClient'
+    DependsOn: 'BuilderResourceServer'
+    Properties:
+      ClientName: !Sub '${Application}-${Environment}-builder-mcp'
+      UserPoolId: !Ref 'BuilderUserPool'
+      GenerateSecret: true
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - 'client_credentials'
+      AllowedOAuthScopes:
+        - 'cornell-builder/invoke'
+
+  # Execution role: read-mostly by design. The only writes are the two pipeline re-run
+  # calls (restart_deployment) and reading the GitHub token secret. Nothing here can
+  # create, update, or delete a stack -- that stays with the pipeline's role, on merge.
+
+  BuilderRuntimeRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-builder-mcp-runtime'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'bedrock-agentcore.${AWS::URLSuffix}'
+            Action:
+              - 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref 'AWS::AccountId'
+      Policies:
+        - PolicyName: 'builder-mcp-runtime'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'ecr:BatchGetImage'
+                  - 'ecr:GetDownloadUrlForLayer'
+                  - 'ecr:BatchCheckLayerAvailability'
+                Resource:
+                  - !GetAtt 'BuilderMcpRepository.Arn'
+              - Effect: 'Allow'
+                Action:
+                  - 'ecr:GetAuthorizationToken'
+                Resource:
+                  - '*'
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                  - 'logs:DescribeLogGroups'
+                  - 'logs:DescribeLogStreams'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock-agentcore/*'
+              - Effect: 'Allow'
+                Action:
+                  - 'cloudformation:DescribeStacks'
+                  - 'cloudformation:DescribeStackEvents'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:cloudformation:*:${AWS::AccountId}:stack/${Application}-${Environment}*'
+              - Effect: 'Allow'
+                Action:
+                  - 'codepipeline:GetPipelineState'
+                  - 'codepipeline:StartPipelineExecution'
+                  - 'codepipeline:RetryStageExecution'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${Application}-${Environment}'
+                  - !Sub 'arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${Application}-${Environment}/*'
+              - Effect: 'Allow'
+                Action:
+                  - 'tag:GetResources'
+                Resource:
+                  - '*'
+              - Effect: 'Allow'
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GitHubTokenSecretName}*'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'iam-role-builder-mcp-runtime'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'builder-mcp'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-builder-mcp'
+
+  # The runtime itself (second deploy, once the image exists)
+
+  BuilderRuntime:
+    Type: 'AWS::BedrockAgentCore::Runtime'
+    Condition: 'HasImage'
+    Properties:
+      # Runtime names take underscores, not hyphens.
+      AgentRuntimeName: !Sub '${Application}_${Environment}_builder_mcp'
+      Description: 'Cornell Builder MCP server (Track A) -- searches blueprints, creates deployments, operates them'
+      AgentRuntimeArtifact:
+        ContainerConfiguration:
+          ContainerUri: !Ref 'ContainerImageUri'
+      RoleArn: !GetAtt 'BuilderRuntimeRole.Arn'
+      NetworkConfiguration:
+        NetworkMode: 'PUBLIC'
+      ProtocolConfiguration: 'MCP'
+      AuthorizerConfiguration:
+        CustomJWTAuthorizer:
+          DiscoveryUrl: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${BuilderUserPool}/.well-known/openid-configuration'
+          AllowedClients:
+            - !Ref 'BuilderClient'
+      EnvironmentVariables:
+        BUILDER_MCP_GITHUB_TOKEN_SECRET: !Ref 'GitHubTokenSecretName'
+        BUILDER_MCP_GITHUB_ORG: 'cu-aaii'
+        BUILDER_MCP_WORKSHOP_REPO: 'ai-dlc-workshop'
+        BUILDER_MCP_APPLICATION: !Ref 'Application'
+        BUILDER_MCP_ENVIRONMENT: !Ref 'Environment'
+      # AWS::BedrockAgentCore::Runtime takes tags as a map, like AWS::SSM::Parameter.
+      Tags:
+        Application: !Ref 'Application'
+        Environment: !Ref 'Environment'
+        Resource: 'agentcore-runtime-builder-mcp'
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'builder-mcp'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-builder-mcp'
+
+Outputs:
+
+  RepositoryUri:
+    Description: 'Push the linux/arm64 image here, then redeploy with ContainerImageUri set'
+    Value: !GetAtt 'BuilderMcpRepository.RepositoryUri'
+
+  TokenEndpoint:
+    Description: 'OAuth client-credentials token endpoint'
+    Value: !Sub 'https://${Application}-${Environment}-builder-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com/oauth2/token'
+
+  ClientId:
+    Description: 'OAuth client id (secret via: aws cognito-idp describe-user-pool-client)'
+    Value: !Ref 'BuilderClient'
+
+  UserPoolId:
+    Description: 'Cognito user pool backing the JWT authorizer'
+    Value: !Ref 'BuilderUserPool'
+
+  RuntimeArn:
+    Condition: 'HasImage'
+    Description: 'AgentCore runtime ARN; the MCP endpoint URL derives from this (see deploy/verify.py)'
+    Value: !GetAtt 'BuilderRuntime.AgentRuntimeArn'

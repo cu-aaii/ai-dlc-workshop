@@ -19,10 +19,16 @@ share this repo and a root-level `aidlc-docs/` would collide across teams.
 - [x] Units Generation — single unit: `builder-mcp`
 
 ### 🟢 CONSTRUCTION PHASE
-- [x] Code Generation — IN PROGRESS: FastMCP server, seven tools (six + export_spec),
-      streamable HTTP, stateless
-- [ ] Build and Test — pytest suite must pass; local HTTP verified
-- [ ] Deploy — Bedrock AgentCore, verified live tool call (end of day)
+- [x] Code Generation — server (seven tools), infra/builder-mcp.yml (AgentCore stack),
+      Dockerfile, deploy + verify scripts
+- [x] Build and Test — 22 tests green; HTTP smoke test green stateful AND stateless;
+      linux/arm64 image builds; template lints clean
+- [x] Spec-driven docs — SPEC.md (contracts C1–C7), PROJECT-KNOWLEDGE.md, deploy/HANDOFF.md
+
+### 🟡 OPERATIONS PHASE
+- [ ] Deploy — **handed off**: Marty deploys from his account/system using
+      deploy/HANDOFF.md; this machine's job ended at "verified locally + on GitHub"
+- [ ] Post-deploy verify — deploy/verify.py against the live runtime
 
 ## Intent Analysis
 - **Request type**: New project (component) inside existing repo

@@ -5,8 +5,10 @@ blueprint catalog, create a deployment (new repo + registration PR), and operate
 deployed. **Merge is the only deploy trigger** — no tool here deploys anything directly,
 and the builder's client never holds a git or AWS credential.
 
-Inception artifacts (requirements, decisions, options docs) live in
-[`aidlc-docs/`](aidlc-docs/aidlc-state.md).
+Start here, in order: [`SPEC.md`](SPEC.md) (contracts C1–C7 — the agreements that must
+not drift), [`aidlc-docs/PROJECT-KNOWLEDGE.md`](aidlc-docs/PROJECT-KNOWLEDGE.md)
+(decision log, gotchas, glossary), [`deploy/HANDOFF.md`](deploy/HANDOFF.md) (deployment
+runbook). Inception artifacts live in [`aidlc-docs/`](aidlc-docs/aidlc-state.md).
 
 ## Tools
 

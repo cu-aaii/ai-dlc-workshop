@@ -54,3 +54,11 @@ You are not allowed to change the hello world blueprint.yaml substantively. Anot
 **Context**: Construction — AgentCore deployment planning
 
 ---
+
+## Deployment Handoff + Spec-Driven Docs Directive
+**Timestamp**: 2026-08-03T20:05:00Z
+**User Input**: "Here is the guide for deployment, by the way. We're going to verify everything locally and then pause before deployment, and my colleague who has the right account will take over and deploy on their aws account instead. Actually, sounds like my colleague marty has a whole system - so as long as we get this to github, he'll take it the rest of the way. But here are the steps.   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-mcp.html   ---- Before we proceed, please utilize best practices of spec driven development, using a contract doc system and clear project knowledge doc, so we don't rely on one chat long term. Encode as much knowledge as you can from our session, in a clear searchable format, to help future agents."
+**AI Response**: Local verification completed: 22 tests green, HTTP smoke test green in stateful and stateless modes, linux/arm64 image builds, infra/builder-mcp.yml lints clean and is registered as deployed_by: manual. No deploy from this machine. Wrote SPEC.md (contracts C1–C7), aidlc-docs/PROJECT-KNOWLEDGE.md (decision log DECISION-01..17, gotchas, glossary), deploy/HANDOFF.md (Marty's runbook). Pushed to fork for handoff.
+**Context**: Construction complete → Operations handoff
+
+---
