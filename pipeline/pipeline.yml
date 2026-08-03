@@ -233,6 +233,301 @@ Resources:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
 
+  # ARM container build -- same mechanics as ContainerBuildProject, aarch64 compute.
+  # Bedrock AgentCore runtimes require linux/arm64 images, which the x86 reference project
+  # cannot produce natively. Added alongside rather than modifying the reference project,
+  # so its known-good definition stays untouched for future x86 Lambda images.
+
+  ArmContainerBuildLogs:
+    Type: 'AWS::Logs::LogGroup'
+    DeletionPolicy: 'Delete'
+    UpdateReplacePolicy: 'Delete'
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${Application}-${Environment}-container-arm'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'log-group-build-project-container-arm'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  ArmContainerBuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-container-arm'
+      Description: !Sub 'Builds linux/arm64 container images for the ${Application}-${Environment} pipeline (AgentCore runtimes)'
+      ServiceRole: !GetAtt 'ContainerBuildRole.Arn'
+      TimeoutInMinutes: 60
+      Visibility: 'PRIVATE'
+      Artifacts:
+        Type: 'CODEPIPELINE'
+      Cache:
+        Type: 'NO_CACHE'
+      Environment:
+        ComputeType: 'BUILD_GENERAL1_SMALL'
+        Image: 'aws/codebuild/amazonlinux2-aarch64-standard:3.0'
+        ImagePullCredentialsType: 'CODEBUILD'
+        PrivilegedMode: true
+        Type: 'ARM_CONTAINER'
+        EnvironmentVariables:
+          - Name: 'APPLICATION'
+            Value: !Ref 'Application'
+          - Name: 'ENVIRONMENT'
+            Value: !Ref 'Environment'
+          - Name: 'CONTAINER_REPOSITORY_URI'
+            Value: !Sub '${ContainerRepository.RepositoryUri}'
+          - Name: 'DOCKER_CLI_EXPERIMENTAL'
+            Value: 'enabled'
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref 'ArmContainerBuildLogs'
+          Status: 'ENABLED'
+      Source:
+        BuildSpec: 'pipeline/codebuild.yml'
+        GitCloneDepth: 0
+        Type: 'CODEPIPELINE'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'codebuild-project-container-arm'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  # Terraform Runner
+  #
+  # Non-AWS resources (Azure/Entra only) are Terraform executed from CodeBuild. One project
+  # serves every blueprint: the pipeline action supplies TF_WORKING_DIR and TF_STATE_KEY, the
+  # same way CONTAINER_TARGET parameterizes ContainerBuildProject. Adding a module is a
+  # Terraform stage action plus a directory of .tf -- see pipeline/README.md.
+
+  # Credentials for the Azure/Entra tenant.
+  #
+  # The value is injected once out of band (`aws secretsmanager put-secret-value`) and is
+  # never in this repository -- it is public and has no secret scanning.
+  #
+  # GenerateSecretString rather than SecretString, and this is load-bearing rather than a
+  # style choice. SecretString is a template property CloudFormation enforces on every stack
+  # update, and the PipelineDeploy stage redeploys this stack on every merge -- so a
+  # placeholder there would silently reset the credential to the placeholder several times a
+  # day. GenerateSecretString is evaluated only at create, so the injected value survives.
+  # Editing the GenerateSecretString block below DOES regenerate and clobber it.
+  #
+  # The generated placeholder carries all three keys on purpose. The CodeBuild environment
+  # variables below resolve a json-key each, and a missing key fails the build with an opaque
+  # CodeBuild error; with the shape correct from the start, an uninjected secret instead fails
+  # where you would expect it to, as an Azure authentication error.
+
+  AzureCredentialsSecret:
+    Type: 'AWS::SecretsManager::Secret'
+    DeletionPolicy: 'Retain'
+    UpdateReplacePolicy: 'Retain'
+    Properties:
+      Name: !Sub '${Application}/${Environment}/azure/terraform-credentials'
+      Description: 'Azure/Entra service principal the Terraform stage authenticates as. Value injected out of band; never stored in the repository.'
+      GenerateSecretString:
+        SecretStringTemplate: '{"tenant_id":"replace-me","client_id":"replace-me"}'
+        GenerateStringKey: 'client_secret'
+        PasswordLength: 32
+        ExcludePunctuation: true
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'secretsmanager-secret-azure-terraform-credentials'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  # Terraform state.
+  #
+  # Deliberately its own bucket, and deliberately without a LifecycleConfiguration. The
+  # pipeline artifact bucket expires objects after 30 days
+  # (bootstrap/account-bootstrap.yml), which would delete Terraform state and leave every
+  # managed resource orphaned. Versioning is on so a corrupted or truncated state push can be
+  # rolled back to the previous version.
+  #
+  # Retained on stack delete: losing this bucket means losing the record of what Terraform
+  # owns in the tenant, which is far worse than an orphaned bucket.
+
+  TerraformStateBucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: 'Retain'
+    UpdateReplacePolicy: 'Retain'
+    Properties:
+      BucketName: !Sub '${Application}-${Environment}-tfstate-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: 'BucketOwnerEnforced'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: 'Enabled'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 's3-bucket-terraform-state'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  TerraformBuildRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-terraform'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'codebuild.${AWS::URLSuffix}'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'terraform'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Exactly one secret, by exact ARN. !Ref on a Secret returns the full ARN
+              # including the random suffix Secrets Manager appends, so this needs no
+              # wildcard and cannot widen to a second secret later by accident.
+              - Effect: 'Allow'
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                Resource:
+                  - !Ref 'AzureCredentialsSecret'
+              # DeleteObject is what releases the S3 native state lock, so read-only here
+              # would hang every subsequent run on a stale lock.
+              - Effect: 'Allow'
+                Action:
+                  - 's3:DeleteObject'
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub '${TerraformStateBucket.Arn}/*'
+              - Effect: 'Allow'
+                Action:
+                  - 's3:ListBucket'
+                Resource:
+                  - !GetAtt 'TerraformStateBucket.Arn'
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Application}-${Environment}-terraform*'
+              # The CodePipeline input artifact.
+              - Effect: 'Allow'
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::deployment-artifacts-${AWS::AccountId}-*/*'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'iam-role-build-project-terraform'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  TerraformLogs:
+    Type: 'AWS::Logs::LogGroup'
+    DeletionPolicy: 'Delete'
+    UpdateReplacePolicy: 'Delete'
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${Application}-${Environment}-terraform'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'log-group-build-project-terraform'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  TerraformProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      # The ${Application}-${Environment} prefix is required, not decorative:
+      # BuildPipelineRole scopes codebuild:StartBuild to project/${Application}-${Environment}*
+      # so a project named outside it cannot be started by the pipeline.
+      Name: !Sub '${Application}-${Environment}-terraform'
+      Description: !Sub 'Runs Terraform against non-AWS (Azure/Entra) resources for the ${Application}-${Environment} pipeline'
+      ServiceRole: !GetAtt 'TerraformBuildRole.Arn'
+      TimeoutInMinutes: 30
+      Visibility: 'PRIVATE'
+      Artifacts:
+        Type: 'CODEPIPELINE'
+      Cache:
+        Type: 'NO_CACHE'
+      Environment:
+        ComputeType: 'BUILD_GENERAL1_SMALL'
+        Image: 'aws/codebuild/amazonlinux2-x86_64-standard:4.0'
+        ImagePullCredentialsType: 'CODEBUILD'
+        # Unlike the container build, Terraform needs no Docker daemon.
+        PrivilegedMode: false
+        Type: 'LINUX_CONTAINER'
+        EnvironmentVariables:
+          - Name: 'APPLICATION'
+            Value: !Ref 'Application'
+          - Name: 'ENVIRONMENT'
+            Value: !Ref 'Environment'
+          - Name: 'OWNER'
+            Value: !Ref 'Owner'
+          - Name: 'TF_STATE_BUCKET'
+            Value: !Ref 'TerraformStateBucket'
+          - Name: 'TF_VERSION'
+            Value: '1.15.8'
+          # The azuread and azurerm providers both read these natively, so the credential
+          # never lands in a .tfvars file, a variable, or Terraform state. CodeBuild resolves
+          # each json-key at build start; the service role above is what permits it.
+          - Name: 'ARM_TENANT_ID'
+            Type: 'SECRETS_MANAGER'
+            Value: !Sub '${AzureCredentialsSecret}:tenant_id'
+          - Name: 'ARM_CLIENT_ID'
+            Type: 'SECRETS_MANAGER'
+            Value: !Sub '${AzureCredentialsSecret}:client_id'
+          - Name: 'ARM_CLIENT_SECRET'
+            Type: 'SECRETS_MANAGER'
+            Value: !Sub '${AzureCredentialsSecret}:client_secret'
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref 'TerraformLogs'
+          Status: 'ENABLED'
+      Source:
+        BuildSpec: 'pipeline/terraform.yml'
+        GitCloneDepth: 0
+        Type: 'CODEPIPELINE'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'codebuild-project-terraform'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
   # Deploy Pipeline
 
   BuildPipelineRole:
@@ -376,6 +671,28 @@ Resources:
                   "RemoteGitRepository": "${RemoteGitRepository}"
                   }
 
+        # Container images, built before anything deploys. One action per named target in
+        # the root Dockerfile; CONTAINER_DIGEST is exported so the deploy action below can
+        # pin by digest rather than tag (see pipeline/codebuild.yml).
+        - Name: 'Build'
+          Actions:
+            - Name: 'BuilderMcpContainer'
+              Namespace: 'BuilderMcpContainer'
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'ArmContainerBuildProject'
+                EnvironmentVariables: >-
+                  [
+                  {"name": "CONTAINER_TARGET", "value": "builder-mcp", "type": "PLAINTEXT"},
+                  {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
+                  ]
+
         # One action per blueprint stack. Register the template in pipeline/stacks.yml and
         # add an action here; the stack name convention is <application>-<environment>-<name>
         # so it stays inside the BuildPipelineRole's CloudFormation resource scope.
@@ -405,6 +722,34 @@ Resources:
                   "Environment": "${Environment}",
                   "Owner": "${Owner}",
                   "SourceCommitId": "#{GitRepository.CommitId}"
+                  }
+
+            - Name: 'BuilderMcpCloudFormation'
+              Namespace: 'BuilderMcpCloudFormation'
+              RunOrder: 1
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-builder-mcp'
+                TemplatePath: 'GitRepositoryArtifact::builder-mcp/infra/builder-mcp.yml'
+                # ContainerImageUri arrives as the digest the Build stage just pushed, so
+                # the runtime always runs exactly the image this commit produced.
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "BlueprintVersion": "0.1.0",
+                  "ContainerImageUri": "#{BuilderMcpContainer.CONTAINER_DIGEST}",
+                  "GitHubTokenSecretName": "${Application}/${Environment}/builder-mcp/github-token"
                   }
 
             # The knowledge base ingests and then verifies its own contents inside the deploy,
@@ -443,6 +788,35 @@ Resources:
                   "SourceCommitId": "#{GitRepository.CommitId}"
                   }
 
+        # Non-AWS resources (Azure/Entra). One action per Terraform module, each supplying its
+        # own working directory and state key so a single CodeBuild project serves all of them.
+        #
+        # Runs after BlueprintDeploy because Azure/Entra resources are expected to reference
+        # AWS ones, not the reverse. Applies unattended -- there is no approval action here, so
+        # a merge reaches the tenant with whatever rights the stored service principal holds.
+        - Name: 'Terraform'
+          Actions:
+            - Name: 'EntraProbeTerraform'
+              Namespace: 'EntraProbeTerraform'
+              RunOrder: 1
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'TerraformProject'
+                # validate_stacks.py text-scans for TF_WORKING_DIR here and cross-checks it
+                # against the directories on disk, in both directions -- the Terraform
+                # equivalent of the stacks.yml <-> pipeline.yml invariant.
+                EnvironmentVariables: !Sub >-
+                  [
+                  {"name":"TF_WORKING_DIR","value":"blueprints/entra-probe/infra/azure","type":"PLAINTEXT"},
+                  {"name":"TF_STATE_KEY","value":"${Application}/${Environment}/entra-probe.tfstate","type":"PLAINTEXT"}
+                  ]
+
 Outputs:
 
   PipelineName:
@@ -460,3 +834,11 @@ Outputs:
   ContainerRepositoryUri:
     Description: 'ECR repository for blueprint container images (no stage builds into it yet)'
     Value: !GetAtt 'ContainerRepository.RepositoryUri'
+
+  TerraformStateBucketName:
+    Description: 'S3 bucket holding Terraform state, one key per module. Retained if this stack is deleted.'
+    Value: !Ref 'TerraformStateBucket'
+
+  AzureCredentialsSecretName:
+    Description: 'Inject the real credential here once: aws secretsmanager put-secret-value --secret-id <this> --secret-string file://creds.json'
+    Value: !Sub '${Application}/${Environment}/azure/terraform-credentials'
