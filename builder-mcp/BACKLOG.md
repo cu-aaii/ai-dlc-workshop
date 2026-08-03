@@ -33,7 +33,7 @@ them.
 
 - **End-to-end reliability test**: can we actually launch a blueprint, reliably? The current
   22 tests cover pure logic; the GitHub and AWS edges are exercised only through dry-run
-  paths. This is a real `create_deployment` → merge → pipeline → running stack run, repeated
+  paths. This is a real `deployment_create` → merge → pipeline → running stack run, repeated
   enough times to say something about reliability rather than "it worked once".
 
 ## Cost
@@ -48,7 +48,7 @@ them.
 
 ## Operations & guardrails
 
-- Cap `restart_deployment` at 3 restarts per deployment per window (window TBD by the mob);
+- Cap `deployment_restart` at 3 restarts per deployment per window (window TBD by the mob);
   past the cap the tool refuses and directs the builder to open a PR / contact the platform
   team. Unbounded retries mask real failures and burn pipeline runs. Open design question:
   this needs restart-count state, which the stateless server (SPEC C4) does not keep. (SPEC C3)

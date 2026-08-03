@@ -8,6 +8,7 @@ from builder_mcp.patching import (
     deployment_repo_files,
     insert_blueprint_action,
     pascal_case,
+    remove_blueprint_action,
     render_pipeline_action,
 )
 
@@ -59,6 +60,33 @@ def test_parameter_overrides_render_as_valid_json():
     json_text = "\n".join(line.strip() for line in match.group(1).splitlines())
     parsed = json.loads(json_text)
     assert parsed["SourceCommitId"] == "#{GitRepository.CommitId}"
+
+
+def test_remove_cuts_exactly_the_action_block():
+    removed = remove_blueprint_action(PIPELINE_YML, "hello-world")
+    assert "HelloWorldCloudFormation" not in removed
+    # the neighbouring action and the Outputs anchor survive intact
+    assert "BuilderMcpCloudFormation" in removed
+    assert "\nOutputs:" in removed
+    # nothing outside the block moved: the removal is a pure cut of one span
+    cut_at = PIPELINE_YML.index("\n", PIPELINE_YML.index("Actions:", PIPELINE_YML.index("BlueprintDeploy")))
+    assert removed.startswith(PIPELINE_YML[:cut_at])
+
+
+def test_insert_then_remove_round_trips_byte_identically():
+    patched = insert_blueprint_action(PIPELINE_YML, _action(), "aidlc-main-team-x-hello")
+    assert remove_blueprint_action(patched, "team-x-hello") == PIPELINE_YML
+
+
+def test_remove_absent_action_raises():
+    with pytest.raises(ValueError, match="no 'NoSuchThingCloudFormation' action"):
+        remove_blueprint_action(PIPELINE_YML, "no-such-thing")
+
+
+def test_remove_then_remove_again_raises():
+    removed = remove_blueprint_action(PIPELINE_YML, "hello-world")
+    with pytest.raises(ValueError, match="no 'HelloWorldCloudFormation' action"):
+        remove_blueprint_action(removed, "hello-world")
 
 
 def test_deployment_repo_shell_pins_version_and_never_copies():

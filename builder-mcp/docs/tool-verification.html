@@ -33,12 +33,12 @@
 </header>
 <main>
   <div class="facts">
-    <span><b>7</b>&nbsp;tools</span><span><b>22</b>&nbsp;tests green</span>
+    <span><b>8</b>&nbsp;tools</span><span><b>28</b>&nbsp;tests green</span>
     <span>MCP over streamable HTTP, verified stateful <i>and</i> stateless</span>
     <span>linux/arm64 image builds · deploys via the pipeline, by digest</span>
   </div>
-  <div class="gov"><b>The governance invariant, in one line:</b> no tool can deploy, merge, or push —
-  a deployment happens exactly one way: a human approves the pull request this server opened, and the merge does the rest.</div>
+  <div class="gov"><b>The governance invariant, in one line:</b> no tool can deploy, merge, push, or destroy —
+  a deployment happens (and is torn down) exactly one way: a human approves the pull request this server opened, and the merge does the rest.</div>
   
     <section class="tool">
       <h2>🔍 <code>blueprint_search</code> <span class="badge green">live output</span></h2>
@@ -87,12 +87,12 @@
       </div>
     </section>
     <section class="tool">
-      <h2>🏗️ <code>create_deployment</code> <span class="badge green">live output</span></h2>
+      <h2>🏗️ <code>deployment_create</code> <span class="badge green">live output</span></h2>
       <p class="blurb">dry_run=true returns the full plan — repo, registration PR, stack, cost — for the human to confirm. Nothing deploys until a human merges the PR.</p>
       <div class="cols">
         <div><h3>1 · The builder asks</h3><div class="ask">“Deploy the hello-world blueprint for me. I&#x27;m tmf77.”</div></div>
         <div><h3>2 · Claude calls the tool</h3><pre>{
-  &quot;tool&quot;: &quot;create_deployment&quot;,
+  &quot;tool&quot;: &quot;deployment_create&quot;,
   &quot;arguments&quot;: {
     &quot;blueprint&quot;: &quot;hello-world&quot;,
     &quot;deployment_name&quot;: &quot;hello-world&quot;,
@@ -126,12 +126,12 @@
       </div>
     </section>
     <section class="tool">
-      <h2>📊 <code>deployment_status</code> <span class="badge amber">graceful degradation — no AWS creds on this laptop; live values on AgentCore</span></h2>
+      <h2>📊 <code>deployment_read</code> <span class="badge amber">graceful degradation — no AWS creds on this laptop; live values on AgentCore</span></h2>
       <p class="blurb">The whole chain in one view: registration PR → pipeline stages → CloudFormation stack.</p>
       <div class="cols">
         <div><h3>1 · The builder asks</h3><div class="ask">“Is my hello-world deployment live yet?”</div></div>
         <div><h3>2 · Claude calls the tool</h3><pre>{
-  &quot;tool&quot;: &quot;deployment_status&quot;,
+  &quot;tool&quot;: &quot;deployment_read&quot;,
   &quot;arguments&quot;: {
     &quot;deployment_name&quot;: &quot;hello-world&quot;
   }
@@ -149,12 +149,12 @@
       </div>
     </section>
     <section class="tool">
-      <h2>✏️ <code>propose_change</code> <span class="badge green">live output</span></h2>
+      <h2>✏️ <code>deployment_update</code> <span class="badge green">live output</span></h2>
       <p class="blurb">Changes become a branch + pull request — never a direct push. The review gate stays unbypassable.</p>
       <div class="cols">
         <div><h3>1 · The builder asks</h3><div class="ask">“Update the README in my deployment repo.”</div></div>
         <div><h3>2 · Claude calls the tool</h3><pre>{
-  &quot;tool&quot;: &quot;propose_change&quot;,
+  &quot;tool&quot;: &quot;deployment_update&quot;,
   &quot;arguments&quot;: {
     &quot;repo&quot;: &quot;deploy-hello-world&quot;,
     &quot;title&quot;: &quot;Clarify usage docs&quot;,
@@ -169,7 +169,7 @@
   &quot;dry_run&quot;: true,
   &quot;plan&quot;: {
     &quot;repo&quot;: &quot;cu-aaii/deploy-hello-world&quot;,
-    &quot;branch&quot;: &quot;propose/6235&quot;,
+    &quot;branch&quot;: &quot;propose/87278&quot;,
     &quot;files_changed&quot;: [
       &quot;README.md&quot;
     ],
@@ -179,12 +179,12 @@
       </div>
     </section>
     <section class="tool">
-      <h2>🩺 <code>health_check</code> <span class="badge amber">graceful degradation — no AWS creds on this laptop; live values on AgentCore</span></h2>
+      <h2>🩺 <code>deployment_health</code> <span class="badge amber">graceful degradation — no AWS creds on this laptop; live values on AgentCore</span></h2>
       <p class="blurb">Stack status, failure events, and an inventory audit that every resource carries the four cornell:* tags.</p>
       <div class="cols">
         <div><h3>1 · The builder asks</h3><div class="ask">“Is my deployment healthy?”</div></div>
         <div><h3>2 · Claude calls the tool</h3><pre>{
-  &quot;tool&quot;: &quot;health_check&quot;,
+  &quot;tool&quot;: &quot;deployment_health&quot;,
   &quot;arguments&quot;: {
     &quot;deployment_name&quot;: &quot;hello-world&quot;
   }
@@ -202,12 +202,12 @@
       </div>
     </section>
     <section class="tool">
-      <h2>🔄 <code>restart_deployment</code> <span class="badge amber">graceful degradation — no AWS creds on this laptop; live values on AgentCore</span></h2>
+      <h2>🔄 <code>deployment_restart</code> <span class="badge amber">graceful degradation — no AWS creds on this laptop; live values on AgentCore</span></h2>
       <p class="blurb">Retries a failed pipeline stage or re-runs at the current version. Can never change WHAT is deployed — that takes a PR.</p>
       <div class="cols">
         <div><h3>1 · The builder asks</h3><div class="ask">“My deployment looks wedged — restart it.”</div></div>
         <div><h3>2 · Claude calls the tool</h3><pre>{
-  &quot;tool&quot;: &quot;restart_deployment&quot;,
+  &quot;tool&quot;: &quot;deployment_restart&quot;,
   &quot;arguments&quot;: {
     &quot;deployment_name&quot;: &quot;hello-world&quot;,
     &quot;dry_run&quot;: true
@@ -220,12 +220,40 @@
       </div>
     </section>
     <section class="tool">
-      <h2>📄 <code>export_spec</code> <span class="badge green">live output</span></h2>
+      <h2>🗑️ <code>deployment_delete</code> <span class="badge green">live output</span></h2>
+      <p class="blurb">Governed deletion, symmetric with creation: a deregistration PR removing the pipeline action — never an AWS delete call. The platform removes the stack after merge, per its DeletionPolicy.</p>
+      <div class="cols">
+        <div><h3>1 · The builder asks</h3><div class="ask">“I&#x27;m done with my hello-world deployment — take it down.”</div></div>
+        <div><h3>2 · Claude calls the tool</h3><pre>{
+  &quot;tool&quot;: &quot;deployment_delete&quot;,
+  &quot;arguments&quot;: {
+    &quot;deployment_name&quot;: &quot;hello-world&quot;,
+    &quot;dry_run&quot;: true
+  }
+}</pre></div>
+        <div><h3>3 · Captured output</h3><pre>{
+  &quot;dry_run&quot;: true,
+  &quot;plan&quot;: {
+    &quot;deployment&quot;: &quot;hello-world&quot;,
+    &quot;stack&quot;: &quot;aidlc-main-hello-world&quot;,
+    &quot;deregistration_pr&quot;: {
+      &quot;repo&quot;: &quot;cu-aaii/ai-dlc-workshop&quot;,
+      &quot;branch&quot;: &quot;undeploy/hello-world&quot;,
+      &quot;edits&quot;: &quot;pipeline/pipeline.yml \u2014 remove the HelloWorldCloudFormation BlueprintDeploy action&quot;
+    },
+    &quot;warning&quot;: &quot;The stack itself is deleted by the platform after the PR merges, per its DeletionPolicy \u2014 this tool only removes the deployment&#x27;s registration.&quot;,
+    &quot;governance&quot;: &quot;Tears down only when a human approves and merges the deregistration PR.&quot;
+  }
+}</pre></div>
+      </div>
+    </section>
+    <section class="tool">
+      <h2>📄 <code>spec_export</code> <span class="badge green">live output</span></h2>
       <p class="blurb">One deployment, six audiences: coder, narrative, security, transfer, user, offboarding.</p>
       <div class="cols">
         <div><h3>1 · The builder asks</h3><div class="ask">“Give me a plain-language writeup of what this system does.”</div></div>
         <div><h3>2 · Claude calls the tool</h3><pre>{
-  &quot;tool&quot;: &quot;export_spec&quot;,
+  &quot;tool&quot;: &quot;spec_export&quot;,
   &quot;arguments&quot;: {
     &quot;deployment_name&quot;: &quot;hello-world&quot;,
     &quot;blueprint&quot;: &quot;hello-world&quot;,

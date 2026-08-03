@@ -3,7 +3,7 @@
 Deliberately narrow: nothing here can create, update, or delete a blueprint stack -- the
 pipeline's CloudFormation actions do that on merge, and only on merge (D4). The one write
 this module performs is telling CodePipeline to run again at the version already on the
-tracked branch (restart_deployment, Q4-A), which cannot change what is deployed.
+tracked branch (deployment_restart, Q4-A), which cannot change what is deployed.
 
 Every function degrades to a {"error": ...} narrative instead of raising, so a demo
 without AWS credentials shows a clear message rather than a stack trace (NFR7).

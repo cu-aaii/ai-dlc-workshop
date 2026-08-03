@@ -102,7 +102,7 @@ Resources:
         - 'cornell-builder/invoke'
 
   # Execution role: read-mostly by design. The only writes are the two pipeline re-run
-  # calls (restart_deployment) and reading the GitHub token secret. Nothing here can
+  # calls (deployment_restart) and reading the GitHub token secret. Nothing here can
   # create, update, or delete a stack -- that stays with the pipeline's role, on merge.
 
   BuilderRuntimeRole:

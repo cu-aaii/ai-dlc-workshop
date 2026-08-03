@@ -14,7 +14,7 @@ dependencies = [
 builder-mcp = "builder_mcp.server:main"
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "hypothesis>=6.100"]
 
 [build-system]
 requires = ["hatchling"]

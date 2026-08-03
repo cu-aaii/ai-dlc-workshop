@@ -76,6 +76,38 @@ def insert_blueprint_action(pipeline_text: str, action_block: str, stack_name: s
     return pipeline_text[:point] + action_block + pipeline_text[point:]
 
 
+def remove_blueprint_action(pipeline_text: str, deployment_name: str) -> str:
+    """Remove a deployment's deploy action from the BlueprintDeploy stage.
+
+    The exact inverse of insert_blueprint_action: match from the action's
+    `- Name: '<PascalCase(deployment)>CloudFormation'` line to the start of the next
+    action at the same indent (or the `Outputs:` anchor for the last action), and cut
+    that span only, so untouched text stays byte-identical and the deregistration PR
+    diff is reviewable.
+    """
+    stage_match = re.search(r"- Name: 'BlueprintDeploy'", pipeline_text)
+    if not stage_match:
+        raise ValueError("pipeline.yml has no BlueprintDeploy stage")
+    action_name = f"{pascal_case(deployment_name)}CloudFormation"
+    start_match = re.search(
+        rf"\n([ ]+)- Name: '{re.escape(action_name)}'", pipeline_text[stage_match.end():]
+    )
+    if not start_match:
+        raise ValueError(
+            f"deployment {deployment_name!r} has no {action_name!r} action in the "
+            "BlueprintDeploy stage"
+        )
+    start = stage_match.end() + start_match.start()  # the newline before the action line
+    indent = start_match.group(1)
+    tail = pipeline_text[start + 1 :]  # skip past our own line before searching onward
+    next_action = re.search(rf"\n{re.escape(indent)}- Name: '", tail)
+    outputs = re.search(r"\nOutputs:\n", tail)
+    if not outputs:
+        raise ValueError("pipeline.yml has no Outputs: block to anchor the removal on")
+    end = start + 1 + min(m.start() for m in (next_action, outputs) if m)
+    return pipeline_text[:start] + pipeline_text[end:]
+
+
 def deployment_repo_files(
     blueprint_name: str,
     blueprint_version: str,
@@ -90,7 +122,7 @@ def deployment_repo_files(
 
     The repo holds the deployment's identity and parameters; the blueprint's code stays in
     the catalog and is referenced by pinned version. This is the builder's iteration home:
-    propose_change targets this repo, and its spec regenerates from deployment.yaml.
+    deployment_update targets this repo, and its spec regenerates from deployment.yaml.
     """
     deployment_manifest = {
         "apiVersion": "builder.cornell.edu/v1",
@@ -121,8 +153,8 @@ this deployment as version-bump pull requests.
 - Stack: `{stack_name}` (us-east-1)
 - Deploys on merge to the tracked branch of {workshop_repo_full} -- merge is the only
   trigger; there is no deploy button.
-- To change this deployment, open a pull request (your AI harness's `propose_change` tool
-  does this). Nobody -- human or agent -- has direct write access.
+- To change this deployment, open a pull request (your AI harness's `deployment_update`
+  tool does this). Nobody -- human or agent -- has direct write access.
 """
     return {
         "deployment.yaml": _yaml.safe_dump(deployment_manifest, sort_keys=False),

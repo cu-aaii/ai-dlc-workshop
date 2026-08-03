@@ -47,7 +47,7 @@ cd builder-mcp
 uv run python deploy/verify.py --stack aidlc-main-builder-mcp --region us-east-1
 ```
 
-OAuth token → MCP handshake → lists all seven tools → live `blueprint_search` call →
+OAuth token → MCP handshake → lists all eight tools → live `blueprint_search` call →
 `VERIFIED: the Cornell Builder is live on AgentCore`.
 
 Connect a Claude client: token from the stack's `TokenEndpoint` output

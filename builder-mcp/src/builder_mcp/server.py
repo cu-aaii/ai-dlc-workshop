@@ -1,11 +1,13 @@
 """Cornell Builder MCP server.
 
-Seven tools that turn plain-language intent into governed deployments through the
-existing deploy path. Design constraints this code is downstream of:
+Eight tools that turn plain-language intent into governed deployments through the
+existing deploy path. Tool names follow noun_verb (blueprint_search, deployment_create,
+spec_export, ...). Design constraints this code is downstream of:
 
-- Merge, and nothing else, deploys (D4). No tool here can deploy, merge, or push to a
-  tracked branch. create_deployment opens a PR; a human approves it; the pipeline does
-  the rest.
+- Merge, and nothing else, deploys (D4). No tool here can deploy, merge, push to a
+  tracked branch, or destroy. deployment_create opens a PR; a human approves it; the
+  pipeline does the rest. deployment_delete is symmetric: a deregistration PR, never an
+  AWS delete call.
 - The builder's client holds no credentials (D3). GitHub and AWS calls run server-side.
 - Stateless transport. Bedrock AgentCore runs streamable HTTP with no session affinity,
   which also rules out MCP elicitation (no back-channel). The confirm-before-doing UX is
@@ -23,7 +25,7 @@ try:  # SDK renamed FastMCP -> MCPServer; support both so the pinned version can
 except ImportError:  # pragma: no cover
     from mcp.server.fastmcp import FastMCP as _ServerClass
 
-from . import aws_ops, spec_export
+from . import aws_ops
 from .catalog import load_catalog, search, validate_inputs
 from .config import Settings
 from .github_ops import GitHubOps
@@ -31,19 +33,25 @@ from .patching import (
     DEPLOYMENT_NAME_PATTERN,
     deployment_repo_files,
     insert_blueprint_action,
+    pascal_case,
+    remove_blueprint_action,
     render_pipeline_action,
 )
+from .spec_export import render_spec
 
 settings = Settings.from_env()
 
 mcp = _ServerClass(
     "cornell-builder",
     instructions=(
-        "The Cornell Builder: search governed infrastructure blueprints, create "
-        "deployments of them, and operate what you deployed. Deployments go live only "
-        "when a human approves the pull request this server opens — there is no deploy "
-        "button, by design. Mutating tools default to dry_run=true; show the user the "
-        "plan and get their confirmation before re-calling with dry_run=false."
+        "The Cornell Builder: search governed infrastructure blueprints "
+        "(blueprint_search), create deployments of them (deployment_create), and "
+        "operate what you deployed (deployment_read, deployment_update, "
+        "deployment_health, deployment_restart, deployment_delete, spec_export). "
+        "Deployments go live — and are torn down — only when a human approves the pull "
+        "request this server opens; there is no deploy or delete button, by design. "
+        "Mutating tools default to dry_run=true; show the user the plan and get their "
+        "confirmation before re-calling with dry_run=false."
     ),
 )
 
@@ -74,7 +82,7 @@ def blueprint_search(query: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def create_deployment(
+def deployment_create(
     blueprint: str,
     deployment_name: str,
     owner_netid: str,
@@ -168,7 +176,7 @@ def create_deployment(
 
 
 @mcp.tool()
-def deployment_status(deployment_name: str) -> dict[str, Any]:
+def deployment_read(deployment_name: str) -> dict[str, Any]:
     """Full-chain status of a deployment: registration PR, pipeline stages, and
     CloudFormation stack state."""
     stack_name = settings.stack_name(deployment_name)
@@ -186,7 +194,7 @@ def deployment_status(deployment_name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def propose_change(
+def deployment_update(
     repo: str,
     title: str,
     description: str,
@@ -227,7 +235,7 @@ def propose_change(
 
 
 @mcp.tool()
-def health_check(deployment_name: str) -> dict[str, Any]:
+def deployment_health(deployment_name: str) -> dict[str, Any]:
     """Health of a running deployment: stack status, failure events if any, and an
     inventory audit that every resource carries the four required cornell:* tags."""
     stack_name = settings.stack_name(deployment_name)
@@ -241,7 +249,7 @@ def health_check(deployment_name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def restart_deployment(deployment_name: str, dry_run: bool = True) -> dict[str, Any]:
+def deployment_restart(deployment_name: str, dry_run: bool = True) -> dict[str, Any]:
     """Re-run the deployment at its current version: retries the failed pipeline stage if
     one exists, otherwise starts a fresh pipeline execution. Cannot change what is
     deployed — changes require a PR. Call with dry_run=true first."""
@@ -251,7 +259,71 @@ def restart_deployment(deployment_name: str, dry_run: bool = True) -> dict[str, 
 
 
 @mcp.tool()
-def export_spec(deployment_name: str, blueprint: str, audience: str = "coder") -> dict[str, Any]:
+def deployment_delete(deployment_name: str, dry_run: bool = True) -> dict[str, Any]:
+    """Delete a deployment the governed way: a deregistration pull request that removes
+    its action from the pipeline, symmetric with deployment_create's registration PR.
+
+    This tool never calls an AWS delete API. After a human approves and merges the PR,
+    the platform removes the stack itself according to its DeletionPolicy — merge is the
+    only trigger, for teardown exactly as for deploys. Always call with dry_run=true
+    first and show the user the plan for confirmation.
+    """
+    if not DEPLOYMENT_NAME_PATTERN.match(deployment_name):
+        return {
+            "error": f"deployment_name {deployment_name!r} must match "
+            f"{DEPLOYMENT_NAME_PATTERN.pattern}"
+        }
+    stack_name = settings.stack_name(deployment_name)
+    action_name = f"{pascal_case(deployment_name)}CloudFormation"
+    branch = f"undeploy/{deployment_name}"
+    plan = {
+        "deployment": deployment_name,
+        "stack": stack_name,
+        "deregistration_pr": {
+            "repo": settings.workshop_repo_full,
+            "branch": branch,
+            "edits": f"pipeline/pipeline.yml — remove the {action_name} BlueprintDeploy action",
+        },
+        "warning": (
+            "The stack itself is deleted by the platform after the PR merges, per its "
+            "DeletionPolicy — this tool only removes the deployment's registration."
+        ),
+        "governance": "Tears down only when a human approves and merges the deregistration PR.",
+    }
+    if dry_run:
+        return {"dry_run": True, "plan": plan}
+
+    github = GitHubOps(settings)
+    results: dict[str, Any] = {"plan": plan}
+    results["branch"] = github.create_branch(settings.workshop_repo_full, branch)
+    if github.can_write:
+        pipeline_text, sha = github.get_file(
+            settings.workshop_repo_full, "pipeline/pipeline.yml", ref=branch
+        )
+        try:
+            patched = remove_blueprint_action(pipeline_text, deployment_name)
+        except ValueError as error:
+            return {"error": str(error)}
+        github.put_file(
+            settings.workshop_repo_full, "pipeline/pipeline.yml", patched,
+            f"Deregister {stack_name}", branch, sha=sha,
+        )
+    results["pull_request"] = github.create_pull(
+        settings.workshop_repo_full,
+        branch,
+        f"Undeploy {stack_name}",
+        f"Deregistration PR opened by the Cornell Builder.\n\n"
+        f"- Deployment: `{deployment_name}`\n- Stack: `{stack_name}`\n"
+        f"- Removes: the `{action_name}` action from the BlueprintDeploy stage\n\n"
+        "Merging this PR is the teardown action: the platform deletes the stack per its "
+        "DeletionPolicy. If this was the blueprint's *last* deployment, its "
+        "`pipeline/stacks.yml` entry should be removed in a follow-up PR.",
+    )
+    return results
+
+
+@mcp.tool()
+def spec_export(deployment_name: str, blueprint: str, audience: str = "coder") -> dict[str, Any]:
     """Export a reviewable spec of a deployment for a given audience: coder (validation),
     narrative (business logic for non-coders), security (auth review), transfer (rebuild
     elsewhere), user (how to use as-is), or offboarding (leaving Cornell)."""
@@ -276,7 +348,7 @@ def export_spec(deployment_name: str, blueprint: str, audience: str = "coder") -
         "status": status,
     }
     try:
-        markdown = spec_export.render_spec(audience, spec)
+        markdown = render_spec(audience, spec)
     except ValueError as error:
         return {"error": str(error)}
     return {"audience": audience, "spec_markdown": markdown}

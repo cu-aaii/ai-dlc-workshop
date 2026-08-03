@@ -50,6 +50,10 @@ def mcp_url(runtime_arn: str, region: str) -> str:
     )
 
 
+EXPECTED_TOOL_COUNT = 8  # SPEC C3: blueprint_search, deployment_create/read/update/
+                         # health/restart/delete, spec_export
+
+
 async def exercise(url: str, token: str) -> None:
     headers = {"Authorization": f"Bearer {token}"}
     async with streamable_http_client(url, headers=headers) as (read, write):
@@ -58,6 +62,11 @@ async def exercise(url: str, token: str) -> None:
             tools = await session.list_tools()
             names = sorted(tool.name for tool in tools.tools)
             print(f"TOOLS ({len(names)}):", ", ".join(names))
+            if len(names) != EXPECTED_TOOL_COUNT:
+                raise SystemExit(
+                    f"expected {EXPECTED_TOOL_COUNT} tools (SPEC C3), got {len(names)} "
+                    "-- is the deployed image current?"
+                )
             result = await session.call_tool(
                 "blueprint_search", {"query": "prove the deploy path"}
             )

@@ -48,30 +48,33 @@ open accounting gap (tracked in BACKLOG.md, Cost).
 
 ## C2 — Deployment shell (`deployment.yaml` in each deployment repo)
 
-**Consumers**: builder-mcp (`create_deployment` writes it, `export_spec` reads it),
+**Consumers**: builder-mcp (`deployment_create` writes it, `spec_export` reads it),
 future upgrade-bot (P1). A deployment repo contains identity, not code (D1: reference,
 never copy): `metadata.name/owner`, `blueprint.name/version/source` (pinned), `stack`,
 `parameters`. Producer: `patching.deployment_repo_files()`.
 
-## C3 — Tool surface (seven tools)
+## C3 — Tool surface (eight tools)
 
 **Consumers**: every builder's Claude client, demo script. Names and semantics are the
-API; renaming a tool is a contract change.
+API; renaming a tool is a contract change. Names follow **noun_verb** (mob 2026-08-03,
+DECISION-19): the noun is the resource (`blueprint`, `deployment`, `spec`), the verb is
+the operation — future tools continue the pattern (`blueprint_create`, ...).
 
 | Tool | Reads/Writes | Contract highlights |
 |---|---|---|
 | `blueprint_search(query)` | read | returns *every* blueprint ranked (never filters), each with full C1 contract |
-| `create_deployment(blueprint, deployment_name, owner_netid, parameters?, dry_run=true)` | GitHub writes | dry_run first is mandatory UX; singleton blueprints force `deployment_name = blueprint name`; output = new repo + registration PR; **never deploys** |
-| `deployment_status(deployment_name)` | read | chain view: open PRs → pipeline stages → stack status |
-| `propose_change(repo, title, description, files, dry_run=true)` | GitHub writes | files map → branch → PR; never a direct push |
-| `health_check(deployment_name)` | read | stack status + failure events + cornell-tag inventory audit |
-| `restart_deployment(deployment_name, dry_run=true)` | 2 AWS writes | retry failed stage / re-run pipeline **at current version only** |
-| `export_spec(deployment_name, blueprint, audience)` | read | audiences: `coder, narrative, security, transfer, user, offboarding` |
+| `deployment_create(blueprint, deployment_name, owner_netid, parameters?, dry_run=true)` | GitHub writes | dry_run first is mandatory UX; singleton blueprints force `deployment_name = blueprint name`; output = new repo + registration PR; **never deploys** |
+| `deployment_read(deployment_name)` | read | chain view: open PRs → pipeline stages → stack status |
+| `deployment_update(repo, title, description, files, dry_run=true)` | GitHub writes | files map → branch → PR; never a direct push |
+| `deployment_health(deployment_name)` | read | stack status + failure events + cornell-tag inventory audit |
+| `deployment_restart(deployment_name, dry_run=true)` | 2 AWS writes | retry failed stage / re-run pipeline **at current version only** |
+| `deployment_delete(deployment_name, dry_run=true)` | GitHub writes | deregistration PR removing the pipeline action, symmetric with `deployment_create`; **never calls an AWS delete API** — the platform removes the stack after merge per its DeletionPolicy; a blueprint's last deployment also needs a stacks.yml-entry follow-up PR |
+| `spec_export(deployment_name, blueprint, audience)` | read | audiences: `coder, narrative, security, transfer, user, offboarding` |
 
 Error contract: tools return `{"error": ...}` narratives, never raise to the transport
 (NFR7). Governance invariants (hold for every tool, forever): no merge, no push to a
 tracked branch, no CloudFormation Create/Update/Delete — merge is the only deploy
-trigger (D4). An agreed future guardrail caps `restart_deployment` at 3 restarts
+trigger (D4). An agreed future guardrail caps `deployment_restart` at 3 restarts
 (tracked in BACKLOG.md, Operations & guardrails). An agreed future addition adds a
 vector-store retrieval tool to the surface (tracked in BACKLOG.md, Catalog & search).
 
@@ -113,7 +116,10 @@ registers by **adding one action to the BlueprintDeploy stage** of
 `patching.py`). Action name `<PascalCase(deployment)>CloudFormation`; stack name
 `<application>-<environment>-<name>` (role-scoping requires it). `stacks.yml` gets a new
 entry **only for a new template** — it rejects duplicate template paths, so re-deploying
-an existing blueprint touches only `pipeline.yml`.
+an existing blueprint touches only `pipeline.yml`. Deregistration (`deployment_delete`)
+is the mirror image: one PR removing that same action; removing a blueprint's **last**
+deployment also requires removing its `stacks.yml` entry, done as a follow-up PR (not
+automated).
 
 ## C7 — Configuration surface
 

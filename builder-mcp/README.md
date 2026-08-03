@@ -12,15 +12,18 @@ runbook). Inception artifacts live in [`aidlc-docs/`](aidlc-docs/aidlc-state.md)
 
 ## Tools
 
+Names follow noun_verb (SPEC C3): the resource first, then the operation.
+
 | Tool | What it does | Mutates? |
 |---|---|---|
 | `blueprint_search` | Rank the catalog against a plain-language ask; returns each blueprint's full contract | no |
-| `create_deployment` | New org repo (thin shell, pinned blueprint version) + registration PR adding the pipeline action | `dry_run` first |
-| `deployment_status` | Registration PR → pipeline stages → stack status, the whole chain | no |
-| `propose_change` | Turn file changes into a PR on a deployment repo — never a push | `dry_run` first |
-| `health_check` | Stack health + failure events + cornell:* tag inventory audit | no |
-| `restart_deployment` | Retry failed pipeline stage / re-run at current version. Never a version change | `dry_run` first |
-| `export_spec` | Render the deployment spec for an audience: coder, narrative, security, transfer, user, offboarding | no |
+| `deployment_create` | New org repo (thin shell, pinned blueprint version) + registration PR adding the pipeline action | `dry_run` first |
+| `deployment_read` | Registration PR → pipeline stages → stack status, the whole chain | no |
+| `deployment_update` | Turn file changes into a PR on a deployment repo — never a push | `dry_run` first |
+| `deployment_health` | Stack health + failure events + cornell:* tag inventory audit | no |
+| `deployment_restart` | Retry failed pipeline stage / re-run at current version. Never a version change | `dry_run` first |
+| `deployment_delete` | Deregistration PR removing the pipeline action — never an AWS delete call; the platform removes the stack after merge | `dry_run` first |
+| `spec_export` | Render the deployment spec for an audience: coder, narrative, security, transfer, user, offboarding | no |
 
 Confirm-before-doing UX: mutating tools default to `dry_run=true` and return the full plan.
 (MCP elicitation is unavailable on stateless transports, which AgentCore requires — the

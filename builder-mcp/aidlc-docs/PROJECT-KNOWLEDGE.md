@@ -29,8 +29,8 @@ merge.
 | DECISION-04 | Deploy trigger | Merge, and nothing else. No deploy tool exists | Proposal D4 |
 | DECISION-05 | Created repo location | New repo in cu-aaii org **plus** registration PR to the workshop repo (Q1-A) | Mob 2026-08-03 |
 | DECISION-06 | Transport | Streamable HTTP from day one; hosted on **Bedrock AgentCore Runtime** | Mob (Q2, then confirmed explicitly) |
-| DECISION-07 | Tool scope | All six mob tools + `export_spec`, same day | Mob (Q3-D) |
-| DECISION-08 | restart_deployment semantics | Re-run at current version (retry failed stage / fresh execution) — **assumed ⭐, Q4 never answered** | Flagged for mob confirmation |
+| DECISION-07 | Tool scope | All six mob tools + `spec_export`, same day | Mob (Q3-D) |
+| DECISION-08 | deployment_restart semantics | Re-run at current version (retry failed stage / fresh execution) — **assumed ⭐, Q4 never answered** | Flagged for mob confirmation |
 | DECISION-09 | Playwright | Dropped from scope | Mob (Q5) |
 | DECISION-10 | End-user auth | Blueprint parameters only; enforcement in the blueprint (tentative) | Mob (Q6-A "I think") |
 | DECISION-11 | Guardrails | Bind at gate + pipeline, not in the MCP; MCP validates inputs for UX only (tentative) | Mob (Q7-A "I think") |
@@ -41,6 +41,7 @@ merge.
 | DECISION-16 | Inbound auth (assumed ⭐) | Cognito client-credentials today, Entra ID at P1 — P1/P2 productionizing answers still pending | agentcore-productionizing-questions.md |
 | DECISION-17 | IaC debt | ~~deployed_by: manual~~ superseded by DECISION-18 | P5-⭐ |
 | DECISION-18 | Deploy method | **Pipeline-native**: root `Dockerfile` target `builder-mcp` → ARM CodeBuild project → Build stage exports digest → BlueprintDeploy action deploys `infra/builder-mcp.yml` with it. `deployed_by: pipeline`. Merge deploys, same as every blueprint | User review 2026-08-03: "when you push to github… a webhook will go deploy its contents"; pipeline/README.md "Adding a container image build" |
+| DECISION-19 | Tool naming + delete | **noun_verb naming standard** for the whole tool surface (`blueprint_search`, `deployment_create/read/update/restart/health/delete`, `spec_export`; future: `blueprint_create`, ...) and **`deployment_delete` commissioned**: governed deletion = deregistration PR removing the pipeline action, symmetric with creation — never an AWS delete API; the platform removes the stack after merge per its DeletionPolicy (SPEC C3 contract change) | Mob 2026-08-03 |
 
 Open items for the mob: Q4 (DECISION-08), P1/P2/P3/P6 in
 [construction/agentcore-productionizing-questions.md](construction/agentcore-productionizing-questions.md),
@@ -96,7 +97,7 @@ and the five decision asks at the end of
 
 ## 4. Current state (as of last push)
 
-- 22 tests green (`uv run pytest -q` in builder-mcp/), local HTTP smoke test green in
+- 28 tests green (`uv run pytest -q` in builder-mcp/), local HTTP smoke test green in
   both stateful and **stateless** modes, arm64 Docker image builds, template lints clean.
 - Deployed: **nothing**. Deployment is Marty's, from GitHub (DECISION-15).
 - Blocked on people: org write access for Tim; mob answers to open items above.
