@@ -56,6 +56,10 @@ them.
 ## Platform (P1+, from the product proposal)
 
 - GitHub App installation replaces the org PAT (SPEC C5, D3)
-- Entra ID (NetID) replaces Cognito client-credentials as inbound auth (SPEC C5)
+- ~~Entra ID replaces Cognito client-credentials as inbound auth (SPEC C5)~~ **done
+  2026-08-03** — pulled forward by platform-lead directive; see DECISION-20
+- Per-user (NetID) identity via the Entra **authorization-code flow** replacing the shared
+  client-credentials grant: client-credentials is app identity, not user identity, so
+  object-level authorization (security F2) still needs the user-identity step (SPEC C5)
 - AI Gateway registration of the AgentCore endpoint
 - Upgrade-bot: version-bump PRs to deployment repos when a blueprint releases (SPEC C2)

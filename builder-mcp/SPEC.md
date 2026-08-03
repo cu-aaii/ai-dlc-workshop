@@ -97,9 +97,16 @@ Dockerfile target breaks the pipeline action: both are one contract.
 
 **Consumers**: platform security review, Marty's deploy system.
 
-- **Inbound**: OAuth client-credentials (Cognito) per `infra/builder-mcp.yml`; JWT
-  authorizer on the runtime; scope `cornell-builder/invoke`. Entra ID (NetID identity) is
-  the P1 replacement. IAM SigV4 was rejected (puts AWS creds in builders' hands).
+- **Inbound**: OAuth client-credentials against **Microsoft Entra ID** (platform-lead
+  directive, 2026-08-03 — the P1 end-state pulled forward; Cognito is removed). JWT
+  authorizer on the runtime per `infra/builder-mcp.yml`: Entra discovery URL, allowed
+  client = the app registration's client id, allowed audience `api://<client-id>`; token
+  scope `api://<client-id>/.default`. The Entra client id/secret pair is what "the
+  builder's API key" maps to. The app registration is hand-created on the Azure side
+  (no Terraform stage exists); its tenant/client ids reach the stack via SSM parameters
+  (`/entra/builder-mcp/*`), the code-connections precedent. Note: client-credentials is
+  *app* identity — per-user NetID identity needs the authorization-code flow (BACKLOG,
+  Platform P1+). IAM SigV4 was rejected (puts AWS creds in builders' hands).
 - **Outbound GitHub**: server-side token only — env `GITHUB_TOKEN` (local) or Secrets
   Manager secret named by `BUILDER_MCP_GITHUB_TOKEN_SECRET` (deployed; default
   `aidlc/main/builder-mcp/github-token`). No token ⇒ writes degrade to dry-run plans.

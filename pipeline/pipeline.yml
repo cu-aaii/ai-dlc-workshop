@@ -520,7 +520,9 @@ Resources:
                   "Owner": "${Owner}",
                   "BlueprintVersion": "0.1.0",
                   "ContainerImageUri": "#{BuilderMcpContainer.CONTAINER_DIGEST}",
-                  "GitHubTokenSecretName": "${Application}/${Environment}/builder-mcp/github-token"
+                  "GitHubTokenSecretName": "${Application}/${Environment}/builder-mcp/github-token",
+                  "SsmEntraTenantId": "/entra/builder-mcp/tenant-id",
+                  "SsmEntraClientId": "/entra/builder-mcp/client-id"
                   }
 
 Outputs:

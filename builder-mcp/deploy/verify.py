@@ -1,7 +1,11 @@
-"""Verify the deployed AgentCore runtime end to end: OAuth token -> MCP handshake ->
-list tools -> live blueprint_search call. The demo-day proof, runnable any time.
+"""Verify the deployed AgentCore runtime end to end: Entra ID OAuth token -> MCP
+handshake -> list tools -> live blueprint_search call. The demo-day proof, runnable any
+time.
 
     uv run python deploy/verify.py --stack aidlc-main-builder-mcp --region us-east-1
+
+The Entra client secret comes from the BUILDER_MCP_ENTRA_CLIENT_SECRET env var, falling
+back to the Secrets Manager secret aidlc/main/builder-mcp/entra-client-secret.
 """
 
 from __future__ import annotations
@@ -9,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 import urllib.parse
 
@@ -18,6 +23,9 @@ import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
+ENTRA_SECRET_ENV = "BUILDER_MCP_ENTRA_CLIENT_SECRET"
+ENTRA_SECRET_NAME = "aidlc/main/builder-mcp/entra-client-secret"
+
 
 def stack_outputs(stack: str, region: str) -> dict[str, str]:
     cfn = boto3.client("cloudformation", region_name=region)
@@ -25,17 +33,34 @@ def stack_outputs(stack: str, region: str) -> dict[str, str]:
     return {o["OutputKey"]: o["OutputValue"] for o in outputs}
 
 
-def client_secret(user_pool_id: str, client_id: str, region: str) -> str:
-    idp = boto3.client("cognito-idp", region_name=region)
-    described = idp.describe_user_pool_client(UserPoolId=user_pool_id, ClientId=client_id)
-    return described["UserPoolClient"]["ClientSecret"]
+def entra_client_secret(region: str) -> str:
+    """Entra client secret: env var first, Secrets Manager fallback."""
+    from_env = os.environ.get(ENTRA_SECRET_ENV)
+    if from_env:
+        return from_env
+    try:
+        sm = boto3.client("secretsmanager", region_name=region)
+        return sm.get_secret_value(SecretId=ENTRA_SECRET_NAME)["SecretString"]
+    except Exception as exc:  # noqa: BLE001 - any failure gets the same friendly hint
+        raise SystemExit(
+            f"no Entra client secret: set {ENTRA_SECRET_ENV} or create the Secrets "
+            f"Manager secret {ENTRA_SECRET_NAME!r} (see deploy/HANDOFF.md pre-flight). "
+            f"Secrets Manager lookup failed with: {exc}"
+        ) from exc
 
 
 def bearer_token(token_endpoint: str, client_id: str, secret: str) -> str:
+    """Entra ID client-credentials grant. The scope is the app registration's own
+    Application ID URI + /.default, which yields a token whose aud the runtime's JWT
+    authorizer accepts (api://<client-id>)."""
     response = httpx.post(
         token_endpoint,
-        auth=(client_id, secret),
-        data={"grant_type": "client_credentials", "scope": "cornell-builder/invoke"},
+        data={
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": secret,
+            "scope": f"api://{client_id}/.default",
+        },
         timeout=15,
     )
     response.raise_for_status()
@@ -82,15 +107,15 @@ def main() -> int:
     args = parser.parse_args()
 
     outputs = stack_outputs(args.stack, args.region)
-    missing = {"TokenEndpoint", "ClientId", "UserPoolId", "RuntimeArn"} - set(outputs)
+    missing = {"EntraTokenEndpoint", "EntraClientId", "RuntimeArn"} - set(outputs)
     if missing:
         print(f"stack {args.stack} is missing outputs {sorted(missing)} -- "
-              "has phase 3 of deploy.ps1 run?", file=sys.stderr)
+              "has the pipeline deployed the Entra-authorizer template?", file=sys.stderr)
         return 1
 
-    secret = client_secret(outputs["UserPoolId"], outputs["ClientId"], args.region)
-    token = bearer_token(outputs["TokenEndpoint"], outputs["ClientId"], secret)
-    print("OAUTH OK: client-credentials token obtained")
+    secret = entra_client_secret(args.region)
+    token = bearer_token(outputs["EntraTokenEndpoint"], outputs["EntraClientId"], secret)
+    print("OAUTH OK: Entra client-credentials token obtained")
     url = mcp_url(outputs["RuntimeArn"], args.region)
     print("ENDPOINT:", url)
     asyncio.run(exercise(url, token))

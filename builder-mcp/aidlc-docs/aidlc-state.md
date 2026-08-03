@@ -30,8 +30,12 @@ share this repo and a root-level `aidlc-docs/` would collide across teams.
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Deploy — **handed off**: Marty deploys from his account/system using
-      deploy/HANDOFF.md; this machine's job ended at "verified locally + on GitHub"
-- [ ] Post-deploy verify — deploy/verify.py against the live runtime
+      deploy/HANDOFF.md; this machine's job ended at "verified locally + on GitHub".
+      Inbound auth is **Entra ID client-credentials** (productionizing question P2
+      answered 2026-08-03 by platform-lead directive; Cognito removed — DECISION-20).
+      New hand-created pre-flight: Azure app registration + two SSM parameters
+      (`/entra/builder-mcp/*`) + `entra-client-secret` in Secrets Manager (see HANDOFF)
+- [ ] Post-deploy verify — deploy/verify.py against the live runtime (Entra token flow)
 
 ## Intent Analysis
 - **Request type**: New project (component) inside existing repo

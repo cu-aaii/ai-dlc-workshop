@@ -38,13 +38,15 @@ merge.
 | DECISION-13 | Export | Spec exports for six audiences: coder, narrative, security, transfer, user, offboarding | Mob (Q9-A, purposes verbatim in audit.md) |
 | DECISION-14 | blueprint.yaml | **FROZEN cross-team standard** — no substantive changes | User directive 2026-08-03 |
 | DECISION-15 | Deployment executor | **Marty deploys from his account/system; this machine only verifies locally and pushes to GitHub** | User directive 2026-08-03 |
-| DECISION-16 | Inbound auth (assumed ⭐) | Cognito client-credentials today, Entra ID at P1 — P1/P2 productionizing answers still pending | agentcore-productionizing-questions.md |
+| DECISION-16 | Inbound auth (assumed ⭐) | ~~Cognito client-credentials today, Entra ID at P1~~ **superseded by DECISION-20** | agentcore-productionizing-questions.md |
 | DECISION-17 | IaC debt | ~~deployed_by: manual~~ superseded by DECISION-18 | P5-⭐ |
 | DECISION-18 | Deploy method | **Pipeline-native**: root `Dockerfile` target `builder-mcp` → ARM CodeBuild project → Build stage exports digest → BlueprintDeploy action deploys `infra/builder-mcp.yml` with it. `deployed_by: pipeline`. Merge deploys, same as every blueprint | User review 2026-08-03: "when you push to github… a webhook will go deploy its contents"; pipeline/README.md "Adding a container image build" |
 | DECISION-19 | Tool naming + delete | **noun_verb naming standard** for the whole tool surface (`blueprint_search`, `deployment_create/read/update/restart/health/delete`, `spec_export`; future: `blueprint_create`, ...) and **`deployment_delete` commissioned**: governed deletion = deregistration PR removing the pipeline action, symmetric with creation — never an AWS delete API; the platform removes the stack after merge per its DeletionPolicy (SPEC C3 contract change) | Mob 2026-08-03 |
+| DECISION-20 | Inbound auth (supersedes DECISION-16) | **Microsoft Entra ID client-credentials NOW**, Cognito removed from `infra/builder-mcp.yml`. App registration is an Azure resource, hand-created by Marty (no Terraform stage exists); tenant/client ids reach the stack via SSM parameters `/entra/builder-mcp/{tenant-id,client-id}` (the SsmCodeStarConnectionArn precedent); client secret in Secrets Manager `aidlc/main/builder-mcp/entra-client-secret`. Authorizer allows client id + audience `api://<client-id>`. Per-user NetID (auth-code flow) stays P1 (BACKLOG) | Marty via Tim, 2026-08-03 (Cornell is an M365 shop; Entra was the stated P1 end state, pulled forward) |
 
-Open items for the mob: Q4 (DECISION-08), P1/P2/P3/P6 in
-[construction/agentcore-productionizing-questions.md](construction/agentcore-productionizing-questions.md),
+Open items for the mob: Q4 (DECISION-08), P1/P3/P6 in
+[construction/agentcore-productionizing-questions.md](construction/agentcore-productionizing-questions.md)
+(P2 answered 2026-08-03 — Entra ID, DECISION-20),
 and the five decision asks at the end of
 [versioning-releases-and-recovery-options.md](inception/requirements/versioning-releases-and-recovery-options.md).
 
@@ -90,8 +92,16 @@ and the five decision asks at the end of
   A per-component Dockerfile in a subdirectory is invisible to it (that mistake was made
   and reverted on day 1). `.dockerignore` at root keeps the context small.
 - **GOTCHA-DEPLOY-ROLE**: `cloudformation-deploy-role` (bootstrap) predates AgentCore —
-  before first merge, confirm it may call `bedrock-agentcore:*` and `cognito-idp:*`,
-  else the BuilderMcp deploy action fails mid-pipeline.
+  before first merge, confirm it may call `bedrock-agentcore:*`, else the BuilderMcp
+  deploy action fails mid-pipeline. Since the Entra swap (DECISION-20) it no longer needs
+  `cognito-idp:*`, but it **does** need `ssm:GetParameters` on `/entra/builder-mcp/*` to
+  resolve the `AWS::SSM::Parameter::Value<String>` parameters at deploy time — and those
+  two parameters must exist first or the deploy fails at parameter resolution.
+- **GOTCHA-JWT-AUTHORIZER**: `CustomJWTAuthorizer` property names are `AllowedClients`
+  (plural) but `AllowedAudience` (singular) — both arrays of String; `AllowedScopes` also
+  exists. Source: AWS::BedrockAgentCore::Runtime CustomJWTAuthorizerConfiguration CFN
+  reference. For Entra client-credentials tokens the `aud` claim is the Application ID
+  URI (`api://<client-id>`), not the client id, so both fields are configured.
 - **GOTCHA-UV-LOCK**: a running `uv run builder-mcp` holds `builder-mcp.exe` and blocks
   the next `uv sync` (os error 32) — stop the server before re-running uv.
 

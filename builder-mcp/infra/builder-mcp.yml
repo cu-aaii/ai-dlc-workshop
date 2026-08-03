@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Cornell Builder MCP server on Bedrock AgentCore Runtime: Cognito client-credentials authorizer, execution role, and the runtime itself. Deployed by the pipeline BlueprintDeploy stage; its image is built by the Build stage from the root Dockerfile (target builder-mcp) and pinned by digest.'
+Description: 'Cornell Builder MCP server on Bedrock AgentCore Runtime: Microsoft Entra ID client-credentials authorizer, execution role, and the runtime itself. Deployed by the pipeline BlueprintDeploy stage; its image is built by the Build stage from the root Dockerfile (target builder-mcp) and pinned by digest.'
 
 Parameters:
 
@@ -43,6 +43,22 @@ Parameters:
     Description: 'Secrets Manager secret holding the server-side GitHub token. The secret itself is created by hand and never appears in this repo.'
     Type: 'String'
 
+  # The Entra app registration is an Azure resource, so it cannot live in this template
+  # and the repo's Terraform-for-Azure stage is deliberately not built. Marty creates the
+  # app registration by hand on the Microsoft side; its identifiers reach this stack via
+  # SSM parameters, following the SsmCodeStarConnectionArn precedent in
+  # pipeline/pipeline.yml (hand-created value, IaC-consumed by name).
+
+  SsmEntraTenantId:
+    Default: '/entra/builder-mcp/tenant-id'
+    Description: 'SSM parameter holding the Entra (Azure AD) tenant id of the hand-created app registration; same hand-created-then-referenced pattern as the code-connections ARN.'
+    Type: 'AWS::SSM::Parameter::Value<String>'
+
+  SsmEntraClientId:
+    Default: '/entra/builder-mcp/client-id'
+    Description: 'SSM parameter holding the application (client) id of the hand-created Entra app registration; same hand-created-then-referenced pattern as the code-connections ARN.'
+    Type: 'AWS::SSM::Parameter::Value<String>'
+
 Conditions:
 
   # The pipeline's Build stage always supplies an image digest, so the runtime deploys on
@@ -54,52 +70,10 @@ Resources:
   # Images live in the pipeline's shared ContainerRepository (pipeline/pipeline.yml);
   # this template deliberately owns no registry.
 
-  # Inbound auth (P2-B): Cognito client-credentials. The client id/secret pair plays the
-  # role of "the builder's API key" until the Entra ID authorizer lands in P1.
-
-  BuilderUserPool:
-    Type: 'AWS::Cognito::UserPool'
-    Properties:
-      UserPoolName: !Sub '${Application}-${Environment}-builder-mcp'
-      # AWS::Cognito::UserPool takes tags as a map, like AWS::SSM::Parameter.
-      UserPoolTags:
-        Application: !Ref 'Application'
-        Environment: !Ref 'Environment'
-        Resource: 'cognito-user-pool-builder-mcp'
-        'cornell:owner': !Ref 'Owner'
-        'cornell:blueprint': 'builder-mcp'
-        'cornell:blueprint-version': !Ref 'BlueprintVersion'
-        'cornell:deployment-id': !Sub '${Application}-${Environment}-builder-mcp'
-
-  BuilderUserPoolDomain:
-    Type: 'AWS::Cognito::UserPoolDomain'
-    Properties:
-      # Domain prefixes are global per region; the account id keeps it collision-free.
-      Domain: !Sub '${Application}-${Environment}-builder-${AWS::AccountId}'
-      UserPoolId: !Ref 'BuilderUserPool'
-
-  BuilderResourceServer:
-    Type: 'AWS::Cognito::UserPoolResourceServer'
-    Properties:
-      Identifier: 'cornell-builder'
-      Name: 'Cornell Builder MCP'
-      UserPoolId: !Ref 'BuilderUserPool'
-      Scopes:
-        - ScopeName: 'invoke'
-          ScopeDescription: 'Call the Cornell Builder MCP tools'
-
-  BuilderClient:
-    Type: 'AWS::Cognito::UserPoolClient'
-    DependsOn: 'BuilderResourceServer'
-    Properties:
-      ClientName: !Sub '${Application}-${Environment}-builder-mcp'
-      UserPoolId: !Ref 'BuilderUserPool'
-      GenerateSecret: true
-      AllowedOAuthFlowsUserPoolClient: true
-      AllowedOAuthFlows:
-        - 'client_credentials'
-      AllowedOAuthScopes:
-        - 'cornell-builder/invoke'
+  # Inbound auth (P2, per platform-lead directive 2026-08-03): Microsoft Entra ID
+  # client-credentials. The Entra client id/secret pair plays the role of "the builder's
+  # API key"; the app registration itself lives on the Azure side (see the SsmEntra*
+  # parameters above). This stack contributes only the JWT authorizer configuration.
 
   # Execution role: read-mostly by design. The only writes are the two pipeline re-run
   # calls (deployment_restart) and reading the GitHub token secret. Nothing here can
@@ -134,6 +108,8 @@ Resources:
                 Resource:
                   # The pipeline's shared container repository, named <app>-<env> there.
                   - !Sub 'arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/${Application}-${Environment}'
+              # ecr:GetAuthorizationToken is account-level by API design (the token grants
+              # registry login, not per-repo access) and cannot be resource-scoped.
               - Effect: 'Allow'
                 Action:
                   - 'ecr:GetAuthorizationToken'
@@ -162,6 +138,8 @@ Resources:
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${Application}-${Environment}'
                   - !Sub 'arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${Application}-${Environment}/*'
+              # tag:GetResources supports no resource scoping; the account-wide read IS
+              # the feature -- deployment_health's cornell-tag inventory audit needs it.
               - Effect: 'Allow'
                 Action:
                   - 'tag:GetResources'
@@ -206,9 +184,14 @@ Resources:
       ProtocolConfiguration: 'MCP'
       AuthorizerConfiguration:
         CustomJWTAuthorizer:
-          DiscoveryUrl: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${BuilderUserPool}/.well-known/openid-configuration'
+          DiscoveryUrl: !Sub 'https://login.microsoftonline.com/${SsmEntraTenantId}/v2.0/.well-known/openid-configuration'
           AllowedClients:
-            - !Ref 'BuilderClient'
+            - !Ref 'SsmEntraClientId'
+          # Entra client-credentials tokens carry the Application ID URI as their aud
+          # claim; api://<client-id> is the default form Marty configures on the app
+          # registration.
+          AllowedAudience:
+            - !Sub 'api://${SsmEntraClientId}'
       EnvironmentVariables:
         BUILDER_MCP_GITHUB_TOKEN_SECRET: !Ref 'GitHubTokenSecretName'
         BUILDER_MCP_GITHUB_ORG: 'cu-aaii'
@@ -227,17 +210,13 @@ Resources:
 
 Outputs:
 
-  TokenEndpoint:
-    Description: 'OAuth client-credentials token endpoint'
-    Value: !Sub 'https://${Application}-${Environment}-builder-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com/oauth2/token'
+  EntraTokenEndpoint:
+    Description: 'Entra ID OAuth client-credentials token endpoint'
+    Value: !Sub 'https://login.microsoftonline.com/${SsmEntraTenantId}/oauth2/v2.0/token'
 
-  ClientId:
-    Description: 'OAuth client id (secret via: aws cognito-idp describe-user-pool-client)'
-    Value: !Ref 'BuilderClient'
-
-  UserPoolId:
-    Description: 'Cognito user pool backing the JWT authorizer'
-    Value: !Ref 'BuilderUserPool'
+  EntraClientId:
+    Description: 'Entra application (client) id; the client secret lives in Secrets Manager, never in this stack'
+    Value: !Ref 'SsmEntraClientId'
 
   RuntimeArn:
     Condition: 'HasImage'
