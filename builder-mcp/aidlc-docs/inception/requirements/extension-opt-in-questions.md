@@ -23,7 +23,7 @@ B) No — skip all SECURITY rules (suitable for PoCs, prototypes, and experiment
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: A (mob, 2026-08-03 — security rules are blocking constraints; compliance pass over existing code commissioned)
 
 > **Context for the mob:** this is the one I would push hardest on. The server custodies a
 > GitHub credential and an AWS role, exposes a public tool surface, and its governance
@@ -56,7 +56,7 @@ B) No — skip the resiliency baseline (suitable for PoCs, prototypes, and exper
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: A (mob, 2026-08-03 — resiliency baseline applied as design-time guidance; assessment commissioned)
 
 > **Context for the mob:** partially pre-empted. The versioning/recovery options doc already
 > proposed a `state:` contract with stateless/derived/authoritative classes — that came from
@@ -77,7 +77,7 @@ C) No — skip all PBT rules (suitable for simple CRUD applications, UI-only pro
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: A (mob, 2026-08-03 — full PBT enforcement; property tests commissioned, starting with patching.py)
 
 > **Context for the mob:** B is a genuine fit here. `patching.py` does text surgery on
 > `pipeline.yml` — insert an action, never corrupt the file — which is exactly a

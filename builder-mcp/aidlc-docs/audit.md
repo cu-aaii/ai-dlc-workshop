@@ -70,3 +70,33 @@ You are not allowed to change the hello world blueprint.yaml substantively. Anot
 **Context**: Operations — deployment method aligned with repo's intended path
 
 ---
+
+## Gates 1 & 2 Answered + Parallel Construction Directive
+**Timestamp**: 2026-08-03T23:30:00Z
+**User Input**: "Gate 1.1 - A, Gate 1.2 - A, Gate 1.3 - A, Gate  2.4 - A, Gate 2.5 - B, Gate 2.6 - C. Meaning??? Gate 2.7  - B.  Gate 2.8 - B. Gate 2.9 - C.  ----> Use  a small army of subagents to intelligently accomplish these tasks in parallel. Use smart spec-driven development style of managing many agents at once, using the build in ui tools to help us and the orchestrator agent (you) to keep track of what is getting made, and what is done. Schedule heartbeats every 15 minutes to keep things moving and do status checks.    One important edit: lets standardize the naming structure --> deployment_create, deployment_read, deployment_update, deployment_delete, and blueprint_search (and someday, blueprint_create, etc.)   A top priority subagent also should be researching STRANDS framework for AI MCP API writing, which was suggested as an alternative to fastapi, well optimized for working with genaI. I'm not familiar with it, so you should look into it, and then eventually have a subagent create a parallel implementation."
+**AI Response**: All nine answers recorded in the gate files ([Answer]: tags filled) and the Extension Configuration table set to Yes/Yes/Yes. Gate 2.6 = C confirmed to mean "both formats" — Given/When/Then per story plus a demo-readiness checklist. Mob decision recorded: tool naming standardized to noun_verb (deployment_create/read/update/delete, blueprint_search; SPEC C3 contract change) — which also commissions the missing deployment_delete tool as a deregistration-PR flow. Six subagents launched in parallel: security compliance pass, resiliency assessment, property-based tests, User Stories Part 2, tool rename + deployment_delete, Strands framework research (top priority). Heartbeat scheduled every 15 minutes.
+**Context**: Gates 1–2 closed; extensions enforced; parallel Construction under orchestration
+
+---
+
+## Security Baseline Compliance Pass — Blocking Findings (extension requirement)
+**Timestamp**: 2026-08-04T00:20:00Z
+**Context**: Security Baseline enabled at Gate 1.1 (blocking constraints). Catch-up pass over
+existing code returned **NON-COMPLIANT: 10 blocking, 9 advisory, 1 compliant, 4 N/A** — full
+report in `construction/security-compliance.md`. Blocking findings (summary; per the
+extension, these block stage completion until resolved):
+1. F1 `propose_change`/`deployment_update` accepts arbitrary paths incl. `.github/workflows/*`,
+   which execute on push before review — bypasses the review gate (server.py:189-226)
+2. F2 shared credential, no object-level authorization; Cognito client secret retrievable via
+   DescribeUserPoolClient
+3. No logging anywhere in the package (SECURITY-03)
+4. Unvalidated owner_netid / files / lengths (SECURITY-05)
+5. Unhandled raise_for_status + orphaned-repo partial failures on execute paths (SECURITY-15)
+6. Raw exception text leaked to callers (SECURITY-09)
+7. No rate limiting / restart cap on a public endpoint (SECURITY-11)
+8. No alarms, dashboards, or log retention (SECURITY-14)
+9. Unpinned Docker base tag; no dependency scanning; no SBOM (SECURITY-10)
+10. Undocumented wildcard-resource IAM statements incl. tag:GetResources on '*' (SECURITY-06)
+**Status**: remediation task queued behind the in-flight tool-rename agent (same files).
+
+---

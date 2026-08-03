@@ -11,9 +11,10 @@ share this repo and a root-level `aidlc-docs/` would collide across teams.
 - [x] Reverse Engineering — SKIPPED (deploy path already documented in CLAUDE.md / pipeline/README.md)
 - [x] Requirements Analysis — answers received 2026-08-03; `requirements.md` generated
       (Q4 answered by assumption ⭐A — mob to confirm)
-- [ ] User Stories — **REOPENED 2026-08-03.** The earlier "skipped" was not a mob decision and
-      no assessment was run. Assessment now complete (execute — four High Priority indicators);
-      Part 1 plan awaiting answers → **GATE 2**
+- [x] User Stories — Part 1 answered by mob (journey-based, 4 personas, G/W/T + checklist,
+      whole-journey coverage, build demo-blocking gaps, PR-reviewer sign-off); Part 2
+      generated: 28 stories / 4 personas / 18 Served, 8 Partial, 2 Not served.
+      **Awaiting mob approval of generated stories** — approval opens GATE 3
 - [x] Workflow Planning — reconstructed retroactively in `inception/plans/execution-plan.md`
 - [ ] Application Design — **REOPENED.** Was never ratified; five modules were designed
       unilaterally → **GATE 3** (opens after Gate 2)
@@ -42,11 +43,12 @@ share this repo and a root-level `aidlc-docs/` would collide across teams.
 
 | Extension | Enabled | Decided At |
 |---|---|---|
-| Security Baseline | **UNANSWERED** | opt-in never presented — **GATE 1** |
-| Resiliency Baseline | **UNANSWERED** | opt-in never presented — **GATE 1** |
-| Property-Based Testing | **UNANSWERED** | opt-in never presented — **GATE 1** |
+| Security Baseline | **Yes** | Gate 1, mob 2026-08-03 (late — compliance pass over existing code commissioned) |
+| Resiliency Baseline | **Yes** | Gate 1, mob 2026-08-03 |
+| Property-Based Testing | **Yes (full)** | Gate 1, mob 2026-08-03 |
 
-Mandatory at workflow start; missed. See
+All three enforced from 2026-08-03 onward as blocking constraints. Answered late — the
+extensions were missed at workflow start; see
 `inception/requirements/extension-opt-in-questions.md`.
 
 ## Open gates
