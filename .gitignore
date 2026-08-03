@@ -14,10 +14,16 @@ venv/
 *.tfplan
 .terraform.lock.hcl
 
-# Claude Code personal settings. Never commit: this repo is public, and these files hold
-# machine-specific paths and per-user permission grants.
+# Claude Code personal settings and MCP server config. Never commit: this repo is public, and
+# these files hold machine-specific paths, per-user permission grants, and — in .mcp.json —
+# the access tokens MCP servers are configured with.
 .claude/settings.local.json
+.mcp.json
 
 .DS_Store
 .idea/
 *.swp
+
+# Alternate data streams Windows attaches to downloaded files, which surface as separate
+# junk files on the WSL side. One accompanies every file saved from a browser.
+*:Zone.Identifier
