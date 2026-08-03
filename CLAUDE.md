@@ -105,8 +105,18 @@ export.
 tools/check
 ```
 
-CI runs that same script. `uv` is its only prerequisite. Never document or run the bare
-`cfn-lint` / `python pipeline/validate_stacks.py` forms — they fail on a clean machine.
+CI runs that same script. `uv` is its only prerequisite — it fetches Python, pyyaml, and
+cfn-lint on demand at pinned versions, so there is nothing else to install and no venv to
+activate:
+
+```sh
+brew install uv                                    # macOS
+curl -LsSf https://astral.sh/uv/install.sh | sh    # Linux/macOS
+irm https://astral.sh/uv/install.ps1 | iex          # Windows (PowerShell)
+```
+
+Never document or run the bare `cfn-lint` / `python pipeline/validate_stacks.py` forms — they
+fail on a clean machine.
 
 ## Gotchas that have already cost time
 
