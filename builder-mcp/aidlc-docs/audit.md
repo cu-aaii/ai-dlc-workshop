@@ -36,3 +36,21 @@ Features
 **Context**: Inception phase, Requirements Analysis, Track A (Cornell Builder MCP)
 
 ---
+
+## Requirements Answers Received
+**Timestamp**: 2026-08-03T17:10:00Z
+**User Input**: "Pull the latest versions of this and the aws ai dlc repos from main, get branch updated, and then go. Q1 - A. Q2.    - HTTP MCP, start local, end deployed on AWS agent core mcp gateway by end of day verified and snazzy.  use my aws cli    Q3 - All six tools TODAY.   Q4.   Q5. -- skip. Q6.      A, I think  Q7. A, I think  Q8.  A - whatever is particualrly AWS friendly . I have python and fastapi on this computer. You can access git from my powershell with 'gitbash' command. Q9 --- a spec - A.     What purposes are the exports for..... 1. validation by another coder.  2. someone who needs a narrative of the business logic. 3. security/authentication check.  4. transfer - ie. help someone else build this elsewhere. 5. how to use this as-is. 6. lower priority: a faculty member is leaving cornell; how do they transfer this elsewhere? ...... We should probably have a system for releases, and release notes. ---- Work on this for now and we will ping you with more architectural thoughts. --- Give us options for versioning, releases, and backups and recovery.   Two example cases: a. if you build an mcp from a blueprint, all that code still lives somewehere. If you build a project knowledgebase from a blueprint and lose it, that data is gone for ever. oops."
+**AI Response**: Rebased builder onto origin/main 416891b (AI-DLC rules now vendored in-repo); aidlc-workflows already current. Recorded answers in requirement-verification-questions.md (Q4 unanswered — proceeding on recommendation A, flagged for confirmation). Generated requirements.md and versioning-releases-and-recovery-options.md. Proceeding to Construction: six-tool FastMCP server, local streamable HTTP now, Bedrock AgentCore deployment by end of day.
+**Context**: Requirements Analysis complete → Construction begins (compressed workflow per mob's "go" and one-day deadline)
+
+---
+
+## Architectural Direction + Constraint
+**Timestamp**: 2026-08-03T18:40:00Z
+**User Input**: "We will host builder mcp on aws agent core.  Ask us productionizing questions too where relevant
+
+You are not allowed to change the hello world blueprint.yaml substantively. Another team relies on it being a shared standard."
+**AI Response**: AgentCore hosting confirmed (was Q2's answer; now firm). blueprints/hello-world/blueprint.yaml frozen as the cross-team manifest standard — noted that the only post-circulation edit was a comment reword required to keep validate_stacks.py's text scan from misreading it (schema and values untouched). Generated construction/agentcore-productionizing-questions.md (P1–P6: topology, inbound auth, account/tags, GitHub credential, IaC debt, observability) and the AgentCore Dockerfile. AWS SSO token found expired; deploy blocked until `aws sso login`.
+**Context**: Construction — AgentCore deployment planning
+
+---

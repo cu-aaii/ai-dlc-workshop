@@ -33,7 +33,7 @@ bootstrapped for it.
   (the CodeConnections handshake alone needs a human in the console).
 - X) Other (describe below)
 
-[Answer]:
+[Answer]: A
 
 ## Q2 — What is the MCP server's own runtime shape this week?
 
@@ -49,7 +49,10 @@ The brief says "registered in the AI Gateway, on the builder's API key" — a re
 - C) **Both**: build stdio first, lift to HTTP Tuesday morning if rehearsal is green.
 - X) Other
 
-[Answer]:
+[Answer]: X — HTTP MCP from the start: run local streamable-HTTP now, end **deployed on
+AWS Bedrock AgentCore (MCP) by end of day**, verified and demo-ready ("snazzy"). Deploy
+using the presenter's AWS CLI credentials (workshop expedient; the IaC/pipeline path is
+the P1 target).
 
 ## Q3 — Which tools are in scope for Tuesday 2 PM?
 
@@ -65,7 +68,7 @@ The demo needs beats 2–4 (search → repo → PR → pipeline). Suggested spli
 - D) All six tools by Tuesday.
 - X) Other
 
-[Answer]:
+[Answer]: D — all six tools **today** (Monday), ahead of the Tuesday demo.
 
 ## Q4 — "Restart a deployment": what does it mean here?
 
@@ -78,7 +81,8 @@ Serverless stacks don't restart in the EC2 sense. Candidates:
 - C) Out of scope entirely; drop it from the tool list.
 - X) Other
 
-[Answer]:
+[Answer]: (not answered — proceeding on the ⭐ recommendation A: retry/redeploy at the
+current version. Mob to confirm or override.)
 
 ## Q5 — What did "Playwright MCP" mean in the starter notes?
 
@@ -88,7 +92,7 @@ Serverless stacks don't restart in the EC2 sense. Candidates:
 - C) A note-to-self about tooling for *building* the MCP, not a product requirement.
 - X) Other
 
-[Answer]:
+[Answer]: Skip — dropped from scope.
 
 ## Q6 — Authentication for the *future user* of the blueprint
 
@@ -104,7 +108,7 @@ course-chatbot, end-users authenticate via Teams/Entra (Track C's problem). What
 - C) Defer entirely; hardcode audience for the demo.
 - X) Other
 
-[Answer]:
+[Answer]: A (tentative — "I think"; revisit if Track C surfaces an identity-provisioning need)
 
 ## Q7 — Guardrails as an input: where do they bind?
 
@@ -116,7 +120,7 @@ course-chatbot, end-users authenticate via Teams/Entra (Track C's problem). What
   before ever creating a repo) — better UX, duplicate enforcement to maintain.
 - X) Other
 
-[Answer]:
+[Answer]: A (tentative — "I think")
 
 ## Q8 — Implementation stack for the server
 
@@ -126,7 +130,8 @@ course-chatbot, end-users authenticate via Teams/Entra (Track C's problem). What
   in the repo.
 - X) Other
 
-[Answer]:
+[Answer]: A — Python, whatever is particularly AWS-friendly. Python + FastAPI already on
+the build machine.
 
 ## Q9 — "Export" feature: export what?
 
@@ -136,4 +141,13 @@ course-chatbot, end-users authenticate via Teams/Entra (Track C's problem). What
 - C) Defer; not needed for Tuesday.
 - X) Other
 
-[Answer]:
+[Answer]: A — a spec. Exports serve six purposes, in priority order:
+1. Validation by another coder
+2. A narrative of the business logic for a non-coder
+3. Security / authentication review
+4. Transfer — help someone else build this elsewhere
+5. How to use the deployment as-is
+6. (lower priority) Off-boarding: a faculty member leaving Cornell takes their system elsewhere
+
+Follow-on requirement: a system for **releases and release notes**. See
+`versioning-releases-and-recovery-options.md` for the options analysis the mob requested.

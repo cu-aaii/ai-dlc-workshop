@@ -8,15 +8,21 @@ share this repo and a root-level `aidlc-docs/` would collide across teams.
 
 ### 🔵 INCEPTION PHASE
 - [x] Workspace Detection
-- [ ] Reverse Engineering — SKIPPED (deploy path already documented in CLAUDE.md / pipeline/README.md)
-- [ ] Requirements Analysis — IN PROGRESS (awaiting answers in `inception/requirements/requirement-verification-questions.md`)
-- [ ] User Stories
-- [ ] Workflow Planning
-- [ ] Application Design
-- [ ] Units Generation
+- [x] Reverse Engineering — SKIPPED (deploy path already documented in CLAUDE.md / pipeline/README.md)
+- [x] Requirements Analysis — answers received 2026-08-03; `requirements.md` generated
+      (Q4 answered by assumption ⭐A — mob to confirm)
+- [x] User Stories — SKIPPED by mob decision ("go", one-day deadline); requirements.md
+      carries the acceptance criteria
+- [x] Workflow Planning — compressed: single unit (builder-mcp server), Construction now,
+      AgentCore deployment by end of day
+- [x] Application Design — folded into requirements FR1–FR8 tool surface
+- [x] Units Generation — single unit: `builder-mcp`
 
 ### 🟢 CONSTRUCTION PHASE
-- [ ] Not started
+- [x] Code Generation — IN PROGRESS: FastMCP server, seven tools (six + export_spec),
+      streamable HTTP, stateless
+- [ ] Build and Test — pytest suite must pass; local HTTP verified
+- [ ] Deploy — Bedrock AgentCore, verified live tool call (end of day)
 
 ## Intent Analysis
 - **Request type**: New project (component) inside existing repo

@@ -1,0 +1,40 @@
+# Blueprint manifest -- the contract the Cornell Builder MCP reads (product proposal §04).
+# Not a CloudFormation template: it declares no template format version, so
+# validate_stacks.py and cfn-lint ignore it by design (that check is a text scan, so even
+# naming the marker key here would trip it). The CFN template it points at is registered
+# in pipeline/stacks.yml as usual.
+apiVersion: builder.cornell.edu/v1
+kind: Blueprint
+metadata:
+  name: hello-world
+  version: 0.1.0        # keep in lockstep with BlueprintVersion default in the template
+  maintainer: ai-sei@cornell.edu
+  maturity: supported
+summary: >-
+  Trivial tagged stack that proves the deploy path end to end: one S3 bucket and one SSM
+  deployment marker, carrying the full cornell:* tagging convention.
+matches:
+  - "prove the deploy path"
+  - "hello world"
+  - "smoke test a deployment"
+  - "check the pipeline works"
+inputs:
+  owner_netid:
+    type: string
+    required: true
+    description: NetID of the person who owns the deployment (cornell:owner)
+template: blueprints/hello-world/infra/hello-world.yml
+# CodePipeline-level parameters, resolved by the pipeline at deploy time (not by the MCP).
+pipeline_parameters:
+  SourceCommitId: "#{GitRepository.CommitId}"
+# The template hardcodes its bucket name and deployment id to <app>-<env>-hello-world, so
+# only one deployment of it can exist per app/environment. Real blueprints should take a
+# DeploymentName parameter instead.
+singleton: true
+cost:
+  baseline_monthly_usd: 0
+  scales_with: []
+data_classification: [public]
+# Backup/recovery contract (see versioning-releases-and-recovery-options.md):
+# stateless | derived | authoritative. Nothing here needs backing up.
+state: []
