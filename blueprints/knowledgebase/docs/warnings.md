@@ -82,12 +82,26 @@ fails in the shared account.
 This is the single largest risk in the template, and the other reason the verifier exists. Treat
 any edit inside that block as untested code.
 
-## Chunking is immutable
+## Chunking cannot be configured at all, and cfn-lint will not tell you
 
-`VectorIngestionConfiguration/ChunkingConfiguration` is create-only. Changing `ChunkingMaxTokens`
-or `ChunkingOverlapPercentage` **replaces the data source** and re-ingests everything from
-scratch. Same for `KnowledgeBaseConfiguration`'s type and embedding model, which replace the
-knowledge base and lose the index.
+`ChunkingConfiguration` is **forbidden** with a managed embedding model. The API rejects it:
+
+```
+A chunking strategy cannot be specified with a managed embedding model.
+Omit chunkingConfiguration to use the default.
+```
+
+The CloudFormation schema accepts the block, so `tools/check` passes clean and the failure lands at
+`CREATE_FAILED` — which on a first create means `ROLLBACK_COMPLETE` and a blocked pipeline for every
+track. An earlier version of this template shipped `ChunkingMaxTokens` and
+`ChunkingOverlapPercentage` parameters for exactly this reason: they lint, they read as reasonable,
+and they cannot work. This was caught by a by-hand `Environment=test` deploy, not by review.
+
+Tuning chunking means `EmbeddingModelType: CUSTOM`, which means naming an embedding model and
+provisioning a vector store.
+
+`KnowledgeBaseConfiguration`'s type and embedding model are still create-only — changing either
+replaces the knowledge base and loses the index.
 
 `DataDeletionPolicy: RETAIN` softens the data-source case — the already-indexed vectors survive a
 data-source replacement — but the new data source still ingests from zero.

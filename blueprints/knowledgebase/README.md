@@ -120,10 +120,11 @@ stack lifecycle to this one and block ever replacing the knowledge base.
 |---|---|---|
 | `IngestionBucketName` | `aidlc-kb-ingestion-890349359349` | Must exist, same account, **same region** (`us-east-1`), General Purpose. |
 | `SmokeQuery` | `What is the late homework policy?` | Must be answerable from the bucket's contents or **every deploy fails**. Change it in the same PR that changes the corpus. |
-| `ChunkingMaxTokens` | `300` | **Immutable** once the data source exists. |
-| `ChunkingOverlapPercentage` | `20` | **Immutable** once the data source exists. |
-
-Changing either chunking value replaces the data source and re-ingests from scratch.
+**Chunking is not tunable here, and that is the service's rule, not ours.** A managed embedding
+model owns chunking outright — supplying a `ChunkingConfiguration` alongside it fails at CREATE with
+*"A chunking strategy cannot be specified with a managed embedding model."* Tuning chunk size means
+`EmbeddingModelType: CUSTOM`, which means naming an embedding model and provisioning a vector store,
+which is the whole cost this blueprint exists to avoid.
 
 ## Not built
 

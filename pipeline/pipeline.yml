@@ -440,8 +440,6 @@ Resources:
                   "BlueprintVersion": "0.1.0",
                   "IngestionBucketName": "aidlc-kb-ingestion-890349359349",
                   "SmokeQuery": "What is the late homework policy?",
-                  "ChunkingMaxTokens": "300",
-                  "ChunkingOverlapPercentage": "20",
                   "SourceCommitId": "#{GitRepository.CommitId}"
                   }
 

@@ -53,19 +53,12 @@ Parameters:
     Description: 'Question the deploy-time verifier asks the knowledge base. The deploy fails if this returns no results, so it has to be answerable from the documents in IngestionBucketName.'
     Type: 'String'
 
-  ChunkingMaxTokens:
-    Default: 300
-    MinValue: 1
-    MaxValue: 8192
-    Description: 'Maximum tokens per chunk. Immutable once the data source exists - changing it replaces the data source and re-ingests everything.'
-    Type: 'Number'
-
-  ChunkingOverlapPercentage:
-    Default: 20
-    MinValue: 1
-    MaxValue: 99
-    Description: 'Overlap between adjacent chunks, as a percentage. Immutable once the data source exists.'
-    Type: 'Number'
+  # There are deliberately no chunking parameters. A managed embedding model owns chunking, and
+  # supplying a ChunkingConfiguration alongside it is rejected outright:
+  #   "A chunking strategy cannot be specified with a managed embedding model."
+  # An earlier version of this template exposed ChunkingMaxTokens and ChunkingOverlapPercentage,
+  # which lints clean and fails at CREATE. Tuning chunking requires EmbeddingModelType: CUSTOM,
+  # which means naming an embedding model and provisioning a vector store.
 
   # Pipeline Provided Parameters
 
@@ -214,12 +207,9 @@ Resources:
         # and an unstated default is one more thing that could differ from what we assume.
         ParsingConfiguration:
           ParsingStrategy: 'SMART_PARSING'
-        # Chunking is create-only: see the parameter descriptions.
-        ChunkingConfiguration:
-          ChunkingStrategy: 'FIXED_SIZE'
-          FixedSizeChunkingConfiguration:
-            MaxTokens: !Ref 'ChunkingMaxTokens'
-            OverlapPercentage: !Ref 'ChunkingOverlapPercentage'
+        # No ChunkingConfiguration. The managed embedding model owns chunking and rejects any
+        # attempt to specify it -- verified by a failed CREATE, not inferred. See the note in
+        # Parameters above.
 
   # CloudFormation creates a data source but never ingests through it, so CREATE_COMPLETE on
   # its own says nothing about whether the knowledge base holds a single document. Nobody on

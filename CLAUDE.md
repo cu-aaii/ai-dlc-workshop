@@ -139,6 +139,14 @@ CI runs that same script. `uv` is its only prerequisite. Never document or run t
   with no job logs, which reads like a broken workflow file. Install tools via `pip`/`run:`
   instead of reaching for a marketplace action.
 - **Nobody can approve their own PR**, so every change needs a second person.
+- **A managed-embedding Bedrock knowledge base rejects `ChunkingConfiguration`.** The
+  CloudFormation schema accepts the block, so cfn-lint passes it clean and the deploy fails at
+  `CREATE_FAILED` with *"A chunking strategy cannot be specified with a managed embedding model."*
+  This cost a rolled-back rehearsal stack; on `main` it would have blocked every track's merges.
+- **Verify a bucket's region before pointing anything at it.** `aidlc-kb-ingestion-bucket` is in
+  **`us-east-2`** despite everything in this repo deploying to `us-east-1`, and the Bedrock managed
+  S3 connector is same-region only. `aws s3api get-bucket-location` returning `null` means
+  `us-east-1`. Use `aidlc-kb-ingestion-890349359349` instead.
 - **`AWS::Bedrock::KnowledgeBase` takes `Tags` as a map**, like `AWS::SSM::Parameter` and unlike
   everything else here. Copying a `Key`/`Value` tag block onto it fails cfn-lint.
 - **`AWS::Bedrock::DataSource` has no `Tags` property at all**, so the four-tag rule is impossible

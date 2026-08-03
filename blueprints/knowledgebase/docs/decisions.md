@@ -183,6 +183,22 @@ carry a comment saying so.
 Worth revisiting repo-wide: a per-blueprint version passed from the pipeline wants a single source
 of truth, and right now there isn't one either way.
 
+## What a by-hand rehearsal proved, and what skipping it would have cost
+
+Before merging, this template was deployed by hand as `aidlc-test-knowledgebase` with
+`Environment=test`. It found one defect that `tools/check`, three documentation passes and a full
+review had all missed, and it converted two assumptions into facts:
+
+| Outcome | Detail |
+|---|---|
+| **Found** | `ChunkingConfiguration` alongside a managed embedding model fails at CREATE. It lints clean. On a first create this leaves `ROLLBACK_COMPLETE`, which blocks every track's merges until someone with account access deletes the stack. |
+| **Confirmed** | `AWS::Bedrock::KnowledgeBase` with `Type: MANAGED` reached `CREATE_COMPLETE`. The managed path does work from CloudFormation, which no AWS example demonstrates. |
+| **Confirmed** | `ConnectorParameters` written as a YAML mapping marshals correctly — the data source request reached server-side validation and failed on chunking rather than on a malformed connector body. |
+
+The general lesson, worth keeping because this repo's deploy model invites the mistake: here
+**cfn-lint clean is a statement about syntax, not about whether the service will accept the
+request.** Two of the three facts above are invisible to every check that runs in CI.
+
 ## Verified against the pinned linter, not recalled
 
 Everything below was read out of `cfn-lint>=1.53,<2`'s bundled `us-east-1` schemas:
@@ -202,7 +218,8 @@ One thing the live data source shows that no document states: the Bedrock API re
 mapping and relies on CloudFormation to marshal it, which is what the `Json` schema type implies.
 That is the last untested assumption in the template, and the reason to rehearse a deploy by hand
 before merging rather than after.
-| `KnowledgeBaseConfiguration` sub-objects and `VectorIngestionConfiguration/ChunkingConfiguration` are create-only | Changing type, embedding model or chunking replaces the resource. |
+| `KnowledgeBaseConfiguration` sub-objects and `VectorIngestionConfiguration/ChunkingConfiguration` are create-only | Changing type or embedding model replaces the resource. |
+| The schema **accepts** `ChunkingConfiguration` next to a managed embedding model | And the API **rejects** it. See below — the sharpest example of cfn-lint clean meaning less than usual here. |
 
 Confirmed from AWS documentation rather than memory:
 

@@ -60,8 +60,11 @@ Add a second source (web crawler is the cheap one) → another `AWS::Bedrock::Da
 ingestion job, so a second data source can be completely empty while the stack goes green. This
 is the step that gets forgotten.
 
-Change chunking → `ChunkingMaxTokens` and `ChunkingOverlapPercentage` are **create-only**.
-Changing either replaces the data source and re-ingests everything.
+Change chunking → **you can't, and adding a `ChunkingConfiguration` back will fail the deploy.** A
+managed embedding model owns chunking; the API rejects any chunking strategy specified alongside it.
+This is a tempting edit because the CloudFormation schema accepts the block and cfn-lint passes it
+clean. It fails at CREATE. Tuning chunking requires `EmbeddingModelType: CUSTOM` plus a vector
+store — a different blueprint, not a parameter.
 
 ## Editing the verifier
 
