@@ -30,11 +30,51 @@ pipeline/                   the deploy path
   codebuild.yml               container image buildspec (ready, not yet wired to a stage)
 blueprints/
   hello-world/                trivial tagged stack; proves the pipeline, and the demo floor
+aidlc-rules/                the AI-DLC methodology — vendored from awslabs, do not edit
 .github/workflows/
   pr-checks.yml               cfn-lint + registry check. No AWS calls, no credentials.
 ```
 
-Every directory has its own README explaining what goes in it.
+Every directory has its own README explaining what goes in it, except `aidlc-rules/` — see
+below for why that one is left exactly as upstream ships it.
+
+## The AI-DLC rules
+
+`aidlc-rules/` is a verbatim copy of that directory from
+[awslabs/aidlc-workflows](https://github.com/awslabs/aidlc-workflows) — the methodology this
+workshop teaches, as a set of prompt files an agent reads.
+
+| | |
+|---|---|
+| Upstream | `https://github.com/awslabs/aidlc-workflows` |
+| Commit | `114ef4d0ae6082e63ff0c7d14a910e3195163235` (2026-07-22) |
+| `aidlc-rules/VERSION` | `1.0.1` |
+| License | MIT No Attribution (MIT-0) — no attribution required, recorded here for re-sync |
+
+**Nothing in `aidlc-rules/` has been modified, and nothing should be.** Re-syncing a future
+release is then a delete-and-replace:
+
+```sh
+git clone --depth 1 https://github.com/awslabs/aidlc-workflows.git /tmp/aidlc-upstream
+rm -rf aidlc-rules && cp -R /tmp/aidlc-upstream/aidlc-rules .
+```
+
+Because that discards local edits without warning, anything this repo needs to say about the
+rules lives in `CLAUDE.md` or here instead.
+
+The rules are **invocation-gated**: `CLAUDE.md` tells an agent to read
+`aidlc-rules/aws-aidlc-rules/core-workflow.md` when someone invokes AI-DLC, not on every
+session. `core-workflow.md` claims priority over all other instructions, so loading it for
+ordinary pipeline work would override this repo's own constraints. `CLAUDE.md` also has to name
+`aidlc-rules/aws-aidlc-rule-details/` explicitly, because the four rule-detail paths
+`core-workflow.md` looks for natively (`.aidlc-rule-details/`, `.kiro/…`, and two others) do not
+exist here.
+
+Upstream's `.claude/settings.json` was **not** copied as-is. Its only real setting was a PR
+attribution line asserting that contributions are licensed under *awslabs'* project license,
+which would be false on this repo — and this repo has no `LICENSE` file to repoint it at. The
+file here carries just the settings schema; add an attribution statement deliberately if the
+workshop wants one.
 
 ## How a merge becomes a deployment
 
