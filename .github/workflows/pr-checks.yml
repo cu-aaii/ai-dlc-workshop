@@ -1,0 +1,49 @@
+name: 'pr-checks'
+
+# Fast, no AWS calls, no credentials -- these have to come back in well under a minute or
+# people stop waiting for them. Anything that needs an AWS API call belongs in the pipeline,
+# not here.
+
+on:
+  pull_request:
+    branches:
+      - 'main'
+  workflow_dispatch:
+
+permissions:
+  contents: 'read'
+
+concurrency:
+  group: 'pr-checks-${{ github.ref }}'
+  cancel-in-progress: true
+
+jobs:
+
+  validate:
+    name: 'validate'
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 10
+    steps:
+
+      # Only github-owned actions and hashicorp/setup-terraform are permitted by the
+      # cu-aaii org allowed-actions policy. A third-party action here fails the run before
+      # any job logs exist, which reads as a mysterious "startup_failure".
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
+
+      - name: 'Set up Python'
+        uses: 'actions/setup-python@v5'
+        with:
+          python-version: '3.12'
+
+      # cfn-lint pulls in pyyaml, which validate_stacks.py uses.
+      - name: 'Install cfn-lint'
+        run: 'pip install --disable-pip-version-check "cfn-lint>=1,<2"'
+
+      - name: 'Stack registry matches the filesystem'
+        run: 'python pipeline/validate_stacks.py'
+
+      # The -- is required: cfn-lint's --region takes nargs='+', so without it the template
+      # paths are parsed as region names and every template is silently skipped.
+      - name: 'cfn-lint every registered template'
+        run: 'cfn-lint --region us-east-1 -- $(python pipeline/validate_stacks.py --list)'

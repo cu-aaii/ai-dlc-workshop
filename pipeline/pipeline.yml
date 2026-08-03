@@ -1,0 +1,426 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AI-DLC workshop deploy path: GitHub -> CodePipeline -> CodeBuild -> CloudFormation. Adapted from the AI Innovation Lab reference pipeline; mechanics preserved, shape generalized to a blueprint monorepo.'
+
+Parameters:
+
+  # Metadata Parameters
+
+  Application:
+    Default: 'aidlc'
+    AllowedPattern: '[a-z0-9-]{1,10}'
+    Description: 'Name used for billing and other tracking/identification purposes'
+    Type: 'String'
+
+  Environment:
+    Default: 'main'
+    AllowedPattern: '[a-z0-9]{1,4}'
+    Description: 'Name of the deployment branch. The Source stage tracks the branch of this name, so Environment=main means "merges to main deploy".'
+    Type: 'String'
+
+  Owner:
+    Default: 'ai-sei'
+    AllowedPattern: '.{1,128}'
+    Description: 'Value for the required cornell:owner tag'
+    Type: 'String'
+
+  RemoteGitRepository:
+    Default: 'cu-aaii/ai-dlc-workshop'
+    Description: 'The Organization/Name of the remote git repository'
+    Type: 'String'
+
+  SsmCodeStarConnectionArn:
+    Default: '/code-connections/cu-aaii'
+    Description: 'The name of the SSM Parameter containing the ARN for the CodeStar Connection with permission to clone the remote git repository'
+    Type: 'AWS::SSM::Parameter::Value<String>'
+
+Resources:
+
+  # Container Build
+  #
+  # Defined and ready, but no stage runs it yet -- the hello-world blueprint is pure
+  # CloudFormation with no image to build. Wiring a blueprint's container build is a Build
+  # stage action plus a Dockerfile; see pipeline/README.md. Kept here rather than removed
+  # so the known-good mechanics are on hand when a blueprint needs a Lambda image.
+
+  ContainerBuildRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-container-build'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'codebuild.${AWS::URLSuffix}'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'container-build'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'codestar-connections:UseConnection'
+                Resource:
+                  - !Ref 'SsmCodeStarConnectionArn'
+              - Effect: 'Allow'
+                Action:
+                  - 'ecr:BatchGetImage'
+                  - 'ecr:BatchCheckLayerAvailability'
+                  - 'ecr:CompleteLayerUpload'
+                  - 'ecr:DescribeImages'
+                  - 'ecr:GetAuthorizationToken'
+                  - 'ecr:GetDownloadUrlForLayer'
+                  - 'ecr:InitiateLayerUpload'
+                  - 'ecr:PutImage'
+                  - 'ecr:UploadLayerPart'
+                Resource:
+                  - '*'
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Application}-${Environment}-container*'
+              - Effect: 'Allow'
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::deployment-artifacts-${AWS::AccountId}-*/*'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'iam-role-build-project-container-build'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  ContainerRepository:
+    Type: 'AWS::ECR::Repository'
+    Properties:
+      RepositoryName: !Sub '${Application}-${Environment}'
+      ImageTagMutability: 'MUTABLE'
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |-
+          {
+            "rules": [
+              {
+                "action": {
+                  "type": "expire"
+                },
+                "selection": {
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 1,
+                  "tagStatus": "untagged"
+                },
+                "description": "Expire Untagged Images",
+                "rulePriority": 1
+              },
+              {
+                "action": {
+                  "type": "expire"
+                },
+                "selection": {
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 3,
+                  "tagPrefixList": ["commit-"],
+                  "tagStatus": "tagged"
+                },
+                "description": "Expire >3 Commit Tags",
+                "rulePriority": 2
+              }
+            ]
+          }
+      RepositoryPolicyText:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              AWS:
+                - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Action:
+              - 'ecr:GetDownloadUrlForLayer'
+              - 'ecr:BatchGetImage'
+              - 'ecr:BatchCheckLayerAvailability'
+          - Effect: 'Allow'
+            Principal:
+              AWS: !GetAtt 'ContainerBuildRole.Arn'
+            Action:
+              - 'ecr:BatchGetImage'
+              - 'ecr:BatchCheckLayerAvailability'
+              - 'ecr:CompleteLayerUpload'
+              - 'ecr:DescribeImages'
+              - 'ecr:GetDownloadUrlForLayer'
+              - 'ecr:InitiateLayerUpload'
+              - 'ecr:PutImage'
+              - 'ecr:UploadLayerPart'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'ecr-repository'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  ContainerBuildLogs:
+    Type: 'AWS::Logs::LogGroup'
+    DeletionPolicy: 'Delete'
+    UpdateReplacePolicy: 'Delete'
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${Application}-${Environment}-container'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'log-group-build-project-container'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  ContainerBuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-container'
+      Description: !Sub 'Builds container images for the ${Application}-${Environment} pipeline'
+      ServiceRole: !GetAtt 'ContainerBuildRole.Arn'
+      TimeoutInMinutes: 60
+      Visibility: 'PRIVATE'
+      Artifacts:
+        Type: 'CODEPIPELINE'
+      Cache:
+        Type: 'NO_CACHE'
+      Environment:
+        ComputeType: 'BUILD_GENERAL1_SMALL'
+        Image: 'aws/codebuild/amazonlinux2-x86_64-standard:4.0'
+        ImagePullCredentialsType: 'CODEBUILD'
+        PrivilegedMode: true
+        Type: 'LINUX_CONTAINER'
+        EnvironmentVariables:
+          - Name: 'APPLICATION'
+            Value: !Ref 'Application'
+          - Name: 'ENVIRONMENT'
+            Value: !Ref 'Environment'
+          - Name: 'CONTAINER_REPOSITORY_URI'
+            Value: !Sub '${ContainerRepository.RepositoryUri}'
+          - Name: 'DOCKER_CLI_EXPERIMENTAL'
+            Value: 'enabled'
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref 'ContainerBuildLogs'
+          Status: 'ENABLED'
+      Source:
+        BuildSpec: 'pipeline/codebuild.yml'
+        GitCloneDepth: 0
+        Type: 'CODEPIPELINE'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'codebuild-project-container'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  # Deploy Pipeline
+
+  BuildPipelineRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-${AWS::Region}-codepipeline'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'codepipeline.${AWS::URLSuffix}'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'codepipeline'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'cloudformation:CreateStack'
+                  - 'cloudformation:DeleteStack'
+                  - 'cloudformation:DescribeStacks'
+                  - 'cloudformation:UpdateStack'
+                  - 'cloudformation:CreateChangeSet'
+                  - 'cloudformation:DeleteChangeSet'
+                  - 'cloudformation:DescribeChangeSet'
+                  - 'cloudformation:ExecuteChangeSet'
+                  - 'cloudformation:SetStackPolicy'
+                  - 'cloudformation:ValidateTemplate'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:cloudformation:*:${AWS::AccountId}:stack/${Application}-${Environment}*'
+              - Effect: 'Allow'
+                Action:
+                  - 'codebuild:BatchGetBuildBatches'
+                  - 'codebuild:BatchGetBuilds'
+                  - 'codebuild:StartBuild'
+                  - 'codebuild:StartBuildBatch'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:codebuild:*:${AWS::AccountId}:project/${Application}-${Environment}*'
+              - Effect: 'Allow'
+                Action:
+                  - 'codestar-connections:UseConnection'
+                Resource:
+                  - !Ref 'SsmCodeStarConnectionArn'
+              - Effect: 'Allow'
+                Action:
+                  - 'iam:PassRole'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+              - Effect: 'Allow'
+                Action:
+                  - 's3:GetObject*'
+                  - 's3:GetReplicationConfiguration'
+                  - 's3:ListBucket'
+                  - 's3:PutObject*'
+                  - 's3:Replicate*'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::deployment-artifacts-${AWS::AccountId}-*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::deployment-artifacts-${AWS::AccountId}-*/*'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'iam-role-build-pipeline'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  BuildPipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      Name: !Sub '${Application}-${Environment}'
+      RestartExecutionOnUpdate: true
+      RoleArn: !GetAtt 'BuildPipelineRole.Arn'
+      ArtifactStores:
+        - Region: !Ref 'AWS::Region'
+          ArtifactStore:
+            Location: !Sub 'deployment-artifacts-${AWS::AccountId}-${AWS::Region}'
+            Type: 'S3'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'pipeline-build'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+      Stages:
+
+        # Tracks the branch named by Environment. DetectChanges registers a webhook, so a
+        # merge to that branch starts the pipeline within seconds. Branch protection on the
+        # GitHub side is what makes "a merge" mean "an approved PR".
+        - Name: 'Source'
+          Actions:
+            - Name: 'GitRepository'
+              Namespace: 'GitRepository'
+              OutputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Source'
+                Owner: 'AWS'
+                Provider: 'CodeStarSourceConnection'
+                Version: '1'
+              Configuration:
+                ConnectionArn: !Ref 'SsmCodeStarConnectionArn'
+                BranchName: !Ref 'Environment'
+                FullRepositoryId: !Ref 'RemoteGitRepository'
+                OutputArtifactFormat: 'CODE_ZIP'
+                DetectChanges: 'true'
+
+        # The pipeline deploys itself first, so a PR that edits pipeline.yml takes effect
+        # on merge without anyone touching the console. RestartExecutionOnUpdate then
+        # reruns the pipeline from the top under the new definition.
+        - Name: 'PipelineDeploy'
+          Actions:
+            - Name: 'PipelineCloudFormation'
+              Namespace: 'PipelineCloudFormation'
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-pipeline'
+                TemplatePath: 'GitRepositoryArtifact::pipeline/pipeline.yml'
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "RemoteGitRepository": "${RemoteGitRepository}"
+                  }
+
+        # One action per blueprint stack. Register the template in pipeline/stacks.yml and
+        # add an action here; the stack name convention is <application>-<environment>-<name>
+        # so it stays inside the BuildPipelineRole's CloudFormation resource scope.
+        - Name: 'BlueprintDeploy'
+          Actions:
+            - Name: 'HelloWorldCloudFormation'
+              Namespace: 'HelloWorldCloudFormation'
+              RunOrder: 1
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-hello-world'
+                TemplatePath: 'GitRepositoryArtifact::blueprints/hello-world/infra/hello-world.yml'
+                # Every parameter the blueprint needs is passed explicitly rather than left
+                # to template defaults, so a stack deploys the same way by hand or by pipeline.
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "SourceCommitId": "#{GitRepository.CommitId}"
+                  }
+
+Outputs:
+
+  PipelineName:
+    Description: 'CodePipeline that deploys this repository'
+    Value: !Ref 'BuildPipeline'
+
+  PipelineConsoleUrl:
+    Description: 'Watch a run here'
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${BuildPipeline}/view?region=${AWS::Region}'
+
+  TrackedBranch:
+    Description: 'Branch whose merges trigger a deploy'
+    Value: !Ref 'Environment'
+
+  ContainerRepositoryUri:
+    Description: 'ECR repository for blueprint container images (no stage builds into it yet)'
+    Value: !GetAtt 'ContainerRepository.RepositoryUri'

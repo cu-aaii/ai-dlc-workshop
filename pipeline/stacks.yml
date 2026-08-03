@@ -1,0 +1,31 @@
+# Registry of every CloudFormation template in this repository.
+#
+# Stack names follow <application>-<environment>-<name>, e.g. aidlc-main-hello-world. That
+# convention is not cosmetic: BuildPipelineRole in pipeline/pipeline.yml scopes its
+# CloudFormation permissions to arn:...:stack/${Application}-${Environment}*, so a stack
+# named outside the convention cannot be deployed by the pipeline.
+#
+# deployed_by:
+#   pipeline  deployed by pipeline/pipeline.yml on merge to the tracked branch
+#   manual    chicken-and-egg bootstrap, run by hand once per account
+#
+# pipeline/validate_stacks.py enforces that this file and the filesystem agree in both
+# directions, and PR checks cfn-lint everything listed here. Registering a new template is
+# therefore what makes it linted -- add the entry in the same PR as the template.
+
+templates:
+
+  - name: 'account-bootstrap'
+    template: 'bootstrap/account-bootstrap.yml'
+    deployed_by: 'manual'
+    description: 'Deploy role, artifact bucket and GitHub connection. Must exist before the pipeline can deploy anything.'
+
+  - name: 'pipeline'
+    template: 'pipeline/pipeline.yml'
+    deployed_by: 'pipeline'
+    description: 'The deploy path itself. Deployed by hand once, then self-updates in the PipelineDeploy stage.'
+
+  - name: 'hello-world'
+    template: 'blueprints/hello-world/infra/hello-world.yml'
+    deployed_by: 'pipeline'
+    description: 'Trivial tagged stack that proves the deploy path end to end.'

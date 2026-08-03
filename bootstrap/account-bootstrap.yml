@@ -1,0 +1,158 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AI-DLC workshop account baseline: the CloudFormation deploy role, the CodePipeline artifact bucket, and the GitHub connection the pipeline sources from. Deployed by hand once per account; everything else deploys through the pipeline.'
+
+Parameters:
+
+  # Metadata Parameters
+
+  Application:
+    Default: 'aidlc'
+    AllowedPattern: '[a-z0-9-]{1,10}'
+    Description: 'Name used for billing and other tracking/identification purposes'
+    Type: 'String'
+
+  Owner:
+    Default: 'ai-sei'
+    AllowedPattern: '.{1,128}'
+    Description: 'Value for the required cornell:owner tag'
+    Type: 'String'
+
+  # Git Connection Parameters
+
+  GitConnectionName:
+    Default: 'cu-aaii'
+    AllowedPattern: '[a-zA-Z0-9._-]{1,32}'
+    Description: 'Name for the CodeConnections connection to the GitHub organization. Also the suffix of the SSM parameter the pipeline reads (/code-connections/<name>).'
+    Type: 'String'
+
+Resources:
+
+  # CloudFormation Deploy Role
+  #
+  # CodePipeline passes this role to CloudFormation for every stack it deploys, so it has
+  # to be able to create whatever the blueprints declare. Name and permissions match the
+  # reference account exactly, because pipeline.yml refers to the role by name.
+  #
+  # This role is why the bootstrap cannot deploy itself through the pipeline: the pipeline
+  # needs the role to exist before it can deploy anything, including this template.
+
+  CloudFormationDeployRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: 'cloudformation-deploy-role'
+      Description: 'Allows CloudFormation to create and manage AWS stacks and resources on your behalf.'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'cloudformation.${AWS::URLSuffix}'
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Resource'
+          Value: 'iam-role-cloudformation-deploy'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  # Pipeline Artifact Bucket
+  #
+  # CodePipeline requires versioning on an S3 artifact store. The bucket name is derived
+  # from account and region because pipeline.yml builds the same name with !Sub.
+
+  DeploymentArtifactsBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub 'deployment-artifacts-${AWS::AccountId}-${AWS::Region}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: 'BucketOwnerEnforced'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: 'Enabled'
+      LifecycleConfiguration:
+        Rules:
+          - Id: 'expire-old-artifacts'
+            Status: 'Enabled'
+            ExpirationInDays: 30
+            NoncurrentVersionExpirationInDays: 7
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Resource'
+          Value: 's3-bucket-deployment-artifacts'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  # GitHub Connection
+  #
+  # Created PENDING. A human has to finish the OAuth handshake in the console before the
+  # pipeline can clone -- see the CompleteTheHandshakeHere output. Connections are
+  # per-account and cannot be shared across accounts.
+
+  GitConnection:
+    Type: 'AWS::CodeStarConnections::Connection'
+    Properties:
+      ConnectionName: !Ref 'GitConnectionName'
+      ProviderType: 'GitHub'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Resource'
+          Value: 'codeconnections-connection-github'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  # pipeline.yml reads the connection ARN through this parameter rather than taking it
+  # literally, so the pipeline template carries no account-specific values.
+
+  GitConnectionArnParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub '/code-connections/${GitConnectionName}'
+      Description: 'ARN of the CodeConnections connection the workshop pipeline sources from'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !Ref 'GitConnection'
+      # AWS::SSM::Parameter takes tags as a map, not a list of Key/Value pairs.
+      Tags:
+        Application: !Ref 'Application'
+        Resource: 'ssm-parameter-code-connection-arn'
+        'cornell:owner': !Ref 'Owner'
+
+Outputs:
+
+  CloudFormationDeployRoleArn:
+    Description: 'Role CodePipeline passes to CloudFormation for every stack deploy'
+    Value: !GetAtt 'CloudFormationDeployRole.Arn'
+
+  DeploymentArtifactsBucketName:
+    Description: 'CodePipeline artifact store'
+    Value: !Ref 'DeploymentArtifactsBucket'
+
+  GitConnectionArn:
+    Description: 'CodeConnections connection ARN (PENDING until the handshake is completed)'
+    Value: !Ref 'GitConnection'
+
+  GitConnectionArnParameterName:
+    Description: 'Pass this as SsmCodeStarConnectionArn when deploying pipeline/pipeline.yml'
+    Value: !Ref 'GitConnectionArnParameter'
+
+  CompleteTheHandshakeHere:
+    Description: 'Open this, select the connection, and choose Update pending connection to authorize the GitHub organization. The pipeline cannot clone until the connection reads AVAILABLE.'
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/codesuite/settings/connections?region=${AWS::Region}'
