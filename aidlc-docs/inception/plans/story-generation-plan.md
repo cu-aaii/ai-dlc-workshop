@@ -45,7 +45,7 @@ D) **One persona** — a single "Dashboard viewer"; the distinctions don't matte
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: D
 
 ### Question 2 — Story granularity
 How large should each story be?
@@ -64,7 +64,7 @@ C) **Mixed** — thin vertical slices for user-facing behaviour, plus explicit s
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ### Question 3 — Story format
 What format should each story use?
@@ -81,7 +81,7 @@ C) **Job story**: "When `<situation>`, I want to `<motivation>`, so I can `<expe
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ### Question 4 — Breakdown / organization approach
 How should `stories.md` be organized? (Trade-offs noted; hybrids are fine.)
@@ -107,7 +107,7 @@ E) **Hybrid: Epic-Based outer structure, User Journey-Based within each epic** �
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ### Question 5 — Acceptance criteria format and depth
 Acceptance criteria here do double duty: they're the definition of done, and they're the source
@@ -125,7 +125,7 @@ C) **Plain checklist bullets** — lighter weight, less ceremony, but a looser f
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ### Question 6 — Scope boundary for the deferred cost work
 `requirements.md` FR-8 makes cost figures a stretch goal with the data source deliberately
@@ -144,7 +144,7 @@ C) **Write full cost stories now**, choosing a data source as part of story-writ
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:B
 
 ### Question 7 — Non-functional work in stories
 The three opted-in extensions produce a lot of blocking non-functional requirements (SECURITY-01..15,
@@ -162,7 +162,7 @@ C) **Both** — cross-cutting concerns get dedicated stories; concerns specific 
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ### Question 8 — Prioritization signal
 Should stories carry a priority/sequencing marker? (Note: `user-stories.md` Step 11 says to avoid
@@ -180,7 +180,7 @@ C) **A simple dependency note per story** ("depends on: story-3") without any pr
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ---
 

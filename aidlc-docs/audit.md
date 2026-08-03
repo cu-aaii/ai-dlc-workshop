@@ -105,3 +105,19 @@
 **Context**: User Stories, Part 1 Steps 1-8 — assessment documented, plan created with embedded questions, gate open awaiting user answers.
 
 ---
+
+## User Stories (Part 1 — Planning, Round 1 answers)
+**Timestamp**: 2026-08-03T00:00:00Z
+**User Input**: "questions answered" — filled `aidlc-docs/inception/plans/story-generation-plan.md`:
+- Q1 (personas): "D" — one persona, a single "Dashboard viewer"; distinctions don't matter for v1 since everyone inside the allowlist sees the same thing
+- Q2 (granularity): "A" — thin vertical slices, each delivering one user-visible capability end to end
+- Q3 (format): "A" — classic "As a / I want / so that", without explicit FR/NFR traceability
+- Q4 (organization): "A" — User Journey-Based
+- Q5 (acceptance criteria): "A" — Given/When/Then, 3-6 per story, no Properties sub-list
+- Q6 (cost stretch boundary): "B" — v1 inventory stories plus clearly-marked placeholder cost stories with TBD criteria
+- Q7 (non-functional work): "A" — as acceptance criteria on functional stories only; nothing is a story on its own
+- Q8 (prioritization): "A" — no markers; sequencing decided in Workflow Planning
+**AI Response**: "Performed the mandatory Step 9 answer analysis. No answer is vague, undefined, option-merging, or self-contradictory — all eight are clean single selections. However, Q2=A + Q4=A + Q7=A interact to leave required work with no home: taken together they require every piece of work to attach to a user-visible slice inside a user journey, and six blocking/mandatory items from the approved requirements.md have no such slice — SECURITY-10 (supply chain: pinned deps, digest-pinned base image, vuln scanning, SBOM), PBT-01..10 (the property-based test suite itself), SECURITY-03 (access logging), SECURITY-04 (application logging), RESILIENCY-07 (collector-failure and snapshot-staleness alarms), RESILIENCY-05 (operator monitoring dashboard). Q1=D compounds this by retiring the operator personas those items would otherwise have attached to. Separately, FR-6 (repurpose the stray hello-world.yml) and FR-7 (platform wiring: stacks.yml registration + matching pipeline.yml action + explicit parameters + stack-naming conformance + tools/check) are functional requirements that a dashboard viewer also never sees — and FR-7 is specifically the item whose omission fails silently. Per Step 10 these are 'missing generation details' requiring follow-up rather than a silent choice, so created `story-generation-plan-clarification.md` with Question 9 (where cross-cutting non-functional work goes: force-fit as criteria / allow labelled enabler stories / non-story Global Definition of Done appendix) and Question 10 (where platform plumbing goes: criterion on every slice / own story / Global DoD / out of story scope with traceability gap reported). Also recorded two judgment calls made without asking: (a) Q6=B's placeholder cost stories cannot satisfy INVEST 'Testable' with TBD criteria, so the Deferred/Stretch section will be explicitly exempted from the B5 INVEST check while v1 stories are held to it in full; (b) Q5=A leaves no PBT gap, because PBT-01 identifies properties at Functional Design, a later stage, and requirements.md §4.2 already carries the candidate property list. Amended `user-stories-assessment.md` rather than leaving a stale justification: struck the 'Multi-Persona Systems' High Priority indicator and the persona-driven reasoning that Q1=D retires, replaced the lead rationale with the silent-failure-mode argument, and marked the superseded expected outcome. The decision to execute the stage still stands on the three remaining High Priority indicators."
+**Context**: User Stories, Part 1 Steps 9-10 — mandatory ambiguity analysis performed, follow-up clarification required before plan approval.
+
+---

@@ -22,8 +22,12 @@
 - [x] **High Priority**: the following ALWAYS-Execute indicators apply —
   - **New User Features / New Product Capabilities**: the dashboard is brand-new user-facing
     functionality; nothing like it exists in the repo today.
-  - **Multi-Persona Systems**: at least three distinct consumer types with different needs
-    (platform team, workshop organizers, campus builders), plus a tool/API consumer.
+  - ~~**Multi-Persona Systems**: at least three distinct consumer types with different needs
+    (platform team, workshop organizers, campus builders), plus a tool/API consumer.~~
+    **RETIRED 2026-08-03** — the user chose a **single** "Dashboard viewer" persona (story plan
+    Q1 = D), on the grounds that everyone inside the WAF allowlist sees exactly the same thing in
+    v1. This indicator no longer applies. The decision to execute this stage still stands on the
+    remaining three High Priority indicators.
   - **Customer-Facing APIs**: the read API is consumed by the UI and by builders' tooling.
   - **Complex Business Requirements with Acceptance Criteria Needs**: tag-completeness detection,
     aggregation by `cornell:deployment-id`, snapshot staleness behaviour, and fail-closed error
@@ -45,19 +49,27 @@ is a UI), not developer tooling, not documentation-only.
 ## Decision
 **Execute User Stories**: **Yes**
 
-**Reasoning**: This is an unambiguous ALWAYS-Execute case, not a borderline one — four High
-Priority indicators apply simultaneously. The strongest single reason is the persona spread: the
-requirements settled on a **network-level** access control (WAF IP allowlist) precisely *because*
-we deferred identity, which means "who is this dashboard for" is now answered by an IP range
-rather than by an identity system. Writing personas forces that question to be answered
-explicitly instead of being implied by a CIDR list. The second strongest reason is that PBT-01
-requires identified properties, and acceptance criteria written per story are the natural source
-for them — doing stories first makes the property list fall out of the specification rather than
-being invented at test-writing time.
+**Reasoning**: This is an unambiguous ALWAYS-Execute case, not a borderline one — three High
+Priority indicators apply simultaneously (four at the time of assessment; see the retired
+multi-persona indicator above). The strongest remaining reason is that the requirements carry
+several behaviours that are easy to get silently wrong and that only an explicit acceptance
+criterion will catch: Tagging API pagination (truncating under-reports inventory while looking
+successful), snapshot staleness display, fail-closed error handling, and the `pipeline.yml` action
+whose absence deploys nothing while reporting every stage `Succeeded`. Acceptance criteria are
+also the natural source for the properties `requirements.md` §4.2 names, so specifying behaviour
+now makes the property list fall out of the spec at Functional Design rather than being invented
+at test-writing time.
+
+**Amendment note (2026-08-03)**: the original reasoning led with the persona spread — that
+deferring identity to a WAF IP allowlist made "who is this dashboard for" a CIDR range rather
+than a role, and that writing personas would force that to be stated outright. Q1 = D collapsed
+the persona set to one, so that argument no longer holds and has been replaced above rather than
+left standing.
 
 ## Expected Outcomes
-- Personas that state explicitly which audiences the WAF allowlist must admit, and which are
-  knowingly excluded in v1.
+- ~~Personas that state explicitly which audiences the WAF allowlist must admit.~~ Superseded by
+  Q1 = D: a single "Dashboard viewer" persona. The WAF allowlist's audience remains defined by the
+  stack parameter carrying Cornell's ranges (`requirements.md` FR-5.3), not by the persona set.
 - Acceptance criteria precise enough to serve as the source for the PBT properties named in
   `requirements.md` §4.2 (snapshot round-trip, aggregation count invariants, collector
   idempotence, oracle comparison, tag-completeness classification).
