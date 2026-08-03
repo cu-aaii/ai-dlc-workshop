@@ -133,3 +133,28 @@ automated).
 All env vars, defaults in [README.md](README.md#configuration-all-env-vars-all-optional).
 Adding a var: document there + here; never make one required without a default (a bare
 `uv run builder-mcp` must always start).
+
+## C8 — Unit ownership
+
+**Consumers**: every team member adopting a unit; reviewers routing PRs.
+
+The codebase is five units plus a shared kernel — boundaries verified by import analysis
+and defined in
+[aidlc-docs/inception/application-design/unit-of-work.md](aidlc-docs/inception/application-design/unit-of-work.md)
+(with dependency matrix and story map alongside). The contract:
+
+1. **A unit's modules are edited only by (or with) its owner.** U1 `catalog.py` · U2
+   `github_ops.py`+`patching.py` · U3 `aws_ops.py` · U4 `spec_export.py` · U5
+   `server.py`/`tools/*`, `infra/`, `Dockerfile`, `deploy/`, pipeline wiring.
+2. **The shared kernel (`config.py`, `validation.py`) has no single owner** — change by
+   agreement only, naming affected units in the PR description. `validation.py` carries
+   security invariants (the path denylist); treat edits like edits to the frozen
+   `blueprint.yaml`.
+3. **No unit imports another unit.** New cross-unit needs go through the kernel or through
+   U5's composition layer — never a direct import. The dependency matrix is the check.
+4. **Tool-surface changes stay C3 events** regardless of which unit hosts the tool; U5
+   co-reviews anything that adds/renames/removes a tool.
+5. **UOW-0** (splitting server.py into per-unit tool modules) lands before units are
+   adopted; until then, `server.py` edits funnel through U5.
+
+Priority at adoption (mob, 2026-08-04): **U1 and U2 critical**, U3 next.
