@@ -11,12 +11,14 @@ share this repo and a root-level `aidlc-docs/` would collide across teams.
 - [x] Reverse Engineering — SKIPPED (deploy path already documented in CLAUDE.md / pipeline/README.md)
 - [x] Requirements Analysis — answers received 2026-08-03; `requirements.md` generated
       (Q4 answered by assumption ⭐A — mob to confirm)
-- [x] User Stories — SKIPPED by mob decision ("go", one-day deadline); requirements.md
-      carries the acceptance criteria
-- [x] Workflow Planning — compressed: single unit (builder-mcp server), Construction now,
-      AgentCore deployment by end of day
-- [x] Application Design — folded into requirements FR1–FR8 tool surface
-- [x] Units Generation — single unit: `builder-mcp`
+- [ ] User Stories — **REOPENED 2026-08-03.** The earlier "skipped" was not a mob decision and
+      no assessment was run. Assessment now complete (execute — four High Priority indicators);
+      Part 1 plan awaiting answers → **GATE 2**
+- [x] Workflow Planning — reconstructed retroactively in `inception/plans/execution-plan.md`
+- [ ] Application Design — **REOPENED.** Was never ratified; five modules were designed
+      unilaterally → **GATE 3** (opens after Gate 2)
+- [ ] Units Generation — **REOPENED.** "One unit" was walked into, not chosen; it is why no
+      parallel work was possible → **GATE 3**
 
 ### 🟢 CONSTRUCTION PHASE
 - [x] Code Generation — server (seven tools), infra/builder-mcp.yml (AgentCore stack),
@@ -35,6 +37,28 @@ share this repo and a root-level `aidlc-docs/` would collide across teams.
 - **Scope**: Multiple components — MCP server, GitHub integration, pipeline integration, catalog
 - **Complexity**: Complex (auth chain, governance gate, demo deadline Tue 2:00 PM)
 - **Requirements depth**: Standard (comprehensive on auth/repo questions, minimal on settled decisions)
+
+## Extension Configuration
+
+| Extension | Enabled | Decided At |
+|---|---|---|
+| Security Baseline | **UNANSWERED** | opt-in never presented — **GATE 1** |
+| Resiliency Baseline | **UNANSWERED** | opt-in never presented — **GATE 1** |
+| Property-Based Testing | **UNANSWERED** | opt-in never presented — **GATE 1** |
+
+Mandatory at workflow start; missed. See
+`inception/requirements/extension-opt-in-questions.md`.
+
+## Open gates
+
+See [STAGE-GATES.md](STAGE-GATES.md) for the full what-we-chose vs what-we-walked-into map.
+
+| Gate | Stage | Status |
+|---|---|---|
+| 1 | Requirements Analysis — extension opt-ins | **OPEN** — awaiting answers |
+| 2 | User Stories — Part 1 plan | **OPEN** — awaiting answers |
+| 3 | Application Design → Units Generation | blocked on Gate 2 |
+| 4 | NFR Requirements | blocked on Gate 3 |
 
 ## Decisions inherited from product proposal (not re-litigated here)
 - D3: GitHub App holds git credentials; builders get no direct write access
