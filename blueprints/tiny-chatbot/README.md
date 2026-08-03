@@ -40,8 +40,10 @@ Three steps, one PR, once hello-world has deployed green:
 1. Add a `Build` stage action in `pipeline/pipeline.yml` running
    **`ArmContainerBuildProject`** — not the x86 `ContainerBuildProject`; the Lambda below
    declares `Architectures: [arm64]`, and an x86 image would crash at invoke — with
-   `CONTAINER_TARGET=tiny-chatbot` (and `DATE_TAG`), per "Adding a container image build"
-   in `pipeline/README.md` and the `BuilderMcpContainer` action as the working example.
+   `CONTAINER_TARGET=tiny-chatbot`, `CONTAINER_CONTEXT=blueprints/tiny-chatbot` (the
+   directory holding this blueprint's `Dockerfile`) and `DATE_TAG`, per "Adding a
+   container image build" in `pipeline/README.md` and the `BuilderMcpContainer` action
+   as the working example.
 2. Add a `BlueprintDeploy` CloudFormation action modelled on `HelloWorldCloudFormation`,
    passing every parameter explicitly — including
    `ContainerImageUri: #{TinyChatbotContainer.CONTAINER_DIGEST}` (deploy by digest, not

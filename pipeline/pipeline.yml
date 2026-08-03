@@ -442,8 +442,9 @@ Resources:
                   "RemoteGitRepository": "${RemoteGitRepository}"
                   }
 
-        # Container images, built before anything deploys. One action per named target in
-        # the root Dockerfile; CONTAINER_DIGEST is exported so the deploy action below can
+        # Container images, built before anything deploys. One action per component
+        # Dockerfile (CONTAINER_CONTEXT is the component directory, CONTAINER_TARGET its
+        # named target); CONTAINER_DIGEST is exported so the deploy action below can
         # pin by digest rather than tag (see pipeline/codebuild.yml).
         - Name: 'Build'
           Actions:
@@ -461,6 +462,7 @@ Resources:
                 EnvironmentVariables: >-
                   [
                   {"name": "CONTAINER_TARGET", "value": "builder-mcp", "type": "PLAINTEXT"},
+                  {"name": "CONTAINER_CONTEXT", "value": "builder-mcp", "type": "PLAINTEXT"},
                   {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
                   ]
 

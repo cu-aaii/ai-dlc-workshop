@@ -1,9 +1,0 @@
-# Keep the build context small: the Dockerfile targets copy only what they name, but the
-# context still ships everything not excluded here.
-.git
-.github
-aidlc-rules
-docs
-**/.venv
-**/__pycache__
-**/aidlc-docs

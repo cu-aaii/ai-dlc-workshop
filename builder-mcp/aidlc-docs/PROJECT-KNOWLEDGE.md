@@ -40,9 +40,10 @@ merge.
 | DECISION-15 | Deployment executor | **Marty deploys from his account/system; this machine only verifies locally and pushes to GitHub** | User directive 2026-08-03 |
 | DECISION-16 | Inbound auth (assumed ⭐) | ~~Cognito client-credentials today, Entra ID at P1~~ **superseded by DECISION-20** | agentcore-productionizing-questions.md |
 | DECISION-17 | IaC debt | ~~deployed_by: manual~~ superseded by DECISION-18 | P5-⭐ |
-| DECISION-18 | Deploy method | **Pipeline-native**: root `Dockerfile` target `builder-mcp` → ARM CodeBuild project → Build stage exports digest → BlueprintDeploy action deploys `infra/builder-mcp.yml` with it. `deployed_by: pipeline`. Merge deploys, same as every blueprint | User review 2026-08-03: "when you push to github… a webhook will go deploy its contents"; pipeline/README.md "Adding a container image build" |
+| DECISION-18 | Deploy method | **Pipeline-native**: `Dockerfile` target `builder-mcp` (root `Dockerfile` at the time; location since moved by DECISION-21) → ARM CodeBuild project → Build stage exports digest → BlueprintDeploy action deploys `infra/builder-mcp.yml` with it. `deployed_by: pipeline`. Merge deploys, same as every blueprint | User review 2026-08-03: "when you push to github… a webhook will go deploy its contents"; pipeline/README.md "Adding a container image build" |
 | DECISION-19 | Tool naming + delete | **noun_verb naming standard** for the whole tool surface (`blueprint_search`, `deployment_create/read/update/restart/health/delete`, `spec_export`; future: `blueprint_create`, ...) and **`deployment_delete` commissioned**: governed deletion = deregistration PR removing the pipeline action, symmetric with creation — never an AWS delete API; the platform removes the stack after merge per its DeletionPolicy (SPEC C3 contract change) | Mob 2026-08-03 |
 | DECISION-20 | Inbound auth (supersedes DECISION-16) | **Microsoft Entra ID client-credentials NOW**, Cognito removed from `infra/builder-mcp.yml`. App registration is an Azure resource, hand-created by Marty (no Terraform stage exists); tenant/client ids reach the stack via SSM parameters `/entra/builder-mcp/{tenant-id,client-id}` (the SsmCodeStarConnectionArn precedent); client secret in Secrets Manager `aidlc/main/builder-mcp/entra-client-secret`. Authorizer allows client id + audience `api://<client-id>`. Per-user NetID (auth-code flow) stays P1 (BACKLOG) | Marty via Tim, 2026-08-03 (Cornell is an M365 shop; Entra was the stated P1 end state, pulled forward) |
+| DECISION-21 | Dockerfile location (amends DECISION-18's file layout) | **Per-component Dockerfiles**: each component owns its Dockerfile and `.dockerignore` (`builder-mcp/Dockerfile`, `blueprints/tiny-chatbot/Dockerfile`), replacing the single repo-root `Dockerfile` with named targets. `codebuild.yml` now builds `$CODEBUILD_SRC_DIR/$CONTAINER_CONTEXT`, and every container Build action must set `CONTAINER_CONTEXT` alongside `CONTAINER_TARGET` (see GOTCHA-CONTAINER-CONTEXT). Named targets are kept so `CONTAINER_TARGET` keeps working | User directive 2026-08-04 |
 
 Open items for the mob: Q4 (DECISION-08), P1/P3/P6 in
 [construction/agentcore-productionizing-questions.md](construction/agentcore-productionizing-questions.md)
@@ -87,10 +88,17 @@ and the five decision asks at the end of
   linux/arm64. Hence `ArmContainerBuildProject` (additive twin, `ARM_CONTAINER` /
   aarch64 image) — don't "simplify" the two projects into one without checking which
   architectures the catalog needs.
-- **GOTCHA-ROOT-DOCKERFILE**: `codebuild.yml` runs `docker build $CODEBUILD_SRC_DIR
-  --target $CONTAINER_TARGET` — repo-root context, root `Dockerfile`, named targets.
-  A per-component Dockerfile in a subdirectory is invisible to it (that mistake was made
-  and reverted on day 1). `.dockerignore` at root keeps the context small.
+- **GOTCHA-CONTAINER-CONTEXT** (was GOTCHA-ROOT-DOCKERFILE): `codebuild.yml` runs
+  `docker build "$CODEBUILD_SRC_DIR/${CONTAINER_CONTEXT:-.}" --target $CONTAINER_TARGET`
+  — the Dockerfile lives at the root of the `CONTAINER_CONTEXT` directory, and COPY paths
+  are relative to that directory. A Build action that forgets to set `CONTAINER_CONTEXT`
+  builds the repo root and fails to find a Dockerfile (there is none there anymore). Each
+  component's `.dockerignore` sits next to its Dockerfile. History, so nobody "fixes"
+  this back: day 1 used a repo-root Dockerfile with named targets because the buildspec
+  hardcoded the repo-root context (a per-component Dockerfile was tried and reverted);
+  on 2026-08-04 a user directive moved to per-component Dockerfiles
+  (`builder-mcp/Dockerfile`, `blueprints/tiny-chatbot/Dockerfile`) and made the buildspec
+  context-aware via `CONTAINER_CONTEXT` (DECISION-21).
 - **GOTCHA-DEPLOY-ROLE**: `cloudformation-deploy-role` (bootstrap) predates AgentCore —
   before first merge, confirm it may call `bedrock-agentcore:*`, else the BuilderMcp
   deploy action fails mid-pipeline. Since the Entra swap (DECISION-20) it no longer needs

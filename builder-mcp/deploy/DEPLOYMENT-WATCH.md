@@ -83,10 +83,17 @@ before — hello-world deployed through it — so this only bites if something r
 ## 2. CodeBuild `aidlc-main-container-arm` — the arm64 image build
 
 This is the **first-ever run** of this project — it was created by PipelineDeploy
-minutes ago. It builds the `builder-mcp` target of the repo-root `Dockerfile` on
-aarch64 compute (AgentCore runtimes require linux/arm64 — that is why it is a separate
-project from the untouched x86 reference project; see GOTCHA-ARM in
+minutes ago. It builds the `builder-mcp` Dockerfile target on aarch64 compute
+(AgentCore runtimes require linux/arm64 — that is why it is a separate project from
+the untouched x86 reference project; see GOTCHA-ARM in
 `../aidlc-docs/PROJECT-KNOWLEDGE.md`). Expect **~3–8 minutes**.
+
+**Layout note:** the CURRENTLY-RUNNING deploy (merge `ad289a8`) still uses the old
+layout — a repo-root `Dockerfile` with named targets and a repo-root `.dockerignore` —
+so don't be surprised if this in-flight build's log shows `docker build` on the repo
+root and COPY paths like `builder-mcp/src`. The Dockerfile has since moved to
+`builder-mcp/Dockerfile` (built with `CONTAINER_CONTEXT=builder-mcp`, context =
+that directory); the new layout takes effect on the first merge that carries it.
 
 **Console:** CodeBuild → Build projects → `aidlc-main-container-arm` → latest build →
 Phase details / Build logs. (Logs also land in CloudWatch group

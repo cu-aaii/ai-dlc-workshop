@@ -70,7 +70,8 @@ pipeline's role, and the pipeline acts only on merge.
 ## Deploying to Bedrock AgentCore
 
 **Merge deploys — same as every blueprint.** The pipeline's Build stage builds the
-`builder-mcp` target of the repo-root `Dockerfile` (linux/arm64) and the BlueprintDeploy
+`builder-mcp` target of [`Dockerfile`](Dockerfile) in this directory (linux/arm64,
+build context `builder-mcp/` via `CONTAINER_CONTEXT`) and the BlueprintDeploy
 stage deploys [`infra/builder-mcp.yml`](infra/builder-mcp.yml) with the image pinned by
 digest. Runbook and review points: [`deploy/HANDOFF.md`](deploy/HANDOFF.md); post-deploy
 proof: `uv run python deploy/verify.py`.

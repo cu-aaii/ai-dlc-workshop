@@ -2,7 +2,8 @@
 
 **The deployment method is the repo's own pipeline.** Nothing here is deployed by hand:
 merging this branch's PR to `main` makes the webhook fire, the `Build` stage build the
-arm64 image from the root `Dockerfile` (target `builder-mcp`), and the `BlueprintDeploy`
+arm64 image from `builder-mcp/Dockerfile` (target `builder-mcp`, build context
+`builder-mcp/` via `CONTAINER_CONTEXT`), and the `BlueprintDeploy`
 stage deploy [`../infra/builder-mcp.yml`](../infra/builder-mcp.yml) with the image pinned
 by digest. AWS reference:
 https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-mcp.html
@@ -98,7 +99,8 @@ The template deploys by hand like any blueprint (repo convention): `aws cloudfor
 deploy` with `ContainerImageUri=` empty deploys everything except the runtime; pass any
 pushed image URI to add it. The hand deploy resolves the same two SSM parameters, so the
 pre-flight above must exist first. Local image check:
-`docker buildx build --platform linux/arm64 --target builder-mcp .` from the repo root.
+`docker buildx build --platform linux/arm64 --target builder-mcp builder-mcp/` from the
+repo root (or the same command with `.` as the context from inside `builder-mcp/`).
 
 ## Teardown
 

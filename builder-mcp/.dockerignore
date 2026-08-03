@@ -1,0 +1,9 @@
+# Keep the build context small: the Dockerfile target copies only what it names, but the
+# context still ships everything not excluded here. Paths are relative to builder-mcp/.
+.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+aidlc-docs
+tests
+deploy

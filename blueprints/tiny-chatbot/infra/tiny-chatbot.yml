@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'The world''s tiniest chatbot: a canned-response Lambda (container image, arm64) behind a public Function URL. No LLM, no state -- exists so the deploy path produces something you can see in a browser. Image built from the root Dockerfile (target tiny-chatbot) once its Build stage action is wired.'
+Description: 'The world''s tiniest chatbot: a canned-response Lambda (container image, arm64) behind a public Function URL. No LLM, no state -- exists so the deploy path produces something you can see in a browser. Image built from blueprints/tiny-chatbot/Dockerfile (target tiny-chatbot) once its Build stage action is wired.'
 
 Parameters:
 

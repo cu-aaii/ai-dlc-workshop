@@ -87,11 +87,14 @@ MCP over **streamable HTTP**; container contract `0.0.0.0:8000`, path `/mcp`,
 `127.0.0.1`; behavior must not differ beyond that. Reference: AWS devguide
 `runtime-mcp.html`.
 
-**Build & deploy path**: the image is a named target (`builder-mcp`) in the **repo-root
-`Dockerfile`**, built by the pipeline's ARM CodeBuild project on merge and deployed **by
-digest** into the stack (`#{BuilderMcpContainer.CONTAINER_DIGEST}`). No local builds, no
-private ECR repo — images live in the shared `<app>-<env>` repository. Renaming the
-Dockerfile target breaks the pipeline action: both are one contract.
+**Build & deploy path**: the image is a named target (`builder-mcp`) in the
+**per-component `Dockerfile` at `builder-mcp/Dockerfile`**, built by the pipeline's ARM
+CodeBuild project on merge with `CONTAINER_CONTEXT=builder-mcp` (the buildspec builds
+`$CODEBUILD_SRC_DIR/$CONTAINER_CONTEXT`, so the build context is this directory) and
+deployed **by digest** into the stack (`#{BuilderMcpContainer.CONTAINER_DIGEST}`). No
+local builds, no private ECR repo — images live in the shared `<app>-<env>` repository.
+Renaming the Dockerfile target or moving the file breaks the pipeline action: target
+name, file location and `CONTAINER_CONTEXT` are one contract.
 
 ## C5 — Credentials & auth
 

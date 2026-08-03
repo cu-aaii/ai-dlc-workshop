@@ -89,8 +89,11 @@ should not be pipeline-deployed, register it `deployed_by: manual` and say why i
 no stage invokes them, because `hello-world` is pure CloudFormation with nothing to build.
 When a blueprint needs a Lambda image:
 
-1. Add a `Dockerfile` with a named target for the component.
+1. Add a `Dockerfile` in the component's own directory (e.g. `builder-mcp/Dockerfile`)
+   with a named target for the component. The build context is that directory, so COPY
+   paths are relative to it.
 2. Add a `Build` stage action before `BlueprintDeploy` that runs `ContainerBuildProject` with
-   `CONTAINER_TARGET` and `DATE_TAG` set (see the reference pattern in `codebuild.yml`).
+   `CONTAINER_TARGET`, `CONTAINER_CONTEXT` (the component directory containing the
+   Dockerfile) and `DATE_TAG` set (see the reference pattern in `codebuild.yml`).
 3. Pass `#{<Namespace>.CONTAINER_DIGEST}` into the blueprint's CloudFormation action and
    deploy by digest, not by tag.

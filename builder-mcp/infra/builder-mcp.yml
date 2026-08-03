@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Cornell Builder MCP server on Bedrock AgentCore Runtime: Microsoft Entra ID client-credentials authorizer, execution role, and the runtime itself. Deployed by the pipeline BlueprintDeploy stage; its image is built by the Build stage from the root Dockerfile (target builder-mcp) and pinned by digest.'
+Description: 'Cornell Builder MCP server on Bedrock AgentCore Runtime: Microsoft Entra ID client-credentials authorizer, execution role, and the runtime itself. Deployed by the pipeline BlueprintDeploy stage; its image is built by the Build stage from builder-mcp/Dockerfile (target builder-mcp) and pinned by digest.'
 
 Parameters:
 
