@@ -3,7 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: INCEPTION - Workflow Planning
+- **Current Stage**: INCEPTION - Application Design (plan + 8 questions issued, awaiting answers)
+- **Execution Plan Approved**: 2026-08-03 — user response "Approve and Continue"
 - **User Stories Approved**: 2026-08-03 — user response "approve stories"
 - **Queued amendment (NOT blocking)**: 2026-08-03 — custom telemetry, answered in
   `inception/requirements/requirement-amendment-questions-telemetry.md` (Q1=A, Q2=C, Q3=B, Q4 free text).
@@ -100,6 +101,6 @@ Infrastructure Design and Code Generation rather than by a story amendment.
 
 ## Current Status
 - **Lifecycle Phase**: INCEPTION
-- **Current Stage**: Workflow Planning complete
-- **Next Stage**: Application Design
-- **Status**: Awaiting execution-plan approval
+- **Current Stage**: Application Design — Steps 1-6 complete
+- **Next Stage**: Application Design Steps 8-10 (answer analysis, then artifact generation)
+- **Status**: Awaiting answers in `inception/plans/application-design-plan.md`
