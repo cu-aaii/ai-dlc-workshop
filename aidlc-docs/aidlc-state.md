@@ -3,7 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: INCEPTION - Application Design (all five artifacts generated, awaiting approval)
+- **Current Stage**: INCEPTION - Units Generation Part 1 (plan + 7 questions issued, awaiting answers)
+- **Application Design Approved**: 2026-08-03 — user response "approved"
 - **Execution Plan Approved**: 2026-08-03 — user response "Approve and Continue"
 - **User Stories Approved**: 2026-08-03 — user response "approve stories"
 - **Queued amendment (NOT blocking)**: 2026-08-03 — custom telemetry, answered in
@@ -85,8 +86,8 @@ Infrastructure Design and Code Generation rather than by a story amendment.
 - [x] Requirements Analysis
 - [x] User Stories
 - [x] Workflow Planning
-- [ ] Application Design — EXECUTE
-- [ ] Units Generation — EXECUTE
+- [x] Application Design
+- [ ] Units Generation — EXECUTE (Part 1 planning in progress)
 
 ### 🟢 CONSTRUCTION PHASE
 - [ ] Functional Design — EXECUTE (PBT-01 identifies properties here)
@@ -129,8 +130,19 @@ See `inception/plans/application-design-plan.md` Part A2 (Q1–Q8) and Part A3 (
 
 ## Current Status
 - **Lifecycle Phase**: INCEPTION
-- **Current Stage**: Application Design — Steps 1-12 complete; all five mandatory artifacts generated
-  under `inception/application-design/` (`components.md`, `component-methods.md`, `services.md`,
-  `component-dependency.md`, `application-design.md`)
-- **Next Stage**: Units Generation (after approval)
-- **Status**: Awaiting explicit user approval of the Application Design
+- **Current Stage**: Units Generation Part 1 (Planning) — Steps 1-5 complete. Application Design is
+  complete and approved; all five mandatory artifacts are in `inception/application-design/`
+  (`components.md`, `component-methods.md`, `services.md`, `component-dependency.md`,
+  `application-design.md`)
+- **Next Stage**: Units Generation Part 2 (Generation), after the plan is approved
+- **Status**: Awaiting answers to the 7 `[Answer]:` tags in
+  `inception/plans/unit-of-work-plan.md`
+
+### What Units Generation actually decides here
+This blueprint deploys as one CloudFormation stack behind one CloudFront distribution, so the
+vendored rules' "each unit becomes an independently deployable service" framing does not apply.
+The decomposition decides **how many times the CONSTRUCTION stages run** — Functional Design, NFR
+Requirements, NFR Design, Infrastructure Design, Code Generation, and Build and Test are per-unit.
+The one boundary that changes *how work is verified* rather than how it is organised: C-04 and C-05
+have empty dependency rows and no AWS SDK, so they can be property-tested on a laptop with no
+account and no pipeline. Everything else needs the never-yet-run container build.

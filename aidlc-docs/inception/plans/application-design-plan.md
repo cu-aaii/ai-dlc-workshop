@@ -338,7 +338,7 @@ begin until those are answered.
 - [x] Mark every step above `[x]`
 - [x] Update `aidlc-docs/aidlc-state.md`
 - [x] Log the approval prompt in `aidlc-docs/audit.md` with an ISO-8601 timestamp
-- [ ] Present the `# 🏗️ Application Design Complete` message and wait for explicit approval
+- [x] Present the `# 🏗️ Application Design Complete` message and wait for explicit approval
 
 ---
 
