@@ -752,6 +752,42 @@ Resources:
                   "GitHubTokenSecretName": "${Application}/${Environment}/builder-mcp/github-token"
                   }
 
+            # The knowledge base ingests and then verifies its own contents inside the deploy,
+            # so this action is slow (minutes, not seconds) and it goes red when the knowledge
+            # base cannot answer the smoke query. That redness is the intended acceptance
+            # signal, not a flaky deploy -- see blueprints/knowledgebase/docs/warnings.md.
+
+            - Name: 'KnowledgeBaseCloudFormation'
+              Namespace: 'KnowledgeBaseCloudFormation'
+              RunOrder: 1
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-knowledgebase'
+                TemplatePath: 'GitRepositoryArtifact::blueprints/knowledgebase/infra/knowledgebase.yml'
+                # Every parameter the blueprint needs is passed explicitly rather than left
+                # to template defaults, so a stack deploys the same way by hand or by pipeline.
+                # BlueprintVersion is duplicated from the template's default on purpose: bump
+                # both in the same PR, or the cornell:blueprint-version tag will lie.
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "BlueprintVersion": "0.1.0",
+                  "IngestionBucketName": "aidlc-kb-ingestion-890349359349",
+                  "SmokeQuery": "What is the late homework policy?",
+                  "SourceCommitId": "#{GitRepository.CommitId}"
+                  }
+
         # Non-AWS resources (Azure/Entra). One action per Terraform module, each supplying its
         # own working directory and state key so a single CodeBuild project serves all of them.
         #

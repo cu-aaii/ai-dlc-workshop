@@ -22,6 +22,12 @@ tfplan
 # machine-specific paths and per-user permission grants.
 .claude/settings.local.json
 
+# Local working notes and workshop handouts. Untracked but not ignored is how these get swept
+# up by `git add -A`.
+SCRATCHPAD.md
+PARTICIPANT_BRIEF.md
+aidlc-docs/
+
 .DS_Store
 .idea/
 *.swp

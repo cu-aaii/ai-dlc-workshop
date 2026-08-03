@@ -19,6 +19,7 @@ have either directory or both. See "Adding a Terraform module" in `pipeline/READ
 |---|---|
 | `hello-world` | Fully deploys. Proves the pipeline and the tagging convention. |
 | `entra-probe` | Fully deploys. Proves the Terraform-from-CodeBuild path reaches the Entra tenant. Terraform only — no AWS resources. |
+| `knowledgebase` | Bedrock managed knowledge base over an existing S3 document bucket. Verifies its own ingestion at deploy time, so a green deploy is the acceptance test. SharePoint and web sources pinned. |
 
 ## Required of every blueprint
 

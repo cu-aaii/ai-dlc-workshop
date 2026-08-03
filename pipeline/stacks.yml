@@ -38,3 +38,8 @@ templates:
     template: 'builder-mcp/infra/builder-mcp.yml'
     deployed_by: 'pipeline'
     description: 'Cornell Builder MCP server on Bedrock AgentCore. Image built by the Build stage (arm64, root Dockerfile target builder-mcp), deployed by digest.'
+
+  - name: 'knowledgebase'
+    template: 'blueprints/knowledgebase/infra/knowledgebase.yml'
+    deployed_by: 'pipeline'
+    description: 'Bedrock managed knowledge base over the existing document bucket. Verifies at deploy time that the documents are indexed and answerable, so a green deploy is the acceptance test.'

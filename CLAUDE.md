@@ -198,6 +198,36 @@ and CI gets it from `hashicorp/setup-terraform`. Never document or run the bare 
   versions; ignoring it lets them drift silently.
 - **`terraform_wrapper: false`** in `hashicorp/setup-terraform`. The wrapper replaces the binary
   with a script that captures output, and `tools/check` depends on real exit codes.
+- **A managed-embedding Bedrock knowledge base rejects `ChunkingConfiguration`.** The
+  CloudFormation schema accepts the block, so cfn-lint passes it clean and the deploy fails at
+  `CREATE_FAILED` with *"A chunking strategy cannot be specified with a managed embedding model."*
+  This cost a rolled-back rehearsal stack; on `main` it would have blocked every track's merges.
+- **Verify a bucket's region before pointing anything at it.** `aidlc-kb-ingestion-bucket` is in
+  **`us-east-2`** despite everything in this repo deploying to `us-east-1`, and the Bedrock managed
+  S3 connector is same-region only. `aws s3api get-bucket-location` returning `null` means
+  `us-east-1`. Use `aidlc-kb-ingestion-890349359349` instead.
+- **`AWS::Bedrock::KnowledgeBase` takes `Tags` as a map**, like `AWS::SSM::Parameter` and unlike
+  everything else here. Copying a `Key`/`Value` tag block onto it fails cfn-lint.
+- **`AWS::Bedrock::DataSource` has no `Tags` property at all**, so the four-tag rule is impossible
+  on it. `blueprints/knowledgebase` mirrors its id into SSM so inventory has a join key; that is
+  the pattern for any future untaggable resource.
+- **`ConnectorParameters` on a Bedrock data source is free-form `Json`.** cfn-lint validates
+  nothing inside it, so a misspelled key passes `tools/check` and fails at deploy — in the shared
+  account. Treat edits in that block as untested code.
+- **A bad Bedrock data source HANGS the deploy instead of failing it.** Bedrock marks the data
+  source `FAILED` in under a second and CloudFormation keeps reporting `CREATE_IN_PROGRESS` —
+  observed for over twenty minutes. On the shared pipeline that stalls `BlueprintDeploy` and blocks
+  every other track's merges, which is strictly worse than a red pipeline. Rehearse any
+  `ConnectorParameters` edit as an `Environment=test` stack and read the status from
+  `aws bedrock-agent list-data-sources`, not from the stack.
+- **`connectionConfiguration.bucketOwnerAccountId` is required, always.** The AWS connector
+  reference marks it "Conditional — required for cross-account access"; that is wrong. Omitting it
+  for a same-account bucket fails validation with *"Member must not be null"* — and it fails via
+  the hang above, not via a red stack. Every AWS example includes it.
+- **CloudFormation never ingests through a Bedrock data source.** `CREATE_COMPLETE` is compatible
+  with an entirely empty knowledge base, and Bedrock has no native scheduled sync. Something in
+  the stack has to start the job, and on this repo's no-CLI deploy path it should also assert the
+  result — see `blueprints/knowledgebase/docs/decisions.md`.
 
 ## Deliberately not built
 
