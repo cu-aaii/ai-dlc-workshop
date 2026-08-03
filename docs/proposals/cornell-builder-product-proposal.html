@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cornell Builder — Product Proposal</title>
+<style>
+  :root {
+    --cornell: #b31b1b;
+    --navy: #232f3e;
+    --orange: #ec7211;
+    --blue: #2c6fa6;
+    --teal: #1f6f6b;
+    --ink: #14181d;
+    --muted: #5f6873;
+    --faint: #8b939d;
+    --line: #e2e5e9;
+    --line-strong: #c9cfd6;
+    --paper: #ffffff;
+    --wash: #f6f7f9;
+    --warm: #fff8f1;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: #eceef1; color: var(--ink);
+    font-family: var(--sans); line-height: 1.55; padding: 30px 14px 60px;
+  }
+  .page {
+    max-width: 880px; margin: 0 auto; background: var(--paper);
+    box-shadow: 0 1px 2px rgba(20,24,29,.10), 0 10px 34px rgba(20,24,29,.09);
+    border-radius: 4px; overflow: hidden;
+  }
+
+  /* ---------- masthead ---------- */
+  header.mast {
+    background: var(--navy); color: #fff; padding: 34px 46px 30px;
+    border-bottom: 5px solid var(--cornell);
+  }
+  .kicker {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--orange); margin: 0 0 12px;
+  }
+  header.mast h1 {
+    font-family: var(--serif); font-weight: 400; font-size: 34px;
+    line-height: 1.12; margin: 0 0 12px; letter-spacing: -.01em;
+  }
+  header.mast h1 em { font-style: italic; color: #ffb27a; }
+  .standfirst {
+    font-size: 15px; color: #c3cad3; max-width: 60ch; margin: 0;
+    border-left: 2px solid rgba(255,255,255,.22); padding-left: 14px;
+  }
+
+  /* ---------- body scaffolding ---------- */
+  .content { padding: 30px 46px 40px; }
+  section { margin-bottom: 34px; }
+  section:last-child { margin-bottom: 0; }
+  h2 {
+    font-family: var(--serif); font-size: 22px; font-weight: 600;
+    letter-spacing: -.01em; margin: 0 0 4px; display: flex;
+    align-items: baseline; gap: 12px;
+  }
+  h2 .sec {
+    font-family: var(--mono); font-size: 11px; font-weight: 400;
+    color: var(--orange); letter-spacing: .08em; flex: none;
+  }
+  .rule { height: 1px; background: var(--line); margin: 0 0 14px; }
+  h3 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--navy); margin: 20px 0 8px; font-weight: 700;
+  }
+  p { margin: 0 0 11px; font-size: 15px; }
+  ul, ol { margin: 0 0 12px; padding-left: 21px; font-size: 15px; }
+  li { margin-bottom: 5px; }
+  strong { font-weight: 650; color: #0d1116; }
+  a { color: var(--blue); }
+  code {
+    font-family: var(--mono); font-size: .86em; background: var(--wash);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px;
+  }
+  .lede {
+    font-family: var(--serif); font-size: 18px; line-height: 1.5;
+    color: #2a3038; margin-bottom: 14px;
+  }
+
+  /* ---------- thesis panel ---------- */
+  .thesis {
+    background: var(--warm); border: 1px solid #f2d9c0;
+    border-left: 4px solid var(--orange); border-radius: 0 4px 4px 0;
+    padding: 16px 20px; margin-bottom: 22px;
+  }
+  .thesis p:last-child { margin-bottom: 0; }
+
+  .note {
+    background: var(--wash); border: 1px solid var(--line);
+    border-radius: 4px; padding: 13px 17px; margin: 0 0 14px;
+    font-size: 14px; color: #384049;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--cornell); display: block; margin-bottom: 5px;
+  }
+
+  /* ---------- is / is not ---------- */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 6px; }
+  .split div { border-top: 3px solid var(--line-strong); padding-top: 10px; }
+  .split div.yes { border-top-color: var(--teal); }
+  .split div.no { border-top-color: var(--cornell); }
+  .split h4 {
+    margin: 0 0 7px; font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; font-weight: 700;
+  }
+  .split .yes h4 { color: var(--teal); }
+  .split .no h4 { color: var(--cornell); }
+  .split ul { font-size: 13.5px; padding-left: 17px; margin-bottom: 0; }
+
+  /* ---------- diagram ---------- */
+  figure { margin: 4px 0 10px; }
+  svg.dia { width: 100%; height: auto; display: block; }
+  figcaption { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+
+  /* ---------- manifest card ---------- */
+  .manifest {
+    background: #101720; border-radius: 5px; overflow: hidden; margin: 0 0 12px;
+    border: 1px solid #1e2936;
+  }
+  .manifest .bar {
+    background: #18222e; padding: 8px 15px; font-family: var(--mono);
+    font-size: 11px; color: #7f8fa1; letter-spacing: .06em;
+    border-bottom: 1px solid #232f3e;
+  }
+  .manifest pre {
+    margin: 0; padding: 15px 18px; font-family: var(--mono);
+    font-size: 12px; line-height: 1.72; color: #d5dde6; overflow-x: auto;
+  }
+  .manifest .k { color: #8fb8de; }
+  .manifest .v { color: #c9e8a8; }
+  .manifest .c { color: #6b7c8f; font-style: italic; }
+  .manifest .n { color: #e8b473; }
+
+  /* ---------- tables ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-bottom: 14px; }
+  th {
+    text-align: left; font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--navy); background: var(--wash); padding: 8px 11px;
+    border-bottom: 2px solid var(--line-strong); font-weight: 700;
+  }
+  td { padding: 9px 11px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:hover { background: #fafbfc; }
+  td.id {
+    font-family: var(--mono); font-size: 11.5px; color: var(--cornell);
+    font-weight: 700; white-space: nowrap; width: 42px;
+  }
+  .rec { color: var(--teal); font-weight: 650; }
+  .risk-h { color: var(--cornell); font-weight: 700; font-size: 11px; letter-spacing: .05em; }
+  .risk-m { color: #b8720f; font-weight: 700; font-size: 11px; letter-spacing: .05em; }
+  .risk-l { color: var(--muted); font-weight: 700; font-size: 11px; letter-spacing: .05em; }
+
+  /* ---------- phases ---------- */
+  .phase {
+    display: grid; grid-template-columns: 92px 1fr; gap: 18px;
+    padding: 14px 0; border-top: 1px solid var(--line);
+  }
+  .phase:first-of-type { border-top: 2px solid var(--line-strong); }
+  .phase .marker { padding-top: 1px; }
+  .phase .pn {
+    font-family: var(--mono); font-size: 19px; font-weight: 700;
+    color: var(--navy); line-height: 1; letter-spacing: -.02em;
+  }
+  .phase .pd {
+    font-family: var(--mono); font-size: 10.5px; color: var(--faint);
+    letter-spacing: .04em; margin-top: 5px;
+  }
+  .phase h4 {
+    margin: 0 0 5px; font-size: 15.5px; font-family: var(--serif);
+    font-weight: 600; color: var(--cornell);
+  }
+  .phase p { font-size: 14px; margin-bottom: 7px; }
+  .gate {
+    font-size: 12.5px; color: #1c4f78; background: #f2f7fb;
+    border-left: 3px solid var(--blue); padding: 7px 11px; border-radius: 0 3px 3px 0;
+  }
+  .gate b { color: #14405f; }
+
+  .pills { margin: 2px 0 0; }
+  .pill {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px;
+    background: var(--wash); border: 1px solid var(--line); color: #46505b;
+    border-radius: 3px; padding: 2px 8px; margin: 0 5px 5px 0;
+  }
+
+  footer.end {
+    margin-top: 30px; padding: 16px 46px 26px; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--muted); background: var(--wash);
+  }
+
+  @media (max-width: 700px) {
+    body { padding: 0; }
+    .page { border-radius: 0; }
+    header.mast { padding: 26px 20px 22px; }
+    header.mast h1 { font-size: 26px; }
+    .content { padding: 22px 20px 30px; }
+    footer.end { padding: 16px 20px 24px; }
+    .split { grid-template-columns: 1fr; }
+    .phase { grid-template-columns: 1fr; gap: 6px; }
+    .phase .marker { display: flex; align-items: baseline; gap: 10px; }
+    table { font-size: 12.5px; }
+    th, td { padding: 7px 8px; }
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page { box-shadow: none; max-width: none; }
+    section { break-inside: avoid-page; }
+    .phase, tr { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="mast">
+    <p class="kicker">Cornell AI-SEI · Product Proposal · Draft for discussion</p>
+    <h1>Cornell Builder<br><em>from a two-day demo to a platform product</em></h1>
+    <p class="standfirst">How to turn the August 3–4 workshop chain into a service units actually adopt — the architecture, the one primitive that decides everything, a four-phase build, and the eight decisions that need answers before September.</p>
+  </header>
+
+  <div class="content">
+
+    <!-- 1 -->
+    <section>
+      <h2><span class="sec">01</span>The product thesis</h2>
+      <div class="rule"></div>
+      <div class="thesis">
+        <p><strong>The product is a paved road, not an AI feature.</strong> Cornell has no sanctioned way to get custom software into production. Units build what they need wherever they can, and central IT finds out afterward — at audit, at incident, or at renewal. The proposal is to build the road: a catalog of governed, versioned infrastructure blueprints, a plain-language front door onto it, one unbypassable review gate, and a single inventory of everything that came out the other end.</p>
+        <p>Adoption follows one rule and only one: <strong>the sanctioned path has to be faster than going around it.</strong> Every decision below is downstream of that. A governed path that takes three weeks loses to a departmental credit card every time.</p>
+      </div>
+      <p>The workshop MVP proves the chain is possible. It does not prove it is a product. The gap between those two things is roughly nine months of work, and most of it is not the AI part — it is versioning, tenancy, policy enforcement, and the operating model that keeps a catalog alive after the people who built it move on.</p>
+    </section>
+
+    <!-- 2 -->
+    <section>
+      <h2><span class="sec">02</span>Scope: what this is and isn't</h2>
+      <div class="rule"></div>
+      <div class="split">
+        <div class="yes">
+          <h4>What it is</h4>
+          <ul>
+            <li>A catalog of versioned, pre-governed infrastructure blueprints</li>
+            <li>A conversational front door that maps intent to blueprints and gathers the parameters</li>
+            <li>A single governance gate every deployment passes through</li>
+            <li>An inventory of every deployment, its owner, health, and cost</li>
+            <li>A contribution model so units extend the catalog rather than queue for it</li>
+          </ul>
+        </div>
+        <div class="no">
+          <h4>What it is not</h4>
+          <ul>
+            <li>Not a low-code app builder — it provisions infrastructure, it does not write your business logic</li>
+            <li>Not an AI product — AI is the interface and the codegen, not the point</li>
+            <li>Not a replacement for unit engineering teams — it removes their undifferentiated work</li>
+            <li>Not a hosting service that central IT operates on units' behalf</li>
+            <li>Not a mandate on day one — mandates before the road is faster produce shadow IT, not compliance</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section>
+      <h2><span class="sec">03</span>Architecture: five planes</h2>
+      <div class="rule"></div>
+      <p>The system is a stack, not a pipeline. The builder touches exactly one plane; the other four are the product's actual substance and are deliberately invisible to them. Drawing it this way makes the load-bearing claim explicit — <strong>everything below the fold is abstracted, and each plane can be replaced without disturbing the one above it.</strong></p>
+
+      <figure>
+        <svg class="dia" viewBox="0 0 900 596" xmlns="http://www.w3.org/2000/svg" role="img"
+             aria-label="Five-plane architecture: Intent, Catalog, Governance, Provisioning, and Operations. The builder interacts only with the Intent plane; the four planes beneath are abstracted away.">
+          <defs>
+            <marker id="dn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="#8b939d"/>
+            </marker>
+            <marker id="up" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="#1f6f6b"/>
+            </marker>
+          </defs>
+          <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+
+            <!-- builder entry -->
+            <rect x="152" y="6" width="300" height="34" rx="17" fill="#fff8f1" stroke="#ec7211" stroke-width="1.6"/>
+            <text x="302" y="28" text-anchor="middle" font-size="12.5" font-style="italic" fill="#a34d09">“a chatbot for my course material”</text>
+            <line x1="302" y1="41" x2="302" y2="58" stroke="#8b939d" stroke-width="1.5" marker-end="url(#dn)"/>
+
+            <!-- PLANE 1 -->
+            <rect x="140" y="62" width="742" height="86" rx="5" fill="#fff8f1" stroke="#ec7211" stroke-width="2"/>
+            <text x="14" y="96" font-family="ui-monospace, Menlo, monospace" font-size="11" font-weight="700" fill="#ec7211">PLANE 1</text>
+            <text x="14" y="114" font-size="13.5" font-weight="700" fill="#232f3e">Intent</text>
+            <text x="14" y="131" font-size="10.5" fill="#8b939d">the only plane</text>
+            <text x="14" y="144" font-size="10.5" fill="#8b939d">a builder sees</text>
+            <text x="158" y="84" font-size="10" font-weight="700" letter-spacing="1" fill="#a34d09">CORNELL BUILDER MCP · in Claude Cowork / Claude Code</text>
+            <rect x="158" y="94" width="150" height="42" rx="4" fill="#fff" stroke="#e0a76f"/>
+            <text x="233" y="111" text-anchor="middle" font-size="11.5" font-weight="700" fill="#a34d09">match intent</text>
+            <text x="233" y="127" text-anchor="middle" font-size="10" fill="#5f6873">catalog in context</text>
+            <rect x="318" y="94" width="150" height="42" rx="4" fill="#fff" stroke="#e0a76f"/>
+            <text x="393" y="111" text-anchor="middle" font-size="11.5" font-weight="700" fill="#a34d09">elicit parameters</text>
+            <text x="393" y="127" text-anchor="middle" font-size="10" fill="#5f6873">docs, owner, unit, name</text>
+            <rect x="478" y="94" width="150" height="42" rx="4" fill="#fff" stroke="#e0a76f"/>
+            <text x="553" y="111" text-anchor="middle" font-size="11.5" font-weight="700" fill="#a34d09">validate</text>
+            <text x="553" y="127" text-anchor="middle" font-size="10" fill="#5f6873">against the manifest</text>
+            <rect x="638" y="94" width="228" height="42" rx="4" fill="#fff" stroke="#e0a76f"/>
+            <text x="752" y="111" text-anchor="middle" font-size="11.5" font-weight="700" fill="#a34d09">propose_change</text>
+            <text x="752" y="127" text-anchor="middle" font-size="10" fill="#5f6873">submits a diff — never holds a git token</text>
+
+            <line x1="511" y1="149" x2="511" y2="166" stroke="#8b939d" stroke-width="1.5" marker-end="url(#dn)"/>
+
+            <!-- abstraction bracket -->
+            <path d="M132 170 L124 170 L124 566 L132 566" fill="none" stroke="#b31b1b" stroke-width="1.4" stroke-dasharray="5 4"/>
+            <text x="118" y="380" text-anchor="middle" font-size="10.5" font-weight="700" fill="#b31b1b"
+                  transform="rotate(-90 118 380)" letter-spacing="1.4">ABSTRACTED — THE BUILDER NEVER SEES THIS</text>
+
+            <!-- PLANE 2 -->
+            <rect x="140" y="170" width="742" height="86" rx="5" fill="#fdf5f5" stroke="#b31b1b" stroke-width="1.6"/>
+            <text x="14" y="200" font-family="ui-monospace, Menlo, monospace" font-size="11" font-weight="700" fill="#b31b1b">PLANE 2</text>
+            <text x="14" y="218" font-size="13.5" font-weight="700" fill="#232f3e">Catalog</text>
+            <text x="14" y="235" font-size="10.5" fill="#8b939d">the product's</text>
+            <text x="14" y="248" font-size="10.5" fill="#8b939d">core asset</text>
+            <text x="158" y="192" font-size="10" font-weight="700" letter-spacing="1" fill="#8c1616">BLUEPRINT REGISTRY</text>
+            <rect x="158" y="202" width="196" height="42" rx="4" fill="#fff" stroke="#dda6a6"/>
+            <text x="256" y="219" text-anchor="middle" font-size="11.5" font-weight="700" fill="#8c1616">manifests</text>
+            <text x="256" y="235" text-anchor="middle" font-size="10" fill="#5f6873">inputs · outputs · cost · owner</text>
+            <rect x="364" y="202" width="196" height="42" rx="4" fill="#fff" stroke="#dda6a6"/>
+            <text x="462" y="219" text-anchor="middle" font-size="11.5" font-weight="700" fill="#8c1616">versioned modules</text>
+            <text x="462" y="235" text-anchor="middle" font-size="10" fill="#5f6873">semver, not copied templates</text>
+            <rect x="570" y="202" width="140" height="42" rx="4" fill="#fff" stroke="#dda6a6"/>
+            <text x="640" y="219" text-anchor="middle" font-size="11.5" font-weight="700" fill="#8c1616">shell templates</text>
+            <text x="640" y="235" text-anchor="middle" font-size="10" fill="#5f6873">thin, per deployment</text>
+            <rect x="720" y="202" width="146" height="42" rx="4" fill="#fff" stroke="#dda6a6"/>
+            <text x="793" y="219" text-anchor="middle" font-size="11.5" font-weight="700" fill="#8c1616">contributions</text>
+            <text x="793" y="235" text-anchor="middle" font-size="10" fill="#5f6873">from any unit, reviewed</text>
+
+            <line x1="511" y1="257" x2="511" y2="274" stroke="#8b939d" stroke-width="1.5" marker-end="url(#dn)"/>
+
+            <!-- PLANE 3 -->
+            <rect x="140" y="278" width="742" height="86" rx="5" fill="#f2f7fb" stroke="#2c6fa6" stroke-width="2"/>
+            <text x="14" y="308" font-family="ui-monospace, Menlo, monospace" font-size="11" font-weight="700" fill="#2c6fa6">PLANE 3</text>
+            <text x="14" y="326" font-size="13.5" font-weight="700" fill="#232f3e">Governance</text>
+            <text x="14" y="343" font-size="10.5" fill="#8b939d">one gate, and</text>
+            <text x="14" y="356" font-size="10.5" fill="#8b939d">only one</text>
+            <text x="158" y="300" font-size="10" font-weight="700" letter-spacing="1" fill="#1c4f78">GITHUB APP · THE SINGLE PATH TO PRODUCTION</text>
+            <rect x="158" y="310" width="164" height="42" rx="4" fill="#fff" stroke="#9dc0dc"/>
+            <text x="240" y="327" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1c4f78">pull request</text>
+            <text x="240" y="343" text-anchor="middle" font-size="10" fill="#5f6873">no direct write, ever</text>
+            <rect x="332" y="310" width="180" height="42" rx="4" fill="#fff" stroke="#9dc0dc"/>
+            <text x="422" y="327" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1c4f78">policy as code</text>
+            <text x="422" y="343" text-anchor="middle" font-size="10" fill="#5f6873">cfn-guard / OPA, blocking</text>
+            <rect x="522" y="310" width="164" height="42" rx="4" fill="#fff" stroke="#9dc0dc"/>
+            <text x="604" y="327" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1c4f78">human review</text>
+            <text x="604" y="343" text-anchor="middle" font-size="10" fill="#5f6873">→ agent, phase 3</text>
+            <rect x="696" y="310" width="170" height="42" rx="4" fill="#fff" stroke="#9dc0dc"/>
+            <text x="781" y="327" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1c4f78">merge = deploy</text>
+            <text x="781" y="343" text-anchor="middle" font-size="10" fill="#5f6873">the only trigger</text>
+
+            <line x1="511" y1="365" x2="511" y2="382" stroke="#8b939d" stroke-width="1.5" marker-end="url(#dn)"/>
+
+            <!-- PLANE 4 -->
+            <rect x="140" y="386" width="742" height="86" rx="5" fill="#f6f7f9" stroke="#232f3e" stroke-width="1.6"/>
+            <text x="14" y="416" font-family="ui-monospace, Menlo, monospace" font-size="11" font-weight="700" fill="#232f3e">PLANE 4</text>
+            <text x="14" y="434" font-size="13.5" font-weight="700" fill="#232f3e">Provisioning</text>
+            <text x="14" y="451" font-size="10.5" fill="#8b939d">where tenancy</text>
+            <text x="14" y="464" font-size="10.5" fill="#8b939d">is decided</text>
+            <text x="158" y="408" font-size="10" font-weight="700" letter-spacing="1" fill="#232f3e">PIPELINE · AWS ACCOUNTS WE CONTROL</text>
+            <rect x="158" y="418" width="176" height="42" rx="4" fill="#fff" stroke="#b6bec7"/>
+            <text x="246" y="435" text-anchor="middle" font-size="11.5" font-weight="700" fill="#232f3e">CodePipeline</text>
+            <text x="246" y="451" text-anchor="middle" font-size="10" fill="#5f6873">build · test · deploy</text>
+            <rect x="344" y="418" width="176" height="42" rx="4" fill="#fff" stroke="#b6bec7"/>
+            <text x="432" y="435" text-anchor="middle" font-size="11.5" font-weight="700" fill="#232f3e">tenancy binding</text>
+            <text x="432" y="451" text-anchor="middle" font-size="10" fill="#5f6873">unit → account → tags</text>
+            <rect x="530" y="418" width="164" height="42" rx="4" fill="#fff" stroke="#b6bec7"/>
+            <text x="612" y="435" text-anchor="middle" font-size="11.5" font-weight="700" fill="#232f3e">guardrails</text>
+            <text x="612" y="451" text-anchor="middle" font-size="10" fill="#5f6873">SCPs · perm boundaries</text>
+            <rect x="704" y="418" width="162" height="42" rx="4" fill="#fff" stroke="#b6bec7"/>
+            <text x="785" y="435" text-anchor="middle" font-size="11.5" font-weight="700" fill="#232f3e">inventory write</text>
+            <text x="785" y="451" text-anchor="middle" font-size="10" fill="#5f6873">recorded, not scanned</text>
+
+            <line x1="511" y1="473" x2="511" y2="490" stroke="#8b939d" stroke-width="1.5" marker-end="url(#dn)"/>
+
+            <!-- PLANE 5 -->
+            <rect x="140" y="494" width="742" height="72" rx="5" fill="#f2f8f7" stroke="#1f6f6b" stroke-width="1.6"/>
+            <text x="14" y="522" font-family="ui-monospace, Menlo, monospace" font-size="11" font-weight="700" fill="#1f6f6b">PLANE 5</text>
+            <text x="14" y="540" font-size="13.5" font-weight="700" fill="#232f3e">Operations</text>
+            <text x="14" y="557" font-size="10.5" fill="#8b939d">the service</text>
+            <text x="158" y="516" font-size="10" font-weight="700" letter-spacing="1" fill="#155f5b">INVENTORY · TELEMETRY · LIFECYCLE</text>
+            <rect x="158" y="526" width="166" height="32" rx="4" fill="#fff" stroke="#a2cbc7"/>
+            <text x="241" y="546" text-anchor="middle" font-size="11.5" font-weight="700" fill="#155f5b">central dashboard</text>
+            <rect x="334" y="526" width="166" height="32" rx="4" fill="#fff" stroke="#a2cbc7"/>
+            <text x="417" y="546" text-anchor="middle" font-size="11.5" font-weight="700" fill="#155f5b">unit-scoped view</text>
+            <rect x="510" y="526" width="166" height="32" rx="4" fill="#fff" stroke="#a2cbc7"/>
+            <text x="593" y="546" text-anchor="middle" font-size="11.5" font-weight="700" fill="#155f5b">cost + chargeback</text>
+            <rect x="686" y="526" width="180" height="32" rx="4" fill="#fff" stroke="#a2cbc7"/>
+            <text x="776" y="546" text-anchor="middle" font-size="11.5" font-weight="700" fill="#155f5b">version drift + patching</text>
+
+            <!-- feedback loop -->
+            <path d="M886 530 L896 530 L896 105 L886 105" fill="none" stroke="#1f6f6b" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#up)"/>
+            <text x="893" y="320" text-anchor="middle" font-size="10" font-weight="700" fill="#1f6f6b"
+                  transform="rotate(90 893 320)" letter-spacing=".8">status, cost and drift surface back to the builder</text>
+          </g>
+        </svg>
+        <figcaption>Planes 2–5 are the product. Plane 1 is the part everyone will talk about, and the cheapest to build.</figcaption>
+      </figure>
+
+      <div class="note">
+        <span class="tag">Correction to the workshop model</span>
+        <p>Code generation happens in the <strong>builder's own client</strong>, not server-side — which is cheaper than it sounds, but means the client cannot hold a git credential if "no direct write access" is to mean anything. The MCP server should expose <code>propose_change</code>, take a diff, and commit through a GitHub App installation. The builder's identity never enters the credential chain.</p>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section>
+      <h2><span class="sec">04</span>The primitive that decides everything</h2>
+      <div class="rule"></div>
+      <p>One design choice determines whether this is a platform in three years or a pile of forty unmaintainable forks: <strong>what exactly is a blueprint?</strong></p>
+      <p>GitHub template repositories copy code at instantiation. Once forty units have made a course chatbot, a security fix to the template reaches none of them — you are sending forty pull requests by hand, forever. Templates are fine for a two-day demo and fatal as a platform.</p>
+      <p>The blueprint should instead be a <strong>versioned module</strong> (Terraform module, CDK construct, or container image) that generated repositories <em>reference</em>. The repo the builder gets is a thin shell: a manifest, parameter values, and a pinned version. Upgrades become a dependency bump the platform can propose automatically.</p>
+
+      <div class="manifest">
+        <div class="bar">blueprint.yaml — the contract every blueprint publishes</div>
+<pre><span class="k">apiVersion</span>: <span class="v">builder.cornell.edu/v1</span>
+<span class="k">kind</span>: <span class="v">Blueprint</span>
+<span class="k">metadata</span>:
+  <span class="k">name</span>: <span class="v">course-chatbot</span>
+  <span class="k">version</span>: <span class="v">2.3.1</span>              <span class="c"># semver — deployments pin to this</span>
+  <span class="k">maintainer</span>: <span class="v">ai-sei@cornell.edu</span>
+  <span class="k">maturity</span>: <span class="v">supported</span>          <span class="c"># experimental | supported | deprecated</span>
+<span class="k">summary</span>: <span class="v">Teams chatbot answering from a document corpus.</span>
+<span class="k">matches</span>:                       <span class="c"># what Plane 1 reads to route intent</span>
+  - <span class="v">"answer questions about my documents"</span>
+  - <span class="v">"chatbot for students / staff"</span>
+<span class="k">inputs</span>:
+  <span class="k">owner_netid</span>:   { <span class="k">type</span>: <span class="v">netid</span>,  <span class="k">required</span>: <span class="n">true</span> }
+  <span class="k">unit</span>:          { <span class="k">type</span>: <span class="v">unit_id</span>, <span class="k">required</span>: <span class="n">true</span> }   <span class="c"># drives tenancy + billing</span>
+  <span class="k">corpus_source</span>: { <span class="k">type</span>: <span class="v">s3|sharepoint</span>, <span class="k">required</span>: <span class="n">true</span> }
+  <span class="k">audience</span>:      { <span class="k">type</span>: <span class="v">enum</span>, <span class="k">values</span>: [<span class="v">unit</span>, <span class="v">cornell</span>], <span class="k">default</span>: <span class="v">unit</span> }
+<span class="k">provides</span>:  [<span class="v">chat_endpoint</span>, <span class="v">retrieval_api</span>]      <span class="c"># composition contract — track D</span>
+<span class="k">requires</span>:  [<span class="v">vector_store</span>]
+<span class="k">module</span>:
+  <span class="k">source</span>: <span class="v">git::cornell/blueprints//course-chatbot</span>
+  <span class="k">ref</span>: <span class="v">v2.3.1</span>                  <span class="c"># referenced, never copied</span>
+<span class="k">cost</span>:
+  <span class="k">baseline_monthly_usd</span>: <span class="n">70</span>
+  <span class="k">scales_with</span>: <span class="v">[queries, corpus_gb]</span>
+<span class="k">data_classification</span>: <span class="v">[public, internal]</span>   <span class="c"># blocks restricted data at the gate</span>
+</pre>
+      </div>
+      <p style="font-size:13.5px;color:var(--muted);">Every other component reads this file. Plane 1 matches on <code>matches</code> and validates against <code>inputs</code>; Plane 3 enforces <code>data_classification</code>; Plane 4 binds <code>unit</code> to an account; Plane 5 tracks <code>version</code> for drift and <code>cost</code> for chargeback. Write this spec before writing anything else.</p>
+    </section>
+
+    <!-- 5 -->
+    <section>
+      <h2><span class="sec">05</span>Build sequence</h2>
+      <div class="rule"></div>
+      <p>Four phases over about a year. Each has an exit gate — <strong>if the gate isn't met, the next phase doesn't start</strong>, because the failure mode of platform projects is starting phase 3 while phase 1 is still broken.</p>
+
+      <div class="phase">
+        <div class="marker"><div class="pn">P0</div><div class="pd">AUG 3–4</div></div>
+        <div>
+          <h4>Prove the chain</h4>
+          <p>One blueprint, one tenant, human review, no composition. Establishes that intent → repo → PR → pipeline → running service works end to end and that the room believes it. Scope is already correctly cut.</p>
+          <div class="pills"><span class="pill">6 tracks</span><span class="pill">1 bundled blueprint</span><span class="pill">demo Tue 2pm</span></div>
+          <div class="gate"><b>Gate:</b> a live chain, and a written record of the artifacts and decisions that survives AWS leaving on Wednesday.</div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="marker"><div class="pn">P1</div><div class="pd">SEP – NOV</div></div>
+        <div>
+          <h4>Make it survivable</h4>
+          <p>Convert the demo into something that can take a second user without a rewrite. This phase is unglamorous and non-negotiable: the manifest spec, module versioning, the GitHub App and <code>propose_change</code>, blocking policy checks, tenancy binding, and inventory written at deploy time. Three blueprints, three pilot units with real backlogs.</p>
+          <div class="pills"><span class="pill">manifest v1</span><span class="pill">semver modules</span><span class="pill">account vending</span><span class="pill">cfn-guard</span><span class="pill">3 pilot units</span></div>
+          <div class="gate"><b>Gate:</b> a pilot unit deploys without AI-SEI touching a keyboard, and a version bump to a blueprint propagates to every deployment of it.</div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="marker"><div class="pn">P2</div><div class="pd">DEC – MAR</div></div>
+        <div>
+          <h4>Composition</h4>
+          <p>The actual vision: separate blocks composed into one deployment. Requires the <code>provides</code>/<code>requires</code> contract from track D to be real — inter-block communication plus a proven isolation boundary between units. Dependency resolution, multi-block pipelines, and the self-service dashboard land here.</p>
+          <div class="pills"><span class="pill">provides/requires</span><span class="pill">isolation proof</span><span class="pill">8–10 blueprints</span><span class="pill">unit dashboards</span></div>
+          <div class="gate"><b>Gate:</b> a deployment composed of three independently versioned blocks, and a documented isolation test that a security reviewer signs off.</div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="marker"><div class="pn">P3</div><div class="pd">APR – AUG</div></div>
+        <div>
+          <h4>Self-service at scale</h4>
+          <p>Open enrollment. The catalog stops being an AI-SEI artifact and becomes shared property: a contribution process, blueprint review standards, a maintainer model, chargeback, published SLOs, and the automated review agent replacing the human gate for low-risk changes.</p>
+          <div class="pills"><span class="pill">contribution model</span><span class="pill">review agent</span><span class="pill">chargeback</span><span class="pill">SLOs</span><span class="pill">20+ blueprints</span></div>
+          <div class="gate"><b>Gate:</b> more than half of new blueprints in a quarter come from outside AI-SEI. If this fails, the platform is a bottleneck wearing a catalog costume.</div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="marker"><div class="pn">P4</div><div class="pd">YEAR 2</div></div>
+        <div>
+          <h4>The default path for all custom development</h4>
+          <p>Extend well past AI-shaped things — SSO-protected web apps, API layers over systems of record, scheduled and event-driven jobs, batch data processing, UI hosting. Only now does a mandate make sense, because only now is the road demonstrably faster than the shortcut.</p>
+          <div class="pills"><span class="pill">non-AI blueprints</span><span class="pill">legacy migration</span><span class="pill">policy mandate</span></div>
+          <div class="gate"><b>Gate:</b> measured time-to-production through the platform beats the median unit's current path.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section>
+      <h2><span class="sec">06</span>Eight decisions needed before September</h2>
+      <div class="rule"></div>
+      <p>These are cheap to decide now and expensive to reverse later. Recommendations in green; each one has a real trade-off.</p>
+      <table>
+        <thead>
+          <tr><th style="width:42px">#</th><th style="width:27%">Decision</th><th style="width:26%">Recommendation</th><th>Trade-off you're accepting</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="id">D1</td><td>Template copy or versioned module?</td><td class="rec">Versioned module; repo is a thin shell</td><td>More upfront design and a harder authoring experience, in exchange for a patch path that doesn't require forty manual PRs.</td></tr>
+          <tr><td class="id">D2</td><td>How does intent match a blueprint?</td><td class="rec">Whole catalog in model context</td><td>Breaks somewhere past 75–100 blueprints. Cheaper and more accurate than vector search until then; revisit, don't pre-build.</td></tr>
+          <tr><td class="id">D3</td><td>Who holds git credentials?</td><td class="rec">GitHub App + <code>propose_change</code></td><td>More server-side plumbing than handing out scoped tokens, but it's the only version where "no direct write access" is actually true.</td></tr>
+          <tr><td class="id">D4</td><td>What triggers a deploy?</td><td class="rec">Merge, and nothing else</td><td>Slower demos and no "just push it" escape hatch — which is the point. Two paths to production means the gate is optional.</td></tr>
+          <tr><td class="id">D5</td><td>Where is the tenancy boundary?</td><td class="rec">Account per unit, not per deployment</td><td>Weaker blast-radius isolation than per-deployment accounts; far less account sprawl and simpler cost allocation. Revisit if a unit handles restricted data.</td></tr>
+          <tr><td class="id">D6</td><td>One IaC standard or three?</td><td class="rec">Pick one for AWS; Terraform only for M365</td><td>Someone's preferred tool loses. Three IaC dialects across a catalog is an unmaintainable authoring surface.</td></tr>
+          <tr><td class="id">D7</td><td>Build the portal or buy it?</td><td class="rec">Build the catalog and gate; evaluate Backstage or Port for Plane 5</td><td>Plane 5 is the least differentiated part and the most work. Buying it is not a defeat.</td></tr>
+          <tr><td class="id">D8</td><td>Who reviews, and how fast?</td><td class="rec">Named rota with a published SLA (target &lt; 4 business hours)</td><td>A real staffing commitment. Without an SLA the review gate becomes the reason people route around the platform.</td></tr>
+        </tbody>
+      </table>
+      <div class="note">
+        <span class="tag">Prior art worth reading before D7</span>
+        <p>AWS built approximately this product — platform team owns templates, developers self-serve instances — and is exiting it. AWS Proton closed to new customers in October 2025 and support ends 7 October 2026. Building it yourselves is now the correct call, but Proton's template/instance versioning model is the best available reference for the problem in D1, and its commercial failure is a useful warning about how hard catalog adoption is.</p>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section>
+      <h2><span class="sec">07</span>What it takes to run</h2>
+      <div class="rule"></div>
+      <p>A catalog with no maintainer is a graveyard within eighteen months. This is a staffing proposal as much as an architecture one.</p>
+      <table>
+        <thead><tr><th style="width:29%">Role</th><th style="width:13%">Load</th><th>Accountable for</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Product owner</strong></td><td>0.5 FTE</td><td>Roadmap, which blueprints exist, saying no. The single most commonly missing role in platform efforts.</td></tr>
+          <tr><td><strong>Platform engineers</strong></td><td>2–3 FTE</td><td>Planes 2–4: registry, gate, pipeline, tenancy, guardrails.</td></tr>
+          <tr><td><strong>Blueprint maintainers</strong></td><td>Federated</td><td>One named owner per blueprint, ideally in the unit that contributed it. Unowned blueprints get deprecated on schedule.</td></tr>
+          <tr><td><strong>Service manager</strong></td><td>0.5 FTE</td><td>Intake, TDX integration, incident path, the "supported service" wrapper.</td></tr>
+          <tr><td><strong>Review rota</strong></td><td>~0.3 FTE</td><td>Meeting the D8 SLA until the review agent takes low-risk changes in P3.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 8 -->
+    <section>
+      <h2><span class="sec">08</span>Risks, ranked honestly</h2>
+      <div class="rule"></div>
+      <table>
+        <thead><tr><th style="width:60px">Risk</th><th style="width:32%">What goes wrong</th><th>What reduces it</th></tr></thead>
+        <tbody>
+          <tr><td class="risk-h">HIGH</td><td><strong>Catalog starvation.</strong> Nobody contributes; AI-SEI becomes the bottleneck it was trying to remove.</td><td>Make contribution a P1 requirement, not a P3 one. Recruit two units to author a blueprint each during the pilot, and make the authoring experience genuinely good.</td></tr>
+          <tr><td class="risk-h">HIGH</td><td><strong>The paved road is slower.</strong> Review latency and blueprint gaps push units back to their own accounts.</td><td>Publish and hold the D8 SLA. Measure time-to-first-deploy every month and treat regression as a P1 incident.</td></tr>
+          <tr><td class="risk-h">HIGH</td><td><strong>Track D stays unsolved</strong> and composition or isolation is assumed rather than proven.</td><td>Gate P2 on a documented isolation test signed off by security. Don't ship multi-tenant composition on an untested boundary.</td></tr>
+          <tr><td class="risk-m">MED</td><td><strong>Version drift.</strong> Forty deployments on nine different blueprint versions, none patchable.</td><td>D1. Decide it before writing the second blueprint, not the twentieth.</td></tr>
+          <tr><td class="risk-m">MED</td><td><strong>The methodology doesn't stick</strong> once the AWS facilitators leave.</td><td>The program-management role in the workshop is load-bearing. Artifacts captured Monday and Tuesday are the only thing that carries into September.</td></tr>
+          <tr><td class="risk-m">MED</td><td><strong>Cost surprise.</strong> Per-deployment Aurora Serverless and Bedrock usage scale faster than anyone modelled.</td><td>Cost estimate in the manifest, shown before deploy. Budget alarms per unit from P1. Aggressive dev-environment expiry.</td></tr>
+          <tr><td class="risk-l">LOW</td><td><strong>Key-person dependency</strong> on the two or three people who understand the whole chain.</td><td>Documented runbooks as a P1 deliverable; rotate the review duty deliberately.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 9 -->
+    <section>
+      <h2><span class="sec">09</span>How we'll know it's working</h2>
+      <div class="rule"></div>
+      <table>
+        <thead><tr><th style="width:38%">Measure</th><th style="width:20%">Target by P3</th><th>Why this one</th></tr></thead>
+        <tbody>
+          <tr><td>Time from request to running dev environment</td><td><strong>&lt; 1 hour</strong></td><td>The whole thesis. If this isn't dramatically better than the status quo, nothing else matters.</td></tr>
+          <tr><td>Reuse ratio — deployments per blueprint</td><td><strong>&gt; 4×</strong></td><td>Below this, you're hand-building with extra steps.</td></tr>
+          <tr><td>Blueprints contributed from outside AI-SEI</td><td><strong>&gt; 50% per quarter</strong></td><td>The difference between a shared platform and a central queue.</td></tr>
+          <tr><td>Share of new custom builds on the platform</td><td><strong>&gt; 40%</strong></td><td>Adoption against the real alternative, which is doing it themselves.</td></tr>
+          <tr><td>Inventory coverage of known custom apps</td><td><strong>&gt; 80%</strong></td><td>The governance payoff leadership is actually buying.</td></tr>
+          <tr><td>Median PR review latency</td><td><strong>&lt; 4 business hours</strong></td><td>The leading indicator for every adoption failure above.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 10 -->
+    <section>
+      <h2><span class="sec">10</span>The ask</h2>
+      <div class="rule"></div>
+      <div class="thesis">
+        <p><strong>Three things, in order.</strong></p>
+        <ol style="margin-bottom:0">
+          <li>Decide D1–D8 in September, before any Phase 1 code is written.</li>
+          <li>Fund the P1 team — roughly 3.5 FTE for a quarter — and name a product owner. Not a committee.</li>
+          <li>Recruit three pilot units with real, funded backlogs. Not volunteers who find it interesting; units that will be annoyed if it doesn't work.</li>
+        </ol>
+      </div>
+      <p style="font-size:13.5px;color:var(--muted);">Everything above is a proposal for discussion, not a plan of record. Cost figures are order-of-magnitude and need a real model before anyone commits to them.</p>
+    </section>
+
+  </div>
+
+  <footer class="end">
+    Cornell Builder — product proposal, drafted alongside the AI-DLC workshop participant brief of 3–4 August. Companion to, and not a replacement for, that document.
+  </footer>
+</div>
+</body>
+</html>
