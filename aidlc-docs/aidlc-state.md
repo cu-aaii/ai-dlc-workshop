@@ -3,7 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: INCEPTION - User Stories (Part 1: Planning — awaiting answers in `inception/plans/story-generation-plan.md`)
+- **Current Stage**: INCEPTION - User Stories (Part 2: Generation complete — awaiting approval of `inception/user-stories/stories.md` and `personas.md`)
+- **Story Plan Approved**: 2026-08-03 — user response "approve plan"
 - **Requirements Approved**: 2026-08-03 — user response "requirements approved"
 
 ## Workspace State

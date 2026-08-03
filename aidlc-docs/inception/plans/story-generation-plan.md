@@ -243,68 +243,68 @@ completes.
       for enabler stories), `P-01` for the single persona**
 
 ### B2. Personas
-- [ ] Generate `aidlc-docs/inception/user-stories/personas.md` with the **single** persona `P-01`
+- [x] Generate `aidlc-docs/inception/user-stories/personas.md` with the **single** persona `P-01`
       "Dashboard viewer" (Q1 = D)
-- [ ] Capture: label, role, goals, motivations, characteristics, technical access level (AWS
+- [x] Capture: label, role, goals, motivations, characteristics, technical access level (AWS
       console? PR-only? neither?), and how they reach the dashboard
-- [ ] State explicitly that admission is by **network position**, not identity — inside the WAF
+- [x] State explicitly that admission is by **network position**, not identity — inside the WAF
       allowlist or not — and record which audiences that knowingly excludes in v1 (anyone
       off-network, including a legitimate Cornell user on a non-allowlisted connection)
-- [ ] Note the persona's relationship to the deferred identity/auth work, and that collapsing to
+- [x] Note the persona's relationship to the deferred identity/auth work, and that collapsing to
       one persona means v1 draws no distinction between platform operators, workshop organizers,
       and campus builders
 
 ### B3. Stories
-- [ ] Generate `aidlc-docs/inception/user-stories/stories.md`: classic format (Q3 = A), organized
+- [x] Generate `aidlc-docs/inception/user-stories/stories.md`: classic format (Q3 = A), organized
       by **user journey** (Q4 = A), as **thin vertical slices** (Q2 = A), IDs `US-nn`
-- [ ] Cover the viewer-facing v1 functional requirements as journey slices: FR-1 (tag inventory),
+- [x] Cover the viewer-facing v1 functional requirements as journey slices: FR-1 (tag inventory),
       FR-2 (periodic snapshot + freshness), FR-3 (read API), FR-4 (web UI), FR-5 (network access
       control)
-- [ ] Write the **7 enabler stories** listed in Part A2, each labelled `[Enabler]` and citing its
+- [x] Write the **7 enabler stories** listed in Part A2, each labelled `[Enabler]` and citing its
       rule IDs (Q9 = B) — including the FR-6 + FR-7 pipeline-deployment story (Q10 = B)
-- [ ] Handle FR-8 in a clearly-marked **Deferred / Stretch** section with criteria explicitly TBD
+- [x] Handle FR-8 in a clearly-marked **Deferred / Stretch** section with criteria explicitly TBD
       pending the data-source decision (Q6 = B)
-- [ ] Cover the behaviours that fail silently if unspecified: Tagging API **pagination**
+- [x] Cover the behaviours that fail silently if unspecified: Tagging API **pagination**
       (truncation under-reports inventory), **snapshot staleness** display, **fail-closed** error
       handling, and the `pipeline.yml` action whose absence deploys nothing while reporting success
-- [ ] Add **no** priority or dependency markers (Q8 = A); state the pipeline-story dependency in
+- [x] Add **no** priority or dependency markers (Q8 = A); state the pipeline-story dependency in
       prose only
 
 ### B4. Acceptance criteria
-- [ ] Write Given/When/Then criteria, 3–6 per story, for every v1 and enabler story (Q5 = A)
-- [ ] Ensure criteria are observable and testable — no "works correctly" or "is performant"
-- [ ] Attach capability-specific NFRs as criteria on their capability's story (Q7 = A) — e.g.
+- [x] Write Given/When/Then criteria, 3–6 per story, for every v1 and enabler story (Q5 = A)
+- [x] Ensure criteria are observable and testable — no "works correctly" or "is performant"
+- [x] Attach capability-specific NFRs as criteria on their capability's story (Q7 = A) — e.g.
       HTTPS-only and security headers on the UI story, input validation and rate limiting on the
       API story
-- [ ] Add **no** "Properties" sub-list (Q5 = A); properties are identified at Functional Design
+- [x] Add **no** "Properties" sub-list (Q5 = A); properties are identified at Functional Design
       from `requirements.md` §4.2
-- [ ] Verify the exceptions in `requirements.md` §4.6 are reflected honestly — in particular, no
+- [x] Verify the exceptions in `requirements.md` §4.6 are reflected honestly — in particular, no
       story may imply per-user authentication exists in v1
 
 ### B5. INVEST verification (mandatory artifact requirement)
-- [ ] **Independent** — each story deliverable without requiring another's completion
-- [ ] **Negotiable** — stories state the need, not the implementation
-- [ ] **Valuable** — each v1 story names the gain for `P-01`; enabler stories are explicitly
+- [x] **Independent** — each story deliverable without requiring another's completion
+- [x] **Negotiable** — stories state the need, not the implementation
+- [x] **Valuable** — each v1 story names the gain for `P-01`; enabler stories are explicitly
       labelled as cross-cutting instead
-- [ ] **Estimable** — scope clear enough to size
-- [ ] **Small** — consistent with thin vertical slices
-- [ ] **Testable** — every story has criteria that can pass or fail unambiguously
-- [ ] Apply the above to v1 and enabler stories only; **exempt the Deferred / Stretch section**
+- [x] **Estimable** — scope clear enough to size
+- [x] **Small** — consistent with thin vertical slices
+- [x] **Testable** — every story has criteria that can pass or fail unambiguously
+- [x] Apply the above to v1 and enabler stories only; **exempt the Deferred / Stretch section**
       (TBD criteria cannot be Testable) and state that exemption in the document
 
 ### B6. Traceability and coverage
-- [ ] Map `P-01` → stories (the persona appears in every non-enabler story; every enabler story is
+- [x] Map `P-01` → stories (the persona appears in every non-enabler story; every enabler story is
       marked cross-cutting rather than naming a persona)
-- [ ] Map stories → requirements in a coverage table (Q3 = A keeps citations out of story *text*,
+- [x] Map stories → requirements in a coverage table (Q3 = A keeps citations out of story *text*,
       so traceability lives in this table instead): every v1 FR covered by at least one story,
       every story tracing to at least one requirement — no orphan stories inventing new scope
-- [ ] Report any requirement left uncovered, rather than quietly padding the story list
+- [x] Report any requirement left uncovered, rather than quietly padding the story list
 
 ### B7. Completion
-- [ ] Mark every step above `[x]`
-- [ ] Update `aidlc-docs/aidlc-state.md` current status
-- [ ] Log the approval prompt in `aidlc-docs/audit.md` with an ISO-8601 timestamp
-- [ ] Present the `# 📚 User Stories Complete` message and wait for explicit approval
+- [x] Mark every step above `[x]`
+- [x] Update `aidlc-docs/aidlc-state.md` current status
+- [x] Log the approval prompt in `aidlc-docs/audit.md` with an ISO-8601 timestamp
+- [x] Present the `# 📚 User Stories Complete` message and wait for explicit approval
 
 ---
 
