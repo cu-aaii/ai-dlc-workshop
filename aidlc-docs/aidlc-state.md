@@ -3,7 +3,12 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: INCEPTION - User Stories (Part 2: Generation complete — awaiting approval of `inception/user-stories/stories.md` and `personas.md`)
+- **Current Stage**: INCEPTION - User Stories (Part 2: Generation complete — approval gate **held open**, see New Requirement below)
+- **Open item blocking the gate**: 2026-08-03 — user requested "custom telemetry" for the dashboard, a new
+  functional requirement arriving after `requirements.md` was approved. Questions pending in
+  `inception/requirements/requirement-amendment-questions-telemetry.md`. The stories gate is not
+  approved until Q3 (sequencing) is answered, since approving now could bank a story set that a
+  pending FR-9 invalidates.
 - **Story Plan Approved**: 2026-08-03 — user response "approve plan"
 - **Requirements Approved**: 2026-08-03 — user response "requirements approved"
 
