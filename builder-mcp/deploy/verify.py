@@ -1,11 +1,17 @@
-"""Verify the deployed AgentCore runtime end to end: Entra ID OAuth token -> MCP
-handshake -> list tools -> live blueprint_search call. The demo-day proof, runnable any
-time.
+"""Verify the deployed AgentCore runtime end to end: auth -> MCP handshake -> list
+tools -> live blueprint_search call. The demo-day proof, runnable any time.
 
     uv run python deploy/verify.py --stack aidlc-main-builder-mcp --region us-east-1
 
-The Entra client secret comes from the BUILDER_MCP_ENTRA_CLIENT_SECRET env var, falling
-back to the Secrets Manager secret aidlc/main/builder-mcp/entra-client-secret.
+Two auth modes, matching the stack's AuthMode parameter (infra/builder-mcp.yml):
+
+- entra: Entra ID OAuth token. The client secret comes from the
+  BUILDER_MCP_ENTRA_CLIENT_SECRET env var, falling back to the Secrets Manager secret
+  aidlc/main/builder-mcp/entra-client-secret.
+- open (--no-auth; auto-detected when the stack has no EntraTokenEndpoint output): no
+  Entra token. AgentCore has no unauthenticated mode -- an open runtime falls back to
+  AWS IAM SigV4 -- so requests are SigV4-signed with the same AWS credentials this
+  script already uses to read the stack outputs.
 """
 
 from __future__ import annotations
@@ -67,6 +73,41 @@ def bearer_token(token_endpoint: str, client_id: str, secret: str) -> str:
     return response.json()["access_token"]
 
 
+def sigv4_auth(region: str):
+    """httpx auth handler that SigV4-signs each request with the caller's AWS
+    credentials. An AuthMode=open runtime has no JWT authorizer, and AgentCore's
+    default inbound auth is IAM SigV4 -- there is no unauthenticated mode."""
+    import httpx2  # the MCP SDK's vendored httpx; its client factory takes httpx2.Auth
+    from botocore.auth import SigV4Auth
+    from botocore.awsrequest import AWSRequest
+
+    credentials = boto3.Session().get_credentials()
+    if credentials is None:
+        raise SystemExit(
+            "no AWS credentials found -- an open (AuthMode=open) runtime still requires "
+            "SigV4-signed calls; configure AWS credentials first"
+        )
+    frozen = credentials.get_frozen_credentials()
+
+    class _SigV4(httpx2.Auth):
+        requires_request_body = True
+
+        def auth_flow(self, request):
+            aws_request = AWSRequest(
+                method=request.method,
+                url=str(request.url),
+                data=request.content,
+                headers={
+                    "Content-Type": request.headers.get("Content-Type", "application/json")
+                },
+            )
+            SigV4Auth(frozen, "bedrock-agentcore", region).add_auth(aws_request)
+            request.headers.update(dict(aws_request.headers))
+            yield request
+
+    return _SigV4()
+
+
 def mcp_url(runtime_arn: str, region: str) -> str:
     encoded = urllib.parse.quote(runtime_arn, safe="")
     return (
@@ -79,12 +120,16 @@ EXPECTED_TOOL_COUNT = 8  # SPEC C3: blueprint_search, deployment_create/read/upd
                          # health/restart/delete, spec_export
 
 
-async def exercise(url: str, token: str) -> None:
+async def exercise(url: str, token: str | None, region: str) -> None:
     # streamable_http_client takes no headers kwarg in the pinned SDK; auth rides on the
     # underlying httpx client instead (same pattern as validate_endpoints.py).
+    # token=None is open mode: SigV4-sign every request instead of a Bearer header.
     from mcp.client.streamable_http import create_mcp_http_client
 
-    http_client = create_mcp_http_client(headers={"Authorization": f"Bearer {token}"})
+    if token is None:
+        http_client = create_mcp_http_client(auth=sigv4_auth(region))
+    else:
+        http_client = create_mcp_http_client(headers={"Authorization": f"Bearer {token}"})
     async with streamable_http_client(url, http_client=http_client) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
@@ -108,21 +153,45 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stack", default="aidlc-main-builder-mcp")
     parser.add_argument("--region", default="us-east-1")
+    parser.add_argument(
+        "--no-auth",
+        action="store_true",
+        help="skip the Entra token (for AuthMode=open stacks); requests are SigV4-signed "
+             "with your AWS credentials, because AgentCore has no unauthenticated mode",
+    )
     args = parser.parse_args()
 
     outputs = stack_outputs(args.stack, args.region)
-    missing = {"EntraTokenEndpoint", "EntraClientId", "RuntimeArn"} - set(outputs)
-    if missing:
-        print(f"stack {args.stack} is missing outputs {sorted(missing)} -- "
-              "has the pipeline deployed the Entra-authorizer template?", file=sys.stderr)
+    if "RuntimeArn" not in outputs:
+        print(f"stack {args.stack} has no RuntimeArn output -- was it deployed with an "
+              "empty ContainerImageUri (runtime skipped)?", file=sys.stderr)
         return 1
 
-    secret = entra_client_secret(args.region)
-    token = bearer_token(outputs["EntraTokenEndpoint"], outputs["EntraClientId"], secret)
-    print("OAUTH OK: Entra client-credentials token obtained")
+    no_auth = args.no_auth
+    if not no_auth and "EntraTokenEndpoint" not in outputs:
+        print("NOTE: stack has no EntraTokenEndpoint output, so it was deployed with "
+              "AuthMode=open (Entra masked for the testing phase) -- falling back to "
+              "--no-auth. Calls are SigV4-signed with your AWS credentials; AgentCore "
+              "has no unauthenticated mode.")
+        no_auth = True
+
+    if no_auth:
+        token = None
+        print("AUTH: open mode -- no Entra token; requests will be SigV4-signed")
+    else:
+        missing = {"EntraTokenEndpoint", "EntraClientId"} - set(outputs)
+        if missing:
+            print(f"stack {args.stack} is missing outputs {sorted(missing)} -- "
+                  "has the pipeline deployed the Entra-authorizer template?",
+                  file=sys.stderr)
+            return 1
+        secret = entra_client_secret(args.region)
+        token = bearer_token(outputs["EntraTokenEndpoint"], outputs["EntraClientId"], secret)
+        print("OAUTH OK: Entra client-credentials token obtained")
+
     url = mcp_url(outputs["RuntimeArn"], args.region)
     print("ENDPOINT:", url)
-    asyncio.run(exercise(url, token))
+    asyncio.run(exercise(url, token, args.region))
     print("VERIFIED: the Cornell Builder is live on AgentCore")
     return 0
 

@@ -143,11 +143,16 @@ def deployment_create(
     parameters: dict[str, str] | None = None,
     dry_run: bool = True,
 ) -> dict[str, Any]:
-    """Create a deployment of a blueprint: a new repo in the Cornell GitHub org plus a
-    registration pull request that makes the pipeline deploy the stack on merge.
+    """Create a deployment of a blueprint: a deployment shell plus a registration pull
+    request that makes the pipeline deploy the stack on merge.
 
-    Always call with dry_run=true first and show the user the plan (repo to be created,
-    PR to be opened, stack name, parameters, estimated cost) for confirmation. Nothing
+    Where the shell lands depends on the server's deployment mode (SPEC C2): in 'folder'
+    mode (testing-phase default) it is written to outputs/<deployment_name>/ in the
+    workshop repo on the same branch as the registration PR — one PR carries both; in
+    'repo' mode (target state) a new deploy-<name> repo is created in the Cornell org.
+
+    Always call with dry_run=true first and show the user the plan (shell location, PR
+    to be opened, stack name, parameters, estimated cost) for confirmation. Nothing
     deploys until a human approves the PR — merge is the only deploy trigger.
     """
     netid_problem = owner_netid_problem(owner_netid)
@@ -177,24 +182,44 @@ def deployment_create(
         **found.pipeline_parameters,
     }
     action_block = render_pipeline_action(deployment_name, found.template, stack_name, overrides)
+    folder_mode = settings.deployment_mode == "folder"
     repo_name = f"deploy-{deployment_name}"
     shell_files = deployment_repo_files(
         found.name, found.version, found.template, deployment_name,
         stack_name, owner_netid, parameters, settings.workshop_repo_full,
+        shell_location="folder" if folder_mode else "repo",
     )
+    if folder_mode:
+        # The folder is always derived server-side: 'outputs/' + the already-validated
+        # deployment_name (DEPLOYMENT_NAME_PATTERN forbids '/', '.', and '..') + '/' +
+        # a fixed basename from deployment_repo_files — never a caller-supplied path.
+        shell_files = {
+            f"outputs/{deployment_name}/{path}": content
+            for path, content in shell_files.items()
+        }
 
     plan = {
         "blueprint": f"{found.name} v{found.version} ({found.maturity})",
         "stack": stack_name,
         "estimated_cost": found.cost,
-        "new_repo": f"{settings.github_org}/{repo_name}",
         "registration_pr": {
             "repo": settings.workshop_repo_full,
-            "edits": "pipeline/pipeline.yml — one new BlueprintDeploy action",
+            "edits": (
+                "pipeline/pipeline.yml — one new BlueprintDeploy action; "
+                f"outputs/{deployment_name}/ — the deployment shell (same PR)"
+                if folder_mode
+                else "pipeline/pipeline.yml — one new BlueprintDeploy action"
+            ),
             "parameter_overrides": overrides,
         },
         "governance": "Deploys only when a human approves and merges the registration PR.",
     }
+    if folder_mode:
+        plan["shell_folder"] = (
+            f"outputs/{deployment_name}/ (in {settings.workshop_repo_full}, same PR)"
+        )
+    else:
+        plan["new_repo"] = f"{settings.github_org}/{repo_name}"
     # F1 denylist: every path this tool writes is validated, even the server-generated
     # shell files — no write can ever land under .github/ or outside the repo.
     files_issue = files_problem(shell_files)
@@ -209,18 +234,33 @@ def deployment_create(
     branch = f"deploy/{deployment_name}"
     try:
         with GitHubOps(settings) as github:
-            results["repo"] = github.create_org_repo(
-                repo_name, f"{found.name} v{found.version} deployment owned by {owner_netid}"
-            )
-            completed_steps.append(f"created repo {settings.github_org}/{repo_name}")
-            for path, content in shell_files.items():
-                github.put_file(
-                    f"{settings.github_org}/{repo_name}", path, content,
-                    f"Initialize {deployment_name} shell", "main",
+            if not folder_mode:
+                # Target-state path (D1/D5): a dedicated deploy-<name> repo. Stashed
+                # behind BUILDER_MCP_DEPLOYMENT_MODE=repo while the testing-phase
+                # credential cannot create org repos; reactivate by setting the env var.
+                results["repo"] = github.create_org_repo(
+                    repo_name, f"{found.name} v{found.version} deployment owned by {owner_netid}"
                 )
-            completed_steps.append("initialized deployment repo shell files")
+                completed_steps.append(f"created repo {settings.github_org}/{repo_name}")
+                for path, content in shell_files.items():
+                    github.put_file(
+                        f"{settings.github_org}/{repo_name}", path, content,
+                        f"Initialize {deployment_name} shell", "main",
+                    )
+                completed_steps.append("initialized deployment repo shell files")
             github.create_branch(settings.workshop_repo_full, branch)
             completed_steps.append(f"created branch {branch} on {settings.workshop_repo_full}")
+            if folder_mode:
+                # Folder mode: the shell rides the same branch as the pipeline edit, so
+                # the registration PR carries both (one PR, no repo creation).
+                for path, content in shell_files.items():
+                    github.put_file(
+                        settings.workshop_repo_full, path, content,
+                        f"Initialize {deployment_name} shell", branch,
+                    )
+                completed_steps.append(
+                    f"wrote the deployment shell under outputs/{deployment_name}/"
+                )
             if github.can_write:
                 pipeline_text, sha = github.get_file(
                     settings.workshop_repo_full, "pipeline/pipeline.yml", ref=branch
@@ -232,28 +272,39 @@ def deployment_create(
                     branch, sha=sha,
                 )
                 completed_steps.append("registered the deploy action on pipeline/pipeline.yml")
+            shell_line = (
+                f"- Deployment shell: `outputs/{deployment_name}/` (in this PR)"
+                if folder_mode
+                else f"- Deployment repo: {settings.github_org}/{repo_name}"
+            )
             results["pull_request"] = github.create_pull(
                 settings.workshop_repo_full,
                 branch,
                 f"Deploy {found.name} v{found.version} as {stack_name} for {owner_netid}",
                 f"Registration PR opened by the Cornell Builder.\n\n"
                 f"- Blueprint: `{found.name}` v{found.version}\n- Stack: `{stack_name}`\n"
-                f"- Owner: `{owner_netid}`\n- Deployment repo: {settings.github_org}/{repo_name}\n\n"
+                f"- Owner: `{owner_netid}`\n{shell_line}\n\n"
                 "Merging this PR is the deploy action. Review the pipeline action diff carefully.",
             )
             completed_steps.append("opened the registration PR")
     except Exception as error:
         # SECURITY-15: the multi-step sequence is not atomic — report exactly how far
         # it got and what may need cleanup, instead of raising mid-way.
-        return {
-            **safe_error(error, f"creating deployment {deployment_name!r}"),
-            "completed_steps": completed_steps,
-            "cleanup": (
+        cleanup = (
+            f"Partial state may remain: branch {branch!r} on "
+            f"{settings.workshop_repo_full} can be deleted safely and the create retried."
+            if folder_mode
+            else (
                 f"Partial state may remain: check for repo "
                 f"{settings.github_org}/{repo_name} and branch {branch!r} on "
                 f"{settings.workshop_repo_full}; delete whichever exists before "
                 "retrying, or ask the platform team."
-            ),
+            )
+        )
+        return {
+            **safe_error(error, f"creating deployment {deployment_name!r}"),
+            "completed_steps": completed_steps,
+            "cleanup": cleanup,
         }
     return results
 
@@ -310,6 +361,22 @@ def deployment_update(
     issue = title_description_problem(title, description) or files_problem(files)
     if issue:
         return {"error": issue}
+    # Folder mode (testing phase): deployments have no deploy-* repo — their shell lives
+    # at outputs/<name>/ in the workshop repo, so a deploy-* target is a mistake worth
+    # explaining rather than a repo that will 404.
+    if settings.deployment_mode == "folder" and repo_full.startswith(
+        f"{settings.github_org}/deploy-"
+    ):
+        shell_name = repo_full.removeprefix(f"{settings.github_org}/deploy-")
+        return {
+            "error": (
+                f"this server runs in 'folder' deployment mode: {repo_full!r} does not "
+                f"exist as a repo. The deployment's shell lives in "
+                f"{settings.workshop_repo_full} under outputs/{shell_name}/ — call "
+                f"deployment_update again with repo={settings.workshop_repo!r} and file "
+                f"paths prefixed outputs/{shell_name}/"
+            )
+        }
     # uuid4, not hash(): hash() is randomized per process (PYTHONHASHSEED), so the
     # branch would differ between the dry-run plan and a post-restart execute.
     branch = f"propose/{uuid.uuid4().hex[:8]}"
@@ -385,6 +452,8 @@ def deployment_restart(deployment_name: str, dry_run: bool = True) -> dict[str, 
 def deployment_delete(deployment_name: str, dry_run: bool = True) -> dict[str, Any]:
     """Delete a deployment the governed way: a deregistration pull request that removes
     its action from the pipeline, symmetric with deployment_create's registration PR.
+    In 'folder' deployment mode the same PR also removes the outputs/<name>/ shell
+    folder, mirroring what deployment_create wrote.
 
     This tool never calls an AWS delete API. After a human approves and merges the PR,
     the platform removes the stack itself according to its DeletionPolicy — merge is the
@@ -399,13 +468,20 @@ def deployment_delete(deployment_name: str, dry_run: bool = True) -> dict[str, A
     stack_name = settings.stack_name(deployment_name)
     action_name = f"{pascal_case(deployment_name)}CloudFormation"
     branch = f"undeploy/{deployment_name}"
+    folder_mode = settings.deployment_mode == "folder"
     plan = {
         "deployment": deployment_name,
         "stack": stack_name,
         "deregistration_pr": {
             "repo": settings.workshop_repo_full,
             "branch": branch,
-            "edits": f"pipeline/pipeline.yml — remove the {action_name} BlueprintDeploy action",
+            "edits": (
+                f"pipeline/pipeline.yml — remove the {action_name} BlueprintDeploy "
+                f"action; outputs/{deployment_name}/ — remove the deployment shell "
+                "folder (same PR)"
+                if folder_mode
+                else f"pipeline/pipeline.yml — remove the {action_name} BlueprintDeploy action"
+            ),
         },
         "warning": (
             "The stack itself is deleted by the platform after the PR merges, per its "
@@ -435,13 +511,35 @@ def deployment_delete(deployment_name: str, dry_run: bool = True) -> dict[str, A
                     f"Deregister {stack_name}", branch, sha=sha,
                 )
                 completed_steps.append("removed the deploy action on the branch")
+                if folder_mode:
+                    # Symmetric teardown: the same PR that deregisters the pipeline
+                    # action also removes the outputs/<name>/ shell folder. The path is
+                    # server-derived from the validated deployment_name, never caller
+                    # input; list_dir returns [] when the folder does not exist.
+                    for path, blob_sha in github.list_dir(
+                        settings.workshop_repo_full, f"outputs/{deployment_name}", ref=branch
+                    ):
+                        github.delete_file(
+                            settings.workshop_repo_full, path,
+                            f"Remove outputs/{deployment_name}/ shell (undeploy {stack_name})",
+                            branch, sha=blob_sha,
+                        )
+                    completed_steps.append(
+                        f"removed the outputs/{deployment_name}/ shell folder on the branch"
+                    )
+            removes_line = (
+                f"- Removes: the `{action_name}` action from the BlueprintDeploy stage "
+                f"and the `outputs/{deployment_name}/` deployment shell"
+                if folder_mode
+                else f"- Removes: the `{action_name}` action from the BlueprintDeploy stage"
+            )
             results["pull_request"] = github.create_pull(
                 settings.workshop_repo_full,
                 branch,
                 f"Undeploy {stack_name}",
                 f"Deregistration PR opened by the Cornell Builder.\n\n"
                 f"- Deployment: `{deployment_name}`\n- Stack: `{stack_name}`\n"
-                f"- Removes: the `{action_name}` action from the BlueprintDeploy stage\n\n"
+                f"{removes_line}\n\n"
                 "Merging this PR is the teardown action: the platform deletes the stack per its "
                 "DeletionPolicy. If this was the blueprint's *last* deployment, its "
                 "`pipeline/stacks.yml` entry should be removed in a follow-up PR.",

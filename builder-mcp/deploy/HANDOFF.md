@@ -20,10 +20,54 @@ Pipeline-order note: `PipelineDeploy` applies the new pipeline definition first 
 `RestartExecutionOnUpdate` reruns from the top, so the first merge picks up the new
 stages on its own — no console action needed.
 
-## Required pre-flight (one-time, before the merge)
+## Testing phase: AuthMode=open (current)
 
-Inbound auth is **Microsoft Entra ID client-credentials** (platform-lead directive,
-2026-08-03). The app registration is an Azure resource: the repo's Terraform-for-Azure
+**The pipeline currently deploys the stack with `AuthMode=open`** (user directive
+2026-08-04): the Entra JWT authorizer is **masked, not removed** — the full Entra
+configuration stays in `infra/builder-mcp.yml` behind the `UseEntra` condition, and the
+Entra pre-flight below is **not required** while open. An open-mode deploy has zero
+pre-flight: no Azure app registration, no SSM parameters, no client secret.
+
+**What "open" actually means — read this before the demo.** AgentCore has **no
+unauthenticated inbound mode**. A runtime without an authorizer configuration falls back
+to the service default, **AWS IAM SigV4** ("the default authentication and authorization
+mechanism that works automatically without additional configuration" — AWS devguide,
+`bedrock-agentcore/latest/devguide/runtime-oauth.html`; a runtime supports either SigV4
+*or* JWT, never neither). So `AuthMode=open` means:
+
+- Nobody logs in via Entra, and no token pre-flight exists — that part is real.
+- But callers still need **AWS credentials** with `bedrock-agentcore:InvokeAgentRuntime`
+  and must **SigV4-sign** every request. `verify.py` handles this automatically
+  (`--no-auth`, auto-detected — it signs with the same credentials it already uses to
+  read the stack).
+- **Implication for Claude clients**: a plain bearer-token MCP client (Claude Code /
+  Cowork pointed at a URL with an `Authorization` header) **cannot call the open cloud
+  endpoint** — standard MCP HTTP clients do not SigV4-sign. The zero-login way to use
+  the server conversationally remains the **local stdio path** (`.mcp.json`, see
+  [LOCAL-TESTING.md](LOCAL-TESTING.md)). This is as publicly accessible as the platform
+  allows.
+
+**Restore checklist (flipping back to Entra):**
+
+1. Do the pre-flight below (Azure app registration + client secret; then either raw ids
+   or the SSM parameters, see step 2).
+2. In `infra/builder-mcp.yml`, choose the parameter form: pass the **raw** tenant/client
+   ids straight into `EntraTenantId` / `EntraClientId` (current plain-String form), or
+   restore the stashed `AWS::SSM::Parameter::Value<String>` declarations (commented
+   block marked STASHED in the template — delete the plain pair, uncomment the stashed
+   pair; the SSM form needs the two `/entra/builder-mcp/*` SSM parameters to exist and
+   `cloudformation-deploy-role` to hold `ssm:GetParameters` on them).
+3. In `pipeline/pipeline.yml`, `BuilderMcpCloudFormation` → `ParameterOverrides`: set
+   `"AuthMode": "entra"` and re-add the two Entra overrides (values per the form chosen
+   in step 2 — the stashed overrides are in a comment right above the block).
+4. Merge; then verify with `uv run python deploy/verify.py` (no `--no-auth` — it must
+   report `OAUTH OK`).
+
+## Stashed production path — Entra pre-flight (one-time, required only when AuthMode=entra)
+
+Inbound auth for the **production path** is **Microsoft Entra ID client-credentials**
+(platform-lead directive, 2026-08-03; masked for the testing phase, see the section
+above). The app registration is an Azure resource: the repo's Terraform-for-Azure
 stage is deliberately not built, so it is created **by hand on the Microsoft side** and
 its identifiers reach the stack via SSM parameters — the same hand-created-then-referenced
 pattern as the CodeConnections ARN (`/code-connections/cu-aaii`).
@@ -39,8 +83,10 @@ pattern as the CodeConnections ARN (`/code-connections/cu-aaii`).
 
 ### (b) AWS side — SSM parameters + Secrets Manager secret
 
-The stack reads the tenant and client ids from SSM at deploy time; the client secret is
-used only by callers (verify.py, Claude clients) and lives in Secrets Manager:
+The two SSM parameters are needed only if you restore the stashed SSM-valued parameter
+form in `infra/builder-mcp.yml` (testing-phase default is plain-String parameters taking
+the raw ids directly — see the restore checklist, step 2). The client secret is used
+only by callers (verify.py, Claude clients) and lives in Secrets Manager:
 
 ```sh
 aws ssm put-parameter --name /entra/builder-mcp/tenant-id --type String --value '<tenant-id>' --region us-east-1
@@ -55,9 +101,9 @@ Secrets Manager, never to SSM, never to this repo (public, no secret scanning).
 
 1. **`AWS::BedrockAgentCore::Runtime` via `cloudformation-deploy-role`** — confirm that
    role's policy covers `bedrock-agentcore:*`; it predates AgentCore. `cognito-idp:*` is
-   **no longer needed** (the Cognito resources are gone), but the role now needs
-   **`ssm:GetParameters`** on `/entra/builder-mcp/*` so CloudFormation can resolve the
-   `AWS::SSM::Parameter::Value<String>` parameters at deploy time.
+   **no longer needed** (the Cognito resources are gone). `ssm:GetParameters` on
+   `/entra/builder-mcp/*` is needed **only when the stashed SSM-valued parameter form is
+   restored** (testing phase uses plain-String parameters, so no SSM resolution happens).
 2. **Runtime name** is `aidlc_main_builder_mcp` (AgentCore takes underscores, not hyphens).
 3. Assumed answers baked in: Runtime-only topology (P1-⭐) — see
    `../aidlc-docs/construction/agentcore-productionizing-questions.md`. Inbound auth (P2)
@@ -82,11 +128,16 @@ cd builder-mcp
 uv run python deploy/verify.py --stack aidlc-main-builder-mcp --region us-east-1
 ```
 
-Entra token (client secret from `BUILDER_MCP_ENTRA_CLIENT_SECRET` or the Secrets Manager
-secret above) → MCP handshake → lists all eight tools → live `blueprint_search` call →
+**Testing phase (AuthMode=open)**: verify.py auto-detects the missing Entra outputs and
+SigV4-signs with your AWS credentials (equivalent to passing `--no-auth`) — no Entra
+setup needed. **Production path (AuthMode=entra)**: Entra token (client secret from
+`BUILDER_MCP_ENTRA_CLIENT_SECRET` or the Secrets Manager secret above) → MCP handshake.
+Either way it lists all eight tools, makes a live `blueprint_search` call, and prints
 `VERIFIED: the Cornell Builder is live on AgentCore`.
 
-Connect a Claude client: POST the stack's `EntraTokenEndpoint` output
+Connect a Claude client (**entra mode only** — in open mode the endpoint requires SigV4,
+which bearer-token MCP clients cannot do; use the local stdio path in LOCAL-TESTING.md
+instead): POST the stack's `EntraTokenEndpoint` output
 (`https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token`) with
 `grant_type=client_credentials`, `client_id` = the `EntraClientId` output,
 `client_secret` = the Secrets Manager value, `scope=api://<client-id>/.default`; MCP URL
@@ -97,8 +148,10 @@ header `Authorization: Bearer <token>`.
 
 The template deploys by hand like any blueprint (repo convention): `aws cloudformation
 deploy` with `ContainerImageUri=` empty deploys everything except the runtime; pass any
-pushed image URI to add it. The hand deploy resolves the same two SSM parameters, so the
-pre-flight above must exist first. Local image check:
+pushed image URI to add it. In the testing-phase default (`AuthMode=open`, plain-String
+Entra parameters) a hand deploy needs **zero pre-flight**; only the stashed SSM-valued
+form resolves the two SSM parameters and therefore needs the pre-flight first. Local
+image check:
 `docker buildx build --platform linux/arm64 --target builder-mcp builder-mcp/` from the
 repo root (or the same command with `.` as the context from inside `builder-mcp/`).
 

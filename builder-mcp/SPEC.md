@@ -46,12 +46,25 @@ changing the manifest contract itself.
 Note: the `cost` block covers per-blueprint cost only — the platform's own overhead is an
 open accounting gap (tracked in BACKLOG.md, Cost).
 
-## C2 — Deployment shell (`deployment.yaml` in each deployment repo)
+## C2 — Deployment shell (`deployment.yaml` + `README.md`)
 
 **Consumers**: builder-mcp (`deployment_create` writes it, `spec_export` reads it),
-future upgrade-bot (P1). A deployment repo contains identity, not code (D1: reference,
+future upgrade-bot (P1). A deployment shell contains identity, not code (D1: reference,
 never copy): `metadata.name/owner`, `blueprint.name/version/source` (pinned), `stack`,
 `parameters`. Producer: `patching.deployment_repo_files()`.
+
+The shell lives in one of two places, switched by `BUILDER_MCP_DEPLOYMENT_MODE`:
+
+- **`folder` (testing-phase default)**: `outputs/<deployment_name>/` in the workshop
+  repo, written on the same branch as the registration PR. Used while the team's GitHub
+  credential has PR-only access to the one workshop repo and cannot create org repos.
+  The folder path is always server-derived (`outputs/` + validated deployment name),
+  never caller-supplied. `deployment_update` targets these files via the workshop repo
+  with `outputs/<name>/...` paths; `deployment_delete` removes the folder in the
+  deregistration PR.
+- **`repo` (target state, stashed)**: a new `cu-aaii/deploy-<name>` repo (D1/D5).
+  The code path is kept intact behind the mode switch and reactivated by setting
+  `BUILDER_MCP_DEPLOYMENT_MODE=repo` once a repo-creating credential exists.
 
 ## C3 — Tool surface (eight tools)
 
@@ -100,16 +113,27 @@ name, file location and `CONTAINER_CONTEXT` are one contract.
 
 **Consumers**: platform security review, Marty's deploy system.
 
-- **Inbound**: OAuth client-credentials against **Microsoft Entra ID** (platform-lead
+- **Inbound — testing phase (current)**: the stack parameter `AuthMode`
+  (`infra/builder-mcp.yml`) defaults to `open`, which **masks** the Entra authorizer —
+  the config stays in the template behind the `UseEntra` condition, restorable per
+  `deploy/HANDOFF.md` "Testing phase: AuthMode=open". Honesty note: on AgentCore,
+  "open" is not anonymous — a runtime without a JWT authorizer falls back to the
+  service default, AWS IAM SigV4, so callers skip the Entra login but must still sign
+  requests with AWS credentials (there is no unauthenticated mode).
+- **Inbound — production path (stashed, unchanged, `AuthMode=entra`)**: OAuth
+  client-credentials against **Microsoft Entra ID** (platform-lead
   directive, 2026-08-03 — the P1 end-state pulled forward; Cognito is removed). JWT
   authorizer on the runtime per `infra/builder-mcp.yml`: Entra discovery URL, allowed
   client = the app registration's client id, allowed audience `api://<client-id>`; token
   scope `api://<client-id>/.default`. The Entra client id/secret pair is what "the
   builder's API key" maps to. The app registration is hand-created on the Azure side
-  (no Terraform stage exists); its tenant/client ids reach the stack via SSM parameters
-  (`/entra/builder-mcp/*`), the code-connections precedent. Note: client-credentials is
-  *app* identity — per-user NetID identity needs the authorization-code flow (BACKLOG,
-  Platform P1+). IAM SigV4 was rejected (puts AWS creds in builders' hands).
+  (no Terraform stage exists); its tenant/client ids reach the stack as raw parameter
+  values during the testing phase, or via SSM parameters (`/entra/builder-mcp/*`, the
+  code-connections precedent) once the stashed SSM-valued parameter form is restored.
+  Note: client-credentials is *app* identity — per-user NetID identity needs the
+  authorization-code flow (BACKLOG, Platform P1+). IAM SigV4 was rejected as the
+  *builder-facing* production mechanism (puts AWS creds in builders' hands) — which is
+  also why testing-phase `open` mode (SigV4) is temporary, not the end state.
 - **Outbound GitHub**: server-side token only — env `GITHUB_TOKEN` (local) or Secrets
   Manager secret named by `BUILDER_MCP_GITHUB_TOKEN_SECRET` (deployed; default
   `aidlc/main/builder-mcp/github-token`). No token ⇒ writes degrade to dry-run plans.
@@ -126,10 +150,14 @@ registers by **adding one action to the BlueprintDeploy stage** of
 `patching.py`). Action name `<PascalCase(deployment)>CloudFormation`; stack name
 `<application>-<environment>-<name>` (role-scoping requires it). `stacks.yml` gets a new
 entry **only for a new template** — it rejects duplicate template paths, so re-deploying
-an existing blueprint touches only `pipeline.yml`. Deregistration (`deployment_delete`)
-is the mirror image: one PR removing that same action; removing a blueprint's **last**
-deployment also requires removing its `stacks.yml` entry, done as a follow-up PR (not
-automated).
+an existing blueprint touches only `pipeline.yml`. In **folder mode** (C2, the
+testing-phase default) the registration PR carries **both** the pipeline action and the
+`outputs/<name>/` deployment shell — one PR, one review; in repo mode the shell lands in
+the new `deploy-<name>` repo and the PR touches only `pipeline.yml`. Deregistration
+(`deployment_delete`) is the mirror image: one PR removing that same action — and, in
+folder mode, the `outputs/<name>/` folder too (symmetric teardown); removing a
+blueprint's **last** deployment also requires removing its `stacks.yml` entry, done as a
+follow-up PR (not automated).
 
 ## C7 — Configuration surface
 

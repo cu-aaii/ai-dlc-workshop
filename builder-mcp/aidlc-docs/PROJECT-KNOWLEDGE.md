@@ -44,6 +44,7 @@ merge.
 | DECISION-19 | Tool naming + delete | **noun_verb naming standard** for the whole tool surface (`blueprint_search`, `deployment_create/read/update/restart/health/delete`, `spec_export`; future: `blueprint_create`, ...) and **`deployment_delete` commissioned**: governed deletion = deregistration PR removing the pipeline action, symmetric with creation — never an AWS delete API; the platform removes the stack after merge per its DeletionPolicy (SPEC C3 contract change) | Mob 2026-08-03 |
 | DECISION-20 | Inbound auth (supersedes DECISION-16) | **Microsoft Entra ID client-credentials NOW**, Cognito removed from `infra/builder-mcp.yml`. App registration is an Azure resource, hand-created by Marty (no Terraform stage exists); tenant/client ids reach the stack via SSM parameters `/entra/builder-mcp/{tenant-id,client-id}` (the SsmCodeStarConnectionArn precedent); client secret in Secrets Manager `aidlc/main/builder-mcp/entra-client-secret`. Authorizer allows client id + audience `api://<client-id>`. Per-user NetID (auth-code flow) stays P1 (BACKLOG) | Marty via Tim, 2026-08-03 (Cornell is an M365 shop; Entra was the stated P1 end state, pulled forward) |
 | DECISION-21 | Dockerfile location (amends DECISION-18's file layout) | **Per-component Dockerfiles**: each component owns its Dockerfile and `.dockerignore` (`builder-mcp/Dockerfile`, `blueprints/tiny-chatbot/Dockerfile`), replacing the single repo-root `Dockerfile` with named targets. `codebuild.yml` now builds `$CODEBUILD_SRC_DIR/$CONTAINER_CONTEXT`, and every container Build action must set `CONTAINER_CONTEXT` alongside `CONTAINER_TARGET` (see GOTCHA-CONTAINER-CONTEXT). Named targets are kept so `CONTAINER_TARGET` keeps working | User directive 2026-08-04 |
+| DECISION-22 | Inbound auth **masked** for the testing phase (temporarily supersedes DECISION-20; DECISION-20 remains the production path) | New `AuthMode` parameter on `infra/builder-mcp.yml` (`open`\|`entra`, default `open`): the Entra JWT authorizer is wrapped in the `UseEntra` condition and omitted while open, so nobody logs in during the demo/testing phase. Masked, not deleted — the full Entra config stays in the template, and the SSM-valued parameters are stashed as comments (plain-String raw-id parameters replace them so an open deploy has **zero pre-flight**; see GOTCHA-SSM-PARAM-EAGER). `open` ≠ public: AgentCore falls back to IAM SigV4 (GOTCHA-NO-PUBLIC-AGENTCORE). Restore path: deploy/HANDOFF.md "Testing phase: AuthMode=open" | User directive 2026-08-04 (demo/testing phase) |
 
 Open items for the mob: Q4 (DECISION-08), P1/P3/P6 in
 [construction/agentcore-productionizing-questions.md](construction/agentcore-productionizing-questions.md)
@@ -102,9 +103,27 @@ and the five decision asks at the end of
 - **GOTCHA-DEPLOY-ROLE**: `cloudformation-deploy-role` (bootstrap) predates AgentCore —
   before first merge, confirm it may call `bedrock-agentcore:*`, else the BuilderMcp
   deploy action fails mid-pipeline. Since the Entra swap (DECISION-20) it no longer needs
-  `cognito-idp:*`, but it **does** need `ssm:GetParameters` on `/entra/builder-mcp/*` to
-  resolve the `AWS::SSM::Parameter::Value<String>` parameters at deploy time — and those
-  two parameters must exist first or the deploy fails at parameter resolution.
+  `cognito-idp:*`. The `ssm:GetParameters` requirement on `/entra/builder-mcp/*` is
+  **dormant during the testing phase** (DECISION-22 stashed the SSM-valued parameters as
+  comments); it returns — along with the parameters-must-exist-first trap — when the
+  stashed form is restored.
+- **GOTCHA-SSM-PARAM-EAGER**: a parameter of Type `AWS::SSM::Parameter::Value<String>`
+  resolves against SSM **at deploy time even if nothing references it** — conditions
+  don't help, because resolution happens before the template evaluates. So the Entra
+  authorizer could not be masked by condition alone: with the SSM-valued declarations
+  active and `/entra/builder-mcp/*` absent, *every* deploy fails at parameter resolution
+  regardless of `AuthMode`. Hence DECISION-22 swaps them for plain-String parameters and
+  keeps the SSM-valued form as commented-out YAML in `infra/builder-mcp.yml`.
+- **GOTCHA-NO-PUBLIC-AGENTCORE**: AgentCore Runtime has **no unauthenticated inbound
+  mode**. Omitting `AuthorizerConfiguration` does not open the endpoint — IAM SigV4 is
+  "the default authentication and authorization mechanism that works automatically
+  without additional configuration", and a runtime supports either SigV4 *or* JWT, never
+  neither (AWS devguide, `bedrock-agentcore/latest/devguide/runtime-oauth.html`; CFN
+  reference marks the property `Required: No`). So `AuthMode=open` callers need AWS
+  credentials with `bedrock-agentcore:InvokeAgentRuntime` and must SigV4-sign; a plain
+  bearer-token MCP client (Claude Code/Cowork over HTTP) **cannot call the open cloud
+  endpoint**. `verify.py --no-auth` signs with the caller's AWS creds; the zero-login
+  conversational path stays the local stdio server (deploy/LOCAL-TESTING.md).
 - **GOTCHA-JWT-AUTHORIZER**: `CustomJWTAuthorizer` property names are `AllowedClients`
   (plural) but `AllowedAudience` (singular) — both arrays of String; `AllowedScopes` also
   exists. Source: AWS::BedrockAgentCore::Runtime CustomJWTAuthorizerConfiguration CFN

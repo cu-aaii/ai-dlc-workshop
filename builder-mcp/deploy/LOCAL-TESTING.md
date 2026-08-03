@@ -3,6 +3,14 @@
 For the team to *use* the MCP conversationally before the AgentCore endpoint is live.
 Nothing here needs AWS or org access.
 
+**This stays the zero-login path even once the cloud endpoint is up.** The testing-phase
+deploy masks the Entra login (`AuthMode=open`), but AgentCore has no unauthenticated
+mode — an "open" runtime falls back to AWS IAM SigV4, which bearer-token MCP clients
+cannot speak. So until the cloud endpoint's auth story is settled (Entra restored, or a
+gateway in front), the local server / `.mcp.json` path below is how anyone tests without
+logging in to anything; the signed cloud check is `verify.py` (§4). Details:
+[HANDOFF.md](HANDOFF.md), "Testing phase: AuthMode=open".
+
 ## 1. Talk to it in Claude Code (30 seconds, zero setup)
 
 `.mcp.json` at the repo root registers the server, so **opening Claude Code in this repo
@@ -72,6 +80,7 @@ credentials. Note the fork has no pipeline, so nothing deploys — the PR is the
 ```sh
 uv run python deploy/validate_endpoints.py                 # 10 calls per tool + latency
 uv run python deploy/verify.py --stack aidlc-main-builder-mcp   # against deployed AgentCore
+#   (testing phase: auto-detects AuthMode=open and SigV4-signs with your AWS creds)
 ```
 
 ## Why no separate chatbot UI

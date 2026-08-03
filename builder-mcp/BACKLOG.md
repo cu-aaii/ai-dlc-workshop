@@ -6,6 +6,13 @@ them.
 
 ## Demo
 
+- **Restore Entra inbound auth after the testing phase.** The runtime currently deploys
+  with `AuthMode=open` (DECISION-22): the Entra JWT authorizer is masked — not removed —
+  and AgentCore falls back to its default IAM SigV4 inbound auth (there is no
+  unauthenticated mode). To restore: flip `AuthMode` to `entra` and re-add the two Entra
+  parameter overrides in `pipeline/pipeline.yml`, after the Entra pre-flight — exact
+  checklist in `deploy/HANDOFF.md`, section "Testing phase: AuthMode=open". (SPEC C5)
+
 - **Time-critical — the demo is 2026-08-04.** Make the process reliably showable two ways:
   (1) record a successful end-to-end run as a fallback, (2) drive the real server live from
   Claude Cowork. Live Cowork use depends on the deployed AgentCore endpoint plus an OAuth

@@ -49,6 +49,7 @@ Tests: `uv run pytest -q` (also run repo-level `tools/check` before pushing).
 | Variable | Default | Purpose |
 |---|---|---|
 | `GITHUB_TOKEN` | *(unset)* | Server-side GitHub credential. Unset → write tools return dry-run plans. GitHub App installation is the P1 target (D3) |
+| `BUILDER_MCP_DEPLOYMENT_MODE` | `folder` | Where `deployment_create` puts the deployment shell: `folder` = `outputs/<name>/` in the workshop repo, same PR as the pipeline action (testing phase — credential can't create repos); `repo` = new `deploy-<name>` org repo (target state, SPEC C2) |
 | `BUILDER_MCP_GITHUB_ORG` | `cu-aaii` | Org for deployment repos |
 | `BUILDER_MCP_WORKSHOP_REPO` | `ai-dlc-workshop` | Repo the pipeline tracks |
 | `BUILDER_MCP_APPLICATION` / `BUILDER_MCP_ENVIRONMENT` | `aidlc` / `main` | Stack-name prefix `<app>-<env>-<name>` |
