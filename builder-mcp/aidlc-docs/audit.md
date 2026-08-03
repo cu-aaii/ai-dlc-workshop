@@ -100,3 +100,11 @@ extension, these block stage completion until resolved):
 **Status**: remediation task queued behind the in-flight tool-rename agent (same files).
 
 ---
+
+## Merge Milestone + Verify-and-Validate Dash
+**Timestamp**: 2026-08-04T02:10:00Z
+**User Input**: (abridged; verbatim stream in session transcript) Update stories.md: deprioritize dry_run to backlog; add a time limit to deploy retries (e.g. 30 min); Stage 7 Evolve is too much for MVP, Stage 8 stays. PR merged into main; team has AWS UI access via Jai (Tim's access pending; Jai is the team's merge rep). Identify which AWS services to watch to confirm the MCP deploys correctly. Skip Strands for now (backlog). Next key objective: verify and validate — after merge deploys, query the runtime with ~10 iterative calls per endpoint; start with one test deployment (hello-world); also draft the world's tiniest chatbot blueprint (canned responses, visible page) but hold deployment until hello-world verifies. Use subagents in parallel.
+**AI Response**: Discovered PR #9 merged at daa7d85 — BEFORE the Entra swap and security remediation — so main is deploying the Cognito variant without the F1 gate-bypass fix. Merged origin/main back into builder and opened PR #11 (the two missing commits) with deploy-order notes for Jai. Launched four parallel agents: stories/backlog update, DEPLOYMENT-WATCH.md runbook, validate_endpoints.py harness (10 calls/tool, latency stats), tiny-chatbot blueprint (registered deployed_by: manual, parked).
+**Context**: Operations — first real deployment in flight; verify-and-validate dash
+
+---

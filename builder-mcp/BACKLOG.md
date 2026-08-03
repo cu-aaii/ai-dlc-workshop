@@ -48,10 +48,20 @@ them.
 
 ## Operations & guardrails
 
-- Cap `deployment_restart` at 3 restarts per deployment per window (window TBD by the mob);
-  past the cap the tool refuses and directs the builder to open a PR / contact the platform
-  team. Unbounded retries mask real failures and burn pipeline runs. Open design question:
-  this needs restart-count state, which the stateless server (SPEC C4) does not keep. (SPEC C3)
+- Cap `deployment_restart` at 3 restarts per deployment per window (window TBD by the mob)
+  **and** time-box each restart at 30 minutes (mob 2026-08-03): a re-run that has not gone
+  green in 30 minutes is treated as failed and counts against the cap. Past the cap the tool
+  refuses and directs the builder to open a PR / contact the platform team. Unbounded retries
+  mask real failures and burn pipeline runs. Open design questions: this needs restart-count
+  state, which the stateless server (SPEC C4) does not keep, and the time-box enforcement
+  mechanism is open — possibly `codepipeline:StopPipelineExecution` after timeout. (SPEC C3)
+
+## UX
+
+- Revisit the `dry_run` confirm UX (deprioritized by the mob 2026-08-03). `dry_run` stays in
+  the code — it is how every mutating tool works — but refining it as a confirmation
+  *experience* is not current work. Includes re-checking whether true MCP elicitation becomes
+  possible if the transport constraints change (SPEC C4).
 
 ## Platform (P1+, from the product proposal)
 
@@ -63,3 +73,6 @@ them.
   object-level authorization (security F2) still needs the user-identity step (SPEC C5)
 - AI Gateway registration of the AgentCore endpoint
 - Upgrade-bot: version-bump PRs to deployment repos when a blueprint releases (SPEC C2)
+- Strands agent pilot — parked by the mob 2026-08-03. The research concluded a rewrite is a
+  category error; the coherent build is an agent *wrapping* the MCP tool surface (~2–4 days,
+  needs an LLM at runtime). See `aidlc-docs/construction/strands-research.md`.
