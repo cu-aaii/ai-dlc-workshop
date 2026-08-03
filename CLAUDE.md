@@ -14,6 +14,31 @@ team controls. Builders get PR-only write access — no AWS account, no console.
 Everyone works in this one repo during the workshop, so `main` staying green matters more than
 usual: **every merge to `main` deploys to a shared AWS account.**
 
+## The rules for this repo
+
+Work in this repo follows **AI-DLC**, the methodology published at
+<https://github.com/awslabs/aidlc-workflows/tree/main/aidlc-rules>. Treat that directory as the
+authoritative rule set: `aws-aidlc-rules/` holds the core workflow (`core-workflow.md`) and
+`aws-aidlc-rule-details/` holds the detail files the core rules pull in on demand
+(`common/`, `inception/`, `construction/`, `extensions/`, `operations/`).
+
+The rules are **not vendored into this repo** — read them from upstream when a task needs them,
+and pin to a release rather than assuming `main` matches what you read last time.
+
+What it changes about how a task runs:
+
+- Activation is conversational — a request that starts with **"Using AI-DLC, ..."** runs the
+  workflow; other requests are ordinary work.
+- Phases are **Inception** (what and why) → **Construction** (how) → Operations (not used here).
+  Only the stages that add value to the request get executed.
+- Clarifying questions go in **files, as structured multiple choice** — not in chat.
+- Every phase is **gated on human approval**: the agent proposes, the human approves. That lines
+  up with this repo's PR-only rule, so nothing merges on the agent's own judgment.
+- Generated artifacts land in `aidlc-docs/`.
+
+Where AI-DLC and the constraints below disagree, **the constraints below win** — they come from
+Cornell's platform design and from an AWS account other people share.
+
 ## Hard constraints
 
 These come from the platform design, not from preference. Don't relax them to make something
