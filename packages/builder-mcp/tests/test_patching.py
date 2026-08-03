@@ -1,9 +1,9 @@
 import json
 import re
-from pathlib import Path
 
 import pytest
 
+from builder_mcp.config import find_repo_root
 from builder_mcp.patching import (
     deployment_repo_files,
     insert_blueprint_action,
@@ -12,9 +12,7 @@ from builder_mcp.patching import (
     render_pipeline_action,
 )
 
-PIPELINE_YML = (Path(__file__).resolve().parents[2] / "pipeline" / "pipeline.yml").read_text(
-    encoding="utf-8"
-)
+PIPELINE_YML = (find_repo_root() / "pipeline" / "pipeline.yml").read_text(encoding="utf-8")
 
 
 def _action(name="team-x-hello"):

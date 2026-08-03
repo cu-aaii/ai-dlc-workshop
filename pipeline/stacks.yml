@@ -35,6 +35,6 @@ templates:
     description: 'Trivial tagged stack that proves the deploy path end to end.'
 
   - name: 'builder-mcp'
-    template: 'builder-mcp/infra/builder-mcp.yml'
+    template: 'packages/builder-mcp/infra/builder-mcp.yml'
     deployed_by: 'pipeline'
     description: 'Cornell Builder MCP server on Bedrock AgentCore. Image built by the Build stage (arm64, root Dockerfile target builder-mcp), deployed by digest.'

@@ -2,7 +2,7 @@
 
 Complements the example-based tests (PBT-10); this file contains ONLY property tests.
 Each test's docstring names the property category from
-aidlc-rules/.../property-based-testing.md (PBT-02 round-trip, PBT-03 invariant, etc.).
+docs/aidlc-rules/.../property-based-testing.md (PBT-02 round-trip, PBT-03 invariant, etc.).
 
 Framework: Hypothesis (PBT-09). Shrinking and seed logging are Hypothesis defaults and
 are not disabled (PBT-08). Domain generators (PBT-07) live in the "Strategies" section
@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import math
 import re
-from pathlib import Path
 
 import pytest
 import yaml
@@ -26,7 +25,7 @@ from hypothesis import settings as hyp_settings
 from hypothesis import strategies as st
 
 from builder_mcp.catalog import Blueprint, search, validate_inputs
-from builder_mcp.config import Settings
+from builder_mcp.config import Settings, find_repo_root
 from builder_mcp.patching import (
     DEPLOYMENT_NAME_PATTERN,
     deployment_repo_files,
@@ -36,9 +35,7 @@ from builder_mcp.patching import (
 )
 from builder_mcp.spec_export import AUDIENCES, render_spec
 
-PIPELINE_YML = (Path(__file__).resolve().parents[2] / "pipeline" / "pipeline.yml").read_text(
-    encoding="utf-8"
-)
+PIPELINE_YML = (find_repo_root() / "pipeline" / "pipeline.yml").read_text(encoding="utf-8")
 
 # deadline=None: text ops on the real 20 KB pipeline.yml are fast but Windows CI timing
 # is jittery; Hypothesis still shrinks and prints the reproducing seed on failure.

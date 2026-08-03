@@ -20,27 +20,44 @@ rather than one application.
 
 ## Layout
 
+A monorepo: one deploy path, a deploy surface, and one package per component.
+
 ```
-bootstrap/                  account baseline — deployed BY HAND, once per account
-  account-bootstrap.yml       deploy role, artifact bucket, GitHub connection
+blueprints/                 THE DEPLOY SURFACE — one directory per blueprint
+  hello-world/                trivial tagged stack; proves the pipeline, and the demo floor
+  course-chatbot/             the workshop MVP — scaffold only, deploys nothing yet
+packages/                   components, one package each
+  builder-mcp/                the Cornell Builder MCP server (track A)
 pipeline/                   the deploy path
   pipeline.yml                CodePipeline / CodeBuild / ECR / IAM
   stacks.yml                  registry of every CloudFormation template in the repo
-  validate_stacks.py          enforces registry ↔ filesystem ↔ pipeline agreement (PR checks)
-  codebuild.yml               container image buildspec (ready, not yet wired to a stage)
-blueprints/
-  hello-world/                trivial tagged stack; proves the pipeline, and the demo floor
-aidlc-rules/                the AI-DLC methodology — vendored from awslabs, do not edit
+  validate_stacks.py          enforces registry ↔ filesystem ↔ pipeline ↔ manifest agreement
+  codebuild.yml               container image buildspec
+bootstrap/                  account baseline — deployed BY HAND, once per account
+  account-bootstrap.yml       deploy role, artifact bucket, GitHub connection
+observability/              seeing what's running (track E) — scaffold only
+docs/
+  aidlc-rules/                the AI-DLC methodology — vendored from awslabs, do not edit
+  aidlc/                      how things here were built — a record, not a backlog
+  decisions/                  one file per decision made on purpose
+Dockerfile                  every container image, one target per component
+tools/check                 the checks that gate a merge; CI runs this exact script
 .github/workflows/
-  pr-checks.yml               cfn-lint + registry check. No AWS calls, no credentials.
+  pr-checks.yml               runs tools/check. No AWS calls, no credentials.
+.mcp.json                   GitHub MCP server for Claude Code — needs one env var, see below
 ```
 
-Every directory has its own README explaining what goes in it, except `aidlc-rules/` — see
+Every directory has its own README explaining what goes in it, except `docs/aidlc-rules/` — see
 below for why that one is left exactly as upstream ships it.
+
+**Two paths cannot move.** `pipeline/pipeline.yml`, because the running pipeline deploys itself
+from that literal path and a commit that relocates it breaks the stage that would have picked up
+the new location — recovery is a by-hand deploy. And `blueprints/`, which the pipeline names in a
+`TemplatePath` and the Builder's catalog globs. Everything else is free to be rearranged.
 
 ## The AI-DLC rules
 
-`aidlc-rules/` is a verbatim copy of that directory from
+`docs/aidlc-rules/` is a verbatim copy of the `aidlc-rules/` directory from
 [awslabs/aidlc-workflows](https://github.com/awslabs/aidlc-workflows) — the methodology this
 workshop teaches, as a set of prompt files an agent reads.
 
@@ -48,25 +65,30 @@ workshop teaches, as a set of prompt files an agent reads.
 |---|---|
 | Upstream | `https://github.com/awslabs/aidlc-workflows` |
 | Commit | `114ef4d0ae6082e63ff0c7d14a910e3195163235` (2026-07-22) |
-| `aidlc-rules/VERSION` | `1.0.1` |
+| `docs/aidlc-rules/VERSION` | `1.0.1` |
 | License | MIT No Attribution (MIT-0) — no attribution required, recorded here for re-sync |
 
-**Nothing in `aidlc-rules/` has been modified, and nothing should be.** Re-syncing a future
+**Nothing in `docs/aidlc-rules/` has been modified, and nothing should be.** Re-syncing a future
 release is then a delete-and-replace:
 
 ```sh
 git clone --depth 1 https://github.com/awslabs/aidlc-workflows.git /tmp/aidlc-upstream
-rm -rf aidlc-rules && cp -R /tmp/aidlc-upstream/aidlc-rules .
+rm -rf docs/aidlc-rules && cp -R /tmp/aidlc-upstream/aidlc-rules docs/aidlc-rules
 ```
 
-Because that discards local edits without warning, anything this repo needs to say about the
-rules lives in `CLAUDE.md` or here instead.
+> **The path deliberately differs from upstream's.** Upstream ships this at the repository root;
+> here it sits under `docs/` beside `docs/aidlc/`. Copy it to `docs/aidlc-rules` rather than
+> running upstream's own `cp -R … .`, which would recreate it at the root and leave the repo with
+> two copies — one of them the one every reference points at, and not the new one.
+
+Because a delete-and-replace discards local edits without warning, anything this repo needs to
+say about the rules lives in `CLAUDE.md` or here instead.
 
 The rules are **invocation-gated**: `CLAUDE.md` tells an agent to read
-`aidlc-rules/aws-aidlc-rules/core-workflow.md` when someone invokes AI-DLC, not on every
+`docs/aidlc-rules/aws-aidlc-rules/core-workflow.md` when someone invokes AI-DLC, not on every
 session. `core-workflow.md` claims priority over all other instructions, so loading it for
 ordinary pipeline work would override this repo's own constraints. `CLAUDE.md` also has to name
-`aidlc-rules/aws-aidlc-rule-details/` explicitly, because the four rule-detail paths
+`docs/aidlc-rules/aws-aidlc-rule-details/` explicitly, because the four rule-detail paths
 `core-workflow.md` looks for natively (`.aidlc-rule-details/`, `.kiro/…`, and two others) do not
 exist here.
 
@@ -130,8 +152,8 @@ Three steps, in order. Only the first two are ever done by hand.
 
 ## PR checks
 
-`cfn-lint` plus the stack-registry check. Lint-and-validate only — no AWS calls, no
-credentials, so they come back in well under a minute.
+The stack-registry check, `cfn-lint`, and the `builder-mcp` test suite. Lint, validate and unit
+tests only — no AWS calls, no credentials, so they come back in about a minute.
 
 Run them before you push:
 
@@ -141,13 +163,48 @@ tools/check
 
 CI runs that exact script, so green locally means green on your PR.
 
-**`uv` is the only prerequisite.** It fetches Python, pyyaml and cfn-lint on demand at pinned
-versions, so there is nothing to install globally and no venv to activate:
+**`uv` is the only prerequisite.** It fetches Python, pyyaml, cfn-lint and the `builder-mcp` test
+dependencies on demand at pinned versions, so there is nothing to install globally and no venv to
+activate:
 
 ```sh
 brew install uv                                    # macOS
 curl -LsSf https://astral.sh/uv/install.sh | sh    # everything else
 ```
+
+## GitHub MCP server
+
+`.mcp.json` gives Claude Code sessions in this repo GitHub's hosted MCP server, so an agent can
+read PRs, issues and repository contents directly instead of being told what they say. It is
+optional — nothing in the deploy path depends on it, and declining the server leaves the repo
+fully usable.
+
+It authenticates with a **fine-grained personal access token**, which the config reads from
+`GITHUB_MCP_PAT` rather than containing. That is not a style choice: this repo is public with no
+secret-scanning safety net, and `.mcp.json` is committed, so a literal token here would be a
+published credential. Keep it in your environment.
+
+1. Create a token at [github.com/settings/personal-access-tokens](https://github.com/settings/personal-access-tokens),
+   scoped to this repository. Read-only on Contents, Issues and Pull requests is enough to
+   review; add write only if you want the agent opening PRs as you.
+2. Export it where your shell will pick it up before Claude Code starts:
+
+   ```sh
+   export GITHUB_MCP_PAT=github_pat_...        # macOS / Linux, in your shell profile
+   ```
+
+   ```powershell
+   [Environment]::SetEnvironmentVariable('GITHUB_MCP_PAT', 'github_pat_...', 'User')
+   ```
+
+3. Restart Claude Code, approve the server when prompted, and run `/mcp`. `connected` means it
+   worked; `failed` means the token is missing, expired, or not scoped to this repo. The token is
+   never validated at config time, so a wrong value fails here rather than earlier.
+
+The token is yours, not the workshop's — everyone sets their own, and it grants exactly the
+GitHub access you gave it, entirely separate from the AWS deploy path. VS Code may flag
+`${GITHUB_MCP_PAT}` as an unknown variable; that is VS Code checking the file against its own
+`mcp.json` schema, and Claude Code expands it correctly.
 
 ## Conventions
 
@@ -164,13 +221,24 @@ deployed.
 **Register every template** in `pipeline/stacks.yml`, and give every `deployed_by: pipeline`
 entry a matching action in `pipeline.yml`. Registering is what makes a template linted, and PR
 checks fail on an unregistered template — or on a registered one that no pipeline action
-deploys, which would otherwise deploy nothing while reporting success.
+deploys, which would otherwise deploy nothing while reporting success. A `blueprint.yaml` whose
+`template:` is unregistered fails too: the manifest is what the Builder offers a builder, so that
+one would advertise a blueprint whose deployment PR cannot deploy.
 
 **Pass every parameter explicitly** from the pipeline. Template defaults exist so a stack can
 be deployed by hand for debugging, not to be the real values.
 
+**One package per component, under `packages/`.** Code that isn't a blueprint and isn't the deploy
+path goes there, self-contained with its own `pyproject.toml` and lockfile. Container images stay
+in the one root `Dockerfile` as named targets, because `pipeline/codebuild.yml` builds
+`docker build $CODEBUILD_SRC_DIR --target $CONTAINER_TARGET` — repo-root context, default
+filename, so per-package Dockerfiles are not an option.
+
 ## Not here yet
 
-This repo is currently the deploy path and nothing else. Still to come, per the workshop spec:
-the `course-chatbot` blueprint (managed Bedrock Knowledge Base, Teams bot, Strands agent), the
-`builder-mcp` keystone, the Terraform stage for Azure/Entra resources, and `observability/`.
+The deploy path works and the Cornell Builder is written. Still to come, per the workshop spec:
+the `course-chatbot` blueprint itself — `blueprints/course-chatbot/` has the Lambda handler and a
+README of what's missing, but no template, no image target and no pipeline action, so it deploys
+nothing — the managed Bedrock Knowledge Base behind it, the Terraform stage for Azure/Entra
+resources, and `observability/`. Each has a scaffolded directory with a README saying what goes in
+it and how to wire it.

@@ -105,7 +105,7 @@ takes a week.
 
 ## 🟡 OPERATIONS
 
-Handed off to Marty per [deploy/HANDOFF.md](../deploy/HANDOFF.md). **Nothing is deployed.**
+Handed off to Marty per [deploy/HANDOFF.md](../../../packages/builder-mcp/deploy/HANDOFF.md). **Nothing is deployed.**
 PR #9 targets `builder-mcp`, not `main`, so merging it will not deploy either.
 
 ---

@@ -13,11 +13,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-def _find_repo_root() -> Path | None:
+def find_repo_root() -> Path | None:
     """Walk up from this file looking for the workshop checkout (pipeline/stacks.yml).
 
     Present when running from the repo; absent on AgentCore, where the catalog and
     pipeline definition are fetched from GitHub instead.
+
+    Public because the tests need it too: this package sits at packages/builder-mcp/, so
+    counting parents to reach the repo root couples every caller to the directory depth
+    and breaks silently the next time something moves. Sentinel-based, so it doesn't.
     """
     for candidate in Path(__file__).resolve().parents:
         if (candidate / "pipeline" / "stacks.yml").is_file():
@@ -57,7 +61,7 @@ class Settings:
             environment=os.environ.get("BUILDER_MCP_ENVIRONMENT", "main"),
             aws_region=region,
             github_token=_resolve_github_token(region),
-            repo_root=Path(root) if root else _find_repo_root(),
+            repo_root=Path(root) if root else find_repo_root(),
         )
 
 

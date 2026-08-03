@@ -510,7 +510,7 @@ Resources:
                 Capabilities: 'CAPABILITY_NAMED_IAM'
                 RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
                 StackName: !Sub '${Application}-${Environment}-builder-mcp'
-                TemplatePath: 'GitRepositoryArtifact::builder-mcp/infra/builder-mcp.yml'
+                TemplatePath: 'GitRepositoryArtifact::packages/builder-mcp/infra/builder-mcp.yml'
                 # ContainerImageUri arrives as the digest the Build stage just pushed, so
                 # the runtime always runs exactly the image this commit produced.
                 ParameterOverrides: !Sub >-

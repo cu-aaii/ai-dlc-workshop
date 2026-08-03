@@ -5,7 +5,7 @@ event**: propose it in a PR that names the contract number, and get agreement fr
 consumer listed — never edit one silently. Code and tests implement these; where code and
 this document disagree, this document wins and the code is the bug.
 
-Related docs: [aidlc-docs/PROJECT-KNOWLEDGE.md](aidlc-docs/PROJECT-KNOWLEDGE.md) (why
+Related docs: [PROJECT-KNOWLEDGE.md](../../docs/aidlc/builder-mcp/PROJECT-KNOWLEDGE.md) (why
 things are the way they are), [deploy/HANDOFF.md](deploy/HANDOFF.md) (how to deploy),
 [README.md](README.md) (how to run).
 

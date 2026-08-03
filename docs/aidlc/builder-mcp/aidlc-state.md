@@ -1,8 +1,10 @@
 # AI-DLC State — builder-mcp (Track A: Cornell Builder)
 
-**Workspace**: brownfield repo (deploy path exists; builder-mcp/ is greenfield)
-**Docs root**: `builder-mcp/aidlc-docs/` — scoped under the component because six tracks
-share this repo and a root-level `aidlc-docs/` would collide across teams.
+**Workspace**: brownfield repo (deploy path exists; the builder-mcp package is greenfield)
+**Docs root**: `docs/aidlc/builder-mcp/`. Originally `builder-mcp/aidlc-docs/`, scoped under
+the component to keep six tracks from colliding; the monorepo restructure resolved that
+differently — one `docs/aidlc/` with a subdirectory per track. The collision worry recorded
+in [STAGE-GATES.md](STAGE-GATES.md) under Workspace Detection is settled.
 
 ## Stage Progress
 

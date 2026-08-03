@@ -3,8 +3,9 @@
 # Run the checks that gate a merge. CI runs this exact script, so a green run here means a
 # green run on your PR -- there is no second code path to drift out of sync.
 #
-# uv is the only prerequisite. It fetches Python, pyyaml and cfn-lint on demand and caches
-# them, so nothing is installed globally and there is no venv to activate.
+# uv is the only prerequisite. It fetches Python, pyyaml, cfn-lint and the builder-mcp test
+# dependencies on demand and caches them, so nothing is installed globally and there is no venv
+# to activate.
 
 set -euo pipefail
 
@@ -38,6 +39,17 @@ templates=$(uv run --quiet pipeline/validate_stacks.py --list)
 # shellcheck disable=SC2086
 uvx --quiet --from "$CFN_LINT" cfn-lint --region "$REGION" -- $templates
 echo 'cfn-lint: clean'
+
+echo '==> builder-mcp tests'
+# Run from the package directory rather than with `uv run --project`: pytest resolves the
+# `testpaths` in that package's pyproject.toml against its own rootdir, and rootdir follows the
+# invocation directory. Its .python-version pins the interpreter, so uv fetches a 64-bit CPython
+# instead of using whatever happens to be on PATH -- a 32-bit Python has no cryptography wheel
+# and sends the install into a Rust build that fails.
+(
+  cd packages/builder-mcp
+  uv run --quiet pytest -q
+)
 
 echo
 echo 'all checks passed'

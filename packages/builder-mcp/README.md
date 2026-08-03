@@ -6,9 +6,10 @@ deployed. **Merge is the only deploy trigger** — no tool here deploys anything
 and the builder's client never holds a git or AWS credential.
 
 Start here, in order: [`SPEC.md`](SPEC.md) (contracts C1–C7 — the agreements that must
-not drift), [`aidlc-docs/PROJECT-KNOWLEDGE.md`](aidlc-docs/PROJECT-KNOWLEDGE.md)
+not drift), [`PROJECT-KNOWLEDGE.md`](../../docs/aidlc/builder-mcp/PROJECT-KNOWLEDGE.md)
 (decision log, gotchas, glossary), [`deploy/HANDOFF.md`](deploy/HANDOFF.md) (deployment
-runbook). Inception artifacts live in [`aidlc-docs/`](aidlc-docs/aidlc-state.md).
+runbook). The AI-DLC artifacts that produced this package are a historical record at
+[`docs/aidlc/builder-mcp/`](../../docs/aidlc/builder-mcp/aidlc-state.md).
 
 ## Tools
 
@@ -32,7 +33,7 @@ dry-run pattern works everywhere.)
 ## Run locally
 
 ```sh
-cd builder-mcp
+cd packages/builder-mcp
 uv run builder-mcp                 # streamable HTTP on http://127.0.0.1:8000/mcp
 ```
 

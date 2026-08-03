@@ -1,9 +1,7 @@
-from pathlib import Path
-
 from builder_mcp.catalog import load_catalog, search, validate_inputs
-from builder_mcp.config import Settings
+from builder_mcp.config import Settings, find_repo_root
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = find_repo_root()
 
 SETTINGS = Settings(
     github_org="cu-aaii", workshop_repo="ai-dlc-workshop", application="aidlc",

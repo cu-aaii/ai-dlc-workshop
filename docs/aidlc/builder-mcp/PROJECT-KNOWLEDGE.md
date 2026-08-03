@@ -4,7 +4,7 @@ Everything a future agent or teammate needs that is *not* derivable from the cod
 2026-08-03 (workshop day 1) so no one has to rely on one chat session. Keyword-rich on
 purpose — grep this file first.
 
-Companion docs: [SPEC.md](../SPEC.md) (the contracts), [deploy/HANDOFF.md](../deploy/HANDOFF.md)
+Companion docs: [SPEC.md](../../../packages/builder-mcp/SPEC.md) (the contracts), [deploy/HANDOFF.md](../../../packages/builder-mcp/deploy/HANDOFF.md)
 (deployment runbook), [aidlc-state.md](aidlc-state.md) (AI-DLC stage tracking),
 [audit.md](audit.md) (verbatim decision inputs).
 

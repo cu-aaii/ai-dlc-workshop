@@ -22,6 +22,12 @@ registry <-> pipeline.yml
     so *silently* -- PR checks pass, every pipeline stage reports Succeeded, and no stack
     appears. Adding the action is step 3 of "Adding a blueprint stack" in pipeline/README.md;
     this is what makes forgetting it a review-time error instead of a mystery.
+
+registry <- blueprint manifests
+    A blueprint.yaml is the contract blueprint_search hands a builder, so one naming an
+    unregistered template advertises a blueprint whose deployment PR cannot deploy. Checked
+    one direction only: a template with no manifest is normal (builder-mcp is platform
+    infrastructure, not a catalog entry).
 """
 
 from __future__ import annotations
@@ -36,6 +42,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REGISTRY_PATH = REPO_ROOT / 'pipeline' / 'stacks.yml'
 PIPELINE_PATH = REPO_ROOT / 'pipeline' / 'pipeline.yml'
+BLUEPRINTS_DIR = REPO_ROOT / 'blueprints'
 
 # CloudFormation deploy actions name their template as
 # `TemplatePath: 'GitRepositoryArtifact::<repo-relative-path>'`. Matched by text scan for the
@@ -142,6 +149,49 @@ def validate(entries: list[dict]) -> list[str]:
         )
 
     errors.extend(check_pipeline_actions(declared))
+    errors.extend(check_blueprint_manifests(declared))
+
+    return errors
+
+
+def check_blueprint_manifests(declared: dict[str, str]) -> list[str]:
+    """Check that every blueprints/*/blueprint.yaml names a registered template.
+
+    The manifest is what blueprint_search returns to a builder, so one pointing at an
+    unregistered -- or nonexistent -- template advertises a blueprint whose deployment_create
+    produces a pull request that cannot deploy. Registration is also what gets the template
+    linted, so this is the invariant the rest of this file enforces, seen from the catalog side.
+
+    A manifest is not a CloudFormation template and is deliberately not registered itself:
+    it declares no template format version, so discover_templates() does not see it.
+    """
+    errors: list[str] = []
+
+    for manifest_path in sorted(BLUEPRINTS_DIR.glob('*/blueprint.yaml')):
+        where = manifest_path.relative_to(REPO_ROOT).as_posix()
+        try:
+            manifest = yaml.safe_load(manifest_path.read_text(encoding='utf-8'))
+        except yaml.YAMLError as exc:
+            errors.append(f'{where}: not valid YAML: {exc}')
+            continue
+
+        if not isinstance(manifest, dict):
+            errors.append(f'{where}: expected a mapping at the top level')
+            continue
+
+        template = manifest.get('template')
+        if not template:
+            errors.append(
+                f'{where}: missing "template" -- a manifest has to name the CloudFormation '
+                'template its blueprint deploys'
+            )
+        elif template not in declared:
+            errors.append(
+                f'{where}: template {template!r} is not registered in pipeline/stacks.yml '
+                '-- blueprint_search would offer a blueprint whose deployment PR cannot '
+                'deploy. Register the template, or add the manifest in the same PR that '
+                'adds it.'
+            )
 
     return errors
 
@@ -190,6 +240,12 @@ def main() -> int:
     entries = load_registry()
 
     if args.list:
+        # LF regardless of platform. tools/check word-splits this output into cfn-lint's
+        # arguments, and on Windows print() would emit CRLF -- leaving a trailing carriage
+        # return on every path but the last. cfn-lint then reports 'E0003 <template> could not
+        # be processed by glob.glob', which reads like a broken template rather than a broken
+        # path, and tools/check cannot pass on a Windows checkout at all.
+        sys.stdout.reconfigure(newline='\n')
         for entry in entries:
             if isinstance(entry, dict) and entry.get('template'):
                 print(entry['template'])

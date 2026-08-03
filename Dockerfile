@@ -10,11 +10,11 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder-mcp
 WORKDIR /app
 
 # Dependency layer first so code edits don't re-resolve the environment.
-COPY builder-mcp/pyproject.toml builder-mcp/uv.lock ./
+COPY packages/builder-mcp/pyproject.toml packages/builder-mcp/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-COPY builder-mcp/src ./src
-COPY builder-mcp/README.md ./
+COPY packages/builder-mcp/src ./src
+COPY packages/builder-mcp/README.md ./
 RUN uv sync --frozen --no-dev
 
 # Stateless + all-interfaces is the AgentCore contract; locally you'd run without these.

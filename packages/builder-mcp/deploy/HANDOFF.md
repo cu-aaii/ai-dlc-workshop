@@ -26,7 +26,8 @@ stages on its own — no console action needed.
    predates AgentCore.
 2. **Runtime name** is `aidlc_main_builder_mcp` (AgentCore takes underscores, not hyphens).
 3. Assumed answers baked in: Cognito client-credentials inbound auth (P2-⭐), Runtime-only
-   topology (P1-⭐) — see `../aidlc-docs/construction/agentcore-productionizing-questions.md`.
+   topology (P1-⭐) — see
+   `../../../docs/aidlc/builder-mcp/construction/agentcore-productionizing-questions.md`.
 
 ## Optional pre-flight (any time, one-time)
 
@@ -43,7 +44,7 @@ aws secretsmanager create-secret --name aidlc/main/builder-mcp/github-token --se
 ## Verify after the pipeline goes green
 
 ```sh
-cd builder-mcp
+cd packages/builder-mcp
 uv run python deploy/verify.py --stack aidlc-main-builder-mcp --region us-east-1
 ```
 

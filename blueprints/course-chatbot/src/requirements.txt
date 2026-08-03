@@ -1,0 +1,9 @@
+# Runtime dependencies for the course-chatbot Lambda image.
+#
+# boto3 is deliberately absent: the AWS Lambda Python base image ships it, and the only
+# call this makes through it (s3:PutObject) is stable across versions.
+#
+# The floor is the SDK version that carries the Bedrock Messages API client; the ceiling
+# keeps a major release from landing in an unrelated PR's image build. This is a floating
+# range rather than a lockfile -- see "Pinning" in this blueprint's README.
+anthropic[bedrock]>=0.92,<2
