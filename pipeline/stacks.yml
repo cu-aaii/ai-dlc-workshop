@@ -36,5 +36,5 @@ templates:
 
   - name: 'builder-mcp'
     template: 'builder-mcp/infra/builder-mcp.yml'
-    deployed_by: 'manual'
-    description: 'Cornell Builder MCP server on Bedrock AgentCore. Deployed by hand during the workshop (builder-mcp/deploy/deploy.ps1); promoting it to a pipeline action is the P1 target.'
+    deployed_by: 'pipeline'
+    description: 'Cornell Builder MCP server on Bedrock AgentCore. Image built by the Build stage (arm64, root Dockerfile target builder-mcp), deployed by digest.'

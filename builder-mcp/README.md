@@ -65,7 +65,8 @@ pipeline's role, and the pipeline acts only on merge.
 
 ## Deploying to Bedrock AgentCore
 
-The server is stateless streamable HTTP on `0.0.0.0:8000/mcp` when run with
-`BUILDER_MCP_HOST=0.0.0.0 BUILDER_MCP_STATELESS=1` — the AgentCore Runtime MCP contract.
-Workshop expedient: deployed by CLI today; the IaC/pipeline path (a blueprint of its own)
-is the P1 target.
+**Merge deploys — same as every blueprint.** The pipeline's Build stage builds the
+`builder-mcp` target of the repo-root `Dockerfile` (linux/arm64) and the BlueprintDeploy
+stage deploys [`infra/builder-mcp.yml`](infra/builder-mcp.yml) with the image pinned by
+digest. Runbook and review points: [`deploy/HANDOFF.md`](deploy/HANDOFF.md); post-deploy
+proof: `uv run python deploy/verify.py`.

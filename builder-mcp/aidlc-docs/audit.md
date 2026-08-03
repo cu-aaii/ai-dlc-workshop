@@ -62,3 +62,11 @@ You are not allowed to change the hello world blueprint.yaml substantively. Anot
 **Context**: Construction complete → Operations handoff
 
 ---
+
+## Course Correction: Pipeline-Native Deployment
+**Timestamp**: 2026-08-03T21:10:00Z
+**User Input**: "Hey is that overkill to make a dockerfile right now? Love what you're doing, but might not need it - can't quite tell. This repo is complex. Review the current state of the github repo, particuarly the intended deployment method. The idea is that when you push to github, there is a github action / webhook that is already that is looking for your pr and will go deploy its contents. Look at README.md and blueprints/README.md and blueprints/hello-world/*"
+**AI Response**: Reviewed README.md, blueprints/README.md, hello-world, pipeline/README.md, codebuild.yml. Verdict: the Dockerfile is required (AgentCore runs container images; pipeline/README.md's "Adding a container image build" makes a Dockerfile step 1), but the local-build deploy script, private ECR repo, and deployed_by: manual were off-path. Rewired to pipeline-native: root Dockerfile with named target builder-mcp (codebuild.yml builds repo-root context), additive ArmContainerBuildProject (AgentCore needs arm64; reference x86 project untouched), Build stage exporting CONTAINER_DIGEST, BuilderMcpCloudFormation action deploying by digest, stacks.yml → deployed_by: pipeline. Deleted deploy.ps1 and builder-mcp/Dockerfile. Recorded DECISION-18 and GOTCHA-ARM/ROOT-DOCKERFILE/DEPLOY-ROLE.
+**Context**: Operations — deployment method aligned with repo's intended path
+
+---

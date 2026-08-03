@@ -68,11 +68,18 @@ trigger (D4).
 
 ## C4 — Transport & runtime
 
-**Consumers**: AgentCore deployment, local dev, Claude clients. MCP over **streamable
-HTTP**; container contract `0.0.0.0:8000`, path `/mcp`, `linux/arm64`, **stateless**
-(`BUILDER_MCP_STATELESS=1`). Stateless ⇒ no MCP elicitation ⇒ the `dry_run` two-step is
-the confirm UX everywhere. Local dev may run stateful on `127.0.0.1`; behavior must not
-differ beyond that. Reference: AWS devguide `runtime-mcp.html`.
+**Consumers**: AgentCore deployment, local dev, Claude clients, the pipeline Build stage.
+MCP over **streamable HTTP**; container contract `0.0.0.0:8000`, path `/mcp`,
+`linux/arm64`, **stateless** (`BUILDER_MCP_STATELESS=1`). Stateless ⇒ no MCP elicitation
+⇒ the `dry_run` two-step is the confirm UX everywhere. Local dev may run stateful on
+`127.0.0.1`; behavior must not differ beyond that. Reference: AWS devguide
+`runtime-mcp.html`.
+
+**Build & deploy path**: the image is a named target (`builder-mcp`) in the **repo-root
+`Dockerfile`**, built by the pipeline's ARM CodeBuild project on merge and deployed **by
+digest** into the stack (`#{BuilderMcpContainer.CONTAINER_DIGEST}`). No local builds, no
+private ECR repo — images live in the shared `<app>-<env>` repository. Renaming the
+Dockerfile target breaks the pipeline action: both are one contract.
 
 ## C5 — Credentials & auth
 

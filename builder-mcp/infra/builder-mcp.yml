@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Cornell Builder MCP server on Bedrock AgentCore Runtime: ECR repository, Cognito client-credentials authorizer, execution role, and the runtime itself. Deployed by hand this week (registered deployed_by: manual); promotion to a pipeline action is the P1 target.'
+Description: 'Cornell Builder MCP server on Bedrock AgentCore Runtime: Cognito client-credentials authorizer, execution role, and the runtime itself. Deployed by the pipeline BlueprintDeploy stage; its image is built by the Build stage from the root Dockerfile (target builder-mcp) and pinned by digest.'
 
 Parameters:
 
@@ -34,7 +34,7 @@ Parameters:
   ContainerImageUri:
     Default: ''
     AllowedPattern: '.{0,512}'
-    Description: 'ECR image URI (with tag) for the runtime. Empty on the first deploy, which creates the repository to push to; deploy again with the URI to create the runtime.'
+    Description: 'Image for the runtime, normally the digest URI the pipeline Build stage exports (#{BuilderMcpContainer.CONTAINER_DIGEST}). Empty deploys everything except the runtime, for bootstrap and debugging.'
     Type: 'String'
 
   GitHubTokenSecretName:
@@ -45,36 +45,14 @@ Parameters:
 
 Conditions:
 
-  # Two-phase deploy: ECR + Cognito + role exist first so there is somewhere to push the
-  # image and something to test auth against; the runtime lands on the second deploy.
+  # The pipeline's Build stage always supplies an image digest, so the runtime deploys on
+  # every pipeline run. The empty-image form exists for hand deploys while debugging.
   HasImage: !Not [!Equals [!Ref 'ContainerImageUri', '']]
 
 Resources:
 
-  # Container Registry
-
-  BuilderMcpRepository:
-    Type: 'AWS::ECR::Repository'
-    Properties:
-      RepositoryName: !Sub '${Application}-${Environment}-builder-mcp'
-      ImageTagMutability: 'MUTABLE'
-      ImageScanningConfiguration:
-        ScanOnPush: true
-      Tags:
-        - Key: 'Application'
-          Value: !Ref 'Application'
-        - Key: 'Environment'
-          Value: !Ref 'Environment'
-        - Key: 'Resource'
-          Value: 'ecr-repository-builder-mcp'
-        - Key: 'cornell:owner'
-          Value: !Ref 'Owner'
-        - Key: 'cornell:blueprint'
-          Value: 'builder-mcp'
-        - Key: 'cornell:blueprint-version'
-          Value: !Ref 'BlueprintVersion'
-        - Key: 'cornell:deployment-id'
-          Value: !Sub '${Application}-${Environment}-builder-mcp'
+  # Images live in the pipeline's shared ContainerRepository (pipeline/pipeline.yml);
+  # this template deliberately owns no registry.
 
   # Inbound auth (P2-B): Cognito client-credentials. The client id/secret pair plays the
   # role of "the builder's API key" until the Entra ID authorizer lands in P1.
@@ -154,7 +132,8 @@ Resources:
                   - 'ecr:GetDownloadUrlForLayer'
                   - 'ecr:BatchCheckLayerAvailability'
                 Resource:
-                  - !GetAtt 'BuilderMcpRepository.Arn'
+                  # The pipeline's shared container repository, named <app>-<env> there.
+                  - !Sub 'arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/${Application}-${Environment}'
               - Effect: 'Allow'
                 Action:
                   - 'ecr:GetAuthorizationToken'
@@ -247,10 +226,6 @@ Resources:
         'cornell:deployment-id': !Sub '${Application}-${Environment}-builder-mcp'
 
 Outputs:
-
-  RepositoryUri:
-    Description: 'Push the linux/arm64 image here, then redeploy with ContainerImageUri set'
-    Value: !GetAtt 'BuilderMcpRepository.RepositoryUri'
 
   TokenEndpoint:
     Description: 'OAuth client-credentials token endpoint'

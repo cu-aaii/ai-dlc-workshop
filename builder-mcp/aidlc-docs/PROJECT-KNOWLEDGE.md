@@ -39,7 +39,8 @@ merge.
 | DECISION-14 | blueprint.yaml | **FROZEN cross-team standard** — no substantive changes | User directive 2026-08-03 |
 | DECISION-15 | Deployment executor | **Marty deploys from his account/system; this machine only verifies locally and pushes to GitHub** | User directive 2026-08-03 |
 | DECISION-16 | Inbound auth (assumed ⭐) | Cognito client-credentials today, Entra ID at P1 — P1/P2 productionizing answers still pending | agentcore-productionizing-questions.md |
-| DECISION-17 | IaC debt | Registered: `infra/builder-mcp.yml` in stacks.yml as `deployed_by: manual`; pipeline action at P1 | P5-⭐, template exists and lints |
+| DECISION-17 | IaC debt | ~~deployed_by: manual~~ superseded by DECISION-18 | P5-⭐ |
+| DECISION-18 | Deploy method | **Pipeline-native**: root `Dockerfile` target `builder-mcp` → ARM CodeBuild project → Build stage exports digest → BlueprintDeploy action deploys `infra/builder-mcp.yml` with it. `deployed_by: pipeline`. Merge deploys, same as every blueprint | User review 2026-08-03: "when you push to github… a webhook will go deploy its contents"; pipeline/README.md "Adding a container image build" |
 
 Open items for the mob: Q4 (DECISION-08), P1/P2/P3/P6 in
 [construction/agentcore-productionizing-questions.md](construction/agentcore-productionizing-questions.md),
@@ -79,6 +80,17 @@ and the five decision asks at the end of
   exists.
 - **GOTCHA-RUNTIME-NAME**: AgentCore runtime names take underscores, not hyphens
   (`aidlc_main_builder_mcp`).
+- **GOTCHA-ARM**: the reference `ContainerBuildProject` is x86_64; AgentCore needs
+  linux/arm64. Hence `ArmContainerBuildProject` (additive twin, `ARM_CONTAINER` /
+  aarch64 image) — don't "simplify" the two projects into one without checking which
+  architectures the catalog needs.
+- **GOTCHA-ROOT-DOCKERFILE**: `codebuild.yml` runs `docker build $CODEBUILD_SRC_DIR
+  --target $CONTAINER_TARGET` — repo-root context, root `Dockerfile`, named targets.
+  A per-component Dockerfile in a subdirectory is invisible to it (that mistake was made
+  and reverted on day 1). `.dockerignore` at root keeps the context small.
+- **GOTCHA-DEPLOY-ROLE**: `cloudformation-deploy-role` (bootstrap) predates AgentCore —
+  before first merge, confirm it may call `bedrock-agentcore:*` and `cognito-idp:*`,
+  else the BuilderMcp deploy action fails mid-pipeline.
 - **GOTCHA-UV-LOCK**: a running `uv run builder-mcp` holds `builder-mcp.exe` and blocks
   the next `uv sync` (os error 32) — stop the server before re-running uv.
 

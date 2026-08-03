@@ -1,61 +1,69 @@
 # Deployment Handoff — builder-mcp → AgentCore
 
-For whoever deploys (Marty): everything is verified locally and parameterized; nothing
-here assumes the author's machine or credentials. AWS reference:
+**The deployment method is the repo's own pipeline.** Nothing here is deployed by hand:
+merging this branch's PR to `main` makes the webhook fire, the `Build` stage build the
+arm64 image from the root `Dockerfile` (target `builder-mcp`), and the `BlueprintDeploy`
+stage deploy [`../infra/builder-mcp.yml`](../infra/builder-mcp.yml) with the image pinned
+by digest. AWS reference:
 https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-mcp.html
 
-## What you're deploying
+## What the merge deploys
 
-One CloudFormation stack, `aidlc-main-builder-mcp`, from
-[`infra/builder-mcp.yml`](../infra/builder-mcp.yml) (registered in `pipeline/stacks.yml`
-as `deployed_by: manual`). It creates: ECR repo → Cognito user pool/domain/resource
-server/client (OAuth client-credentials authorizer) → execution role (read-mostly; see
-SPEC C5) → AgentCore Runtime (arm64 container, MCP protocol, JWT authorizer). Every
-resource carries the four `cornell:*` tags.
+| Piece | Where |
+|---|---|
+| ARM CodeBuild project (`aidlc-main-container-arm`) | `pipeline/pipeline.yml` — additive; the x86 reference project is untouched |
+| `Build` stage → `BuilderMcpContainer` action | exports `CONTAINER_DIGEST` per `pipeline/codebuild.yml` |
+| `aidlc-main-builder-mcp` stack | Cognito client-credentials authorizer, read-mostly execution role, AgentCore Runtime (MCP protocol, JWT authorizer) — every resource `cornell:*`-tagged |
 
-## Pre-flight (one-time)
+Pipeline-order note: `PipelineDeploy` applies the new pipeline definition first and
+`RestartExecutionOnUpdate` reruns from the top, so the first merge picks up the new
+stages on its own — no console action needed.
 
-1. **GitHub credential** (optional but needed for repo/PR creation): create an org-scoped
-   fine-grained PAT and store it:
-   ```sh
-   aws secretsmanager create-secret --name aidlc/main/builder-mcp/github-token --secret-string '<token>' --region us-east-1
-   ```
-   Without it the server runs fine; GitHub write tools return dry-run plans.
-2. Docker with buildx (arm64), or any builder that produces `linux/arm64` images.
+## Pre-merge review points (the things worth a human's attention)
 
-## Deploy
+1. **`AWS::BedrockAgentCore::Runtime` + `AWS::Cognito::*` via `cloudformation-deploy-role`**
+   — confirm that role's policy covers `bedrock-agentcore:*` and `cognito-idp:*`; it
+   predates AgentCore.
+2. **Runtime name** is `aidlc_main_builder_mcp` (AgentCore takes underscores, not hyphens).
+3. Assumed answers baked in: Cognito client-credentials inbound auth (P2-⭐), Runtime-only
+   topology (P1-⭐) — see `../aidlc-docs/construction/agentcore-productionizing-questions.md`.
 
-Scripted (PowerShell): [`deploy.ps1`](deploy.ps1) — pass `-Owner <netid>`. It is nothing
-but the three steps below; if your own system replaces it, match these:
+## Optional pre-flight (any time, one-time)
 
-1. **Base stack** — `aws cloudformation deploy` with `ContainerImageUri=` (empty) →
-   creates ECR/Cognito/role. Stack-level tags: the four `cornell:*` values.
-2. **Image** — `docker buildx build --platform linux/arm64 -t <RepositoryUri>:latest --push .`
-   from `builder-mcp/` (RepositoryUri is a stack output).
-3. **Runtime** — same deploy command with `ContainerImageUri=<RepositoryUri>:latest`.
-
-## Verify ("snazzy" check)
+GitHub credential for repo/PR creation — without it the server runs fine but its GitHub
+write tools return dry-run plans:
 
 ```sh
+aws secretsmanager create-secret --name aidlc/main/builder-mcp/github-token --secret-string '<org-scoped fine-grained PAT>' --region us-east-1
+```
+
+(The secret name is passed to the stack by the pipeline as
+`<app>/<env>/builder-mcp/github-token`.)
+
+## Verify after the pipeline goes green
+
+```sh
+cd builder-mcp
 uv run python deploy/verify.py --stack aidlc-main-builder-mcp --region us-east-1
 ```
 
-Fetches the Cognito client secret, gets a client-credentials token, does the MCP
-handshake against the runtime endpoint, lists all seven tools, and makes a live
-`blueprint_search` call. Success ends with `VERIFIED: the Cornell Builder is live on
-AgentCore`.
+OAuth token → MCP handshake → lists all seven tools → live `blueprint_search` call →
+`VERIFIED: the Cornell Builder is live on AgentCore`.
 
-Connect a Claude client: token from the Cognito token endpoint (stack output), then add
-an HTTP MCP server at
-`https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/<urlencoded-runtime-arn>/invocations?qualifier=DEFAULT`
-with header `Authorization: Bearer <token>`.
+Connect a Claude client: token from the stack's `TokenEndpoint` output
+(client-credentials, scope `cornell-builder/invoke`), MCP URL
+`https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/<urlencoded RuntimeArn>/invocations?qualifier=DEFAULT`,
+header `Authorization: Bearer <token>`.
 
-## Known limitations / open items
+## Debugging fallback
 
-- Inbound auth is Cognito client-credentials (assumed answer to P2 in
-  [`../aidlc-docs/construction/agentcore-productionizing-questions.md`](../aidlc-docs/construction/agentcore-productionizing-questions.md));
-  Entra ID is the P1 target. P1/P3/P6 answers may adjust this stack.
-- The catalog is fetched from the GitHub repo when running off-repo — unauthenticated
-  GitHub API calls are rate-limited (60/hr/IP); the token secret also fixes this.
-- Teardown: delete the stack; ECR images and the Cognito domain go with it. Nothing else
-  was created outside CloudFormation.
+The template deploys by hand like any blueprint (repo convention): `aws cloudformation
+deploy` with `ContainerImageUri=` empty deploys everything except the runtime; pass any
+pushed image URI to add it. Local image check:
+`docker buildx build --platform linux/arm64 --target builder-mcp .` from the repo root.
+
+## Teardown
+
+Delete stack `aidlc-main-builder-mcp` (Cognito domain included). Remove the Build-stage
+action + stacks.yml entry in a PR to stop rebuilding. Images live in the shared
+`aidlc-main` ECR repo and age out by its lifecycle policy.
