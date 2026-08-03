@@ -39,6 +39,10 @@ format-version marker string, even in a comment — `validate_stacks.py` detects
 by text scan. Manifest `metadata.version` stays in lockstep with the template's
 `BlueprintVersion` default.
 
+Note: the catalog's home moving to a private repo is an agreed future change (tracked in
+BACKLOG.md, Catalog & search) that will change how consumers fetch manifests without
+changing the manifest contract itself.
+
 ## C2 — Deployment shell (`deployment.yaml` in each deployment repo)
 
 **Consumers**: builder-mcp (`create_deployment` writes it, `export_spec` reads it),
@@ -64,7 +68,8 @@ API; renaming a tool is a contract change.
 Error contract: tools return `{"error": ...}` narratives, never raise to the transport
 (NFR7). Governance invariants (hold for every tool, forever): no merge, no push to a
 tracked branch, no CloudFormation Create/Update/Delete — merge is the only deploy
-trigger (D4).
+trigger (D4). An agreed future guardrail caps `restart_deployment` at 3 restarts
+(tracked in BACKLOG.md, Operations & guardrails).
 
 ## C4 — Transport & runtime
 

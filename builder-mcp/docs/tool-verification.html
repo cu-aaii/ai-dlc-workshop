@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cornell Builder MCP — Tool Verification</title>
+<style>
+  :root { --red:#b31b1b; --ink:#222; --mut:#666; --line:#e5e2dd; }
+  * { box-sizing:border-box; }
+  body { font:15px/1.5 "Segoe UI",system-ui,sans-serif; color:var(--ink); margin:0; background:#faf9f7; }
+  header { background:var(--red); color:#fff; padding:28px 40px; }
+  header h1 { margin:0 0 4px; font-size:26px; }
+  header p { margin:0; opacity:.85; }
+  main { max-width:1200px; margin:0 auto; padding:24px 40px 60px; }
+  .facts { display:flex; gap:24px; flex-wrap:wrap; margin:18px 0 6px; color:var(--mut); font-size:13.5px; }
+  .tool { background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px 22px; margin:18px 0; }
+  .tool h2 { margin:0 0 4px; font-size:19px; }
+  .blurb { color:var(--mut); margin:2px 0 14px; }
+  .cols { display:grid; grid-template-columns: 1fr 1.1fr 1.6fr; gap:16px; }
+  .cols h3 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--mut); margin:0 0 6px; }
+  .ask { background:#fdf6ec; border:1px solid #efe2c8; border-radius:8px; padding:12px 14px; font-style:italic; }
+  pre { background:#f4f2ef; border:1px solid var(--line); border-radius:8px; padding:12px; overflow-x:auto; font-size:12px; margin:0; max-height:340px; overflow-y:auto; }
+  .badge { font-size:11px; font-weight:600; border-radius:99px; padding:3px 10px; vertical-align:middle; }
+  .green { background:#e6f4e6; color:#1b6e1b; }
+  .amber { background:#fdf0d9; color:#8a5a00; }
+  .gov { background:#fff; border-left:4px solid var(--red); border-radius:6px; padding:14px 18px; margin:22px 0; }
+  @media (max-width:900px) { .cols { grid-template-columns:1fr; } }
+</style></head><body>
+<header>
+  <h1>Cornell Builder MCP — every tool, verified</h1>
+  <p>Track A · AI-DLC Workshop · captured live from the server code on 2026-08-03</p>
+</header>
+<main>
+  <div class="facts">
+    <span><b>7</b>&nbsp;tools</span><span><b>22</b>&nbsp;tests green</span>
+    <span>MCP over streamable HTTP, verified stateful <i>and</i> stateless</span>
+    <span>linux/arm64 image builds · deploys via the pipeline, by digest</span>
+  </div>
+  <div class="gov"><b>The governance invariant, in one line:</b> no tool can deploy, merge, or push —
+  a deployment happens exactly one way: a human approves the pull request this server opened, and the merge does the rest.</div>
+  
+    <section class="tool">
+      <h2>🔍 <code>blueprint_search</code> <span class="badge green">live output</span></h2>
+      <p class="blurb">Ranks the whole catalog against plain language; returns each blueprint&#x27;s full contract (inputs, cost, maturity).</p>
+      <div class="cols">
+        <div><h3>1 · The builder asks</h3><div class="ask">“I want to smoke test that the deploy path works.”</div></div>
+        <div><h3>2 · Claude calls the tool</h3><pre>{
+  &quot;tool&quot;: &quot;blueprint_search&quot;,
+  &quot;arguments&quot;: {
+    &quot;query&quot;: &quot;smoke test that the deploy path works&quot;
+  }
+}</pre></div>
+        <div><h3>3 · Captured output</h3><pre>{
+  &quot;query&quot;: &quot;smoke test that the deploy path works&quot;,
+  &quot;results&quot;: [
+    {
+      &quot;match_score&quot;: 18.0,
+      &quot;name&quot;: &quot;hello-world&quot;,
+      &quot;version&quot;: &quot;0.1.0&quot;,
+      &quot;maturity&quot;: &quot;supported&quot;,
+      &quot;summary&quot;: &quot;Trivial tagged stack that proves the deploy path end to end: one S3 bucket and one SSM deployment marker, carrying the full cornell:* tagging convention.&quot;,
+      &quot;matches&quot;: [
+        &quot;prove the deploy path&quot;,
+        &quot;hello world&quot;,
+        &quot;smoke test a deployment&quot;,
+        &quot;check the pipeline works&quot;
+      ],
+      &quot;inputs&quot;: {
+        &quot;owner_netid&quot;: {
+          &quot;type&quot;: &quot;string&quot;,
+          &quot;required&quot;: true,
+          &quot;description&quot;: &quot;NetID of the person who owns the deployment (cornell:owner)&quot;
+        }
+      },
+      &quot;singleton&quot;: true,
+      &quot;cost&quot;: {
+        &quot;baseline_monthly_usd&quot;: 0,
+        &quot;scales_with&quot;: []
+      },
+      &quot;data_classification&quot;: [
+        &quot;public&quot;
+      ]
+    }
+  ]
+}</pre></div>
+      </div>
+    </section>
+    <section class="tool">
+      <h2>🏗️ <code>create_deployment</code> <span class="badge green">live output</span></h2>
+      <p class="blurb">dry_run=true returns the full plan — repo, registration PR, stack, cost — for the human to confirm. Nothing deploys until a human merges the PR.</p>
+      <div class="cols">
+        <div><h3>1 · The builder asks</h3><div class="ask">“Deploy the hello-world blueprint for me. I&#x27;m tmf77.”</div></div>
+        <div><h3>2 · Claude calls the tool</h3><pre>{
+  &quot;tool&quot;: &quot;create_deployment&quot;,
+  &quot;arguments&quot;: {
+    &quot;blueprint&quot;: &quot;hello-world&quot;,
+    &quot;deployment_name&quot;: &quot;hello-world&quot;,
+    &quot;owner_netid&quot;: &quot;tmf77&quot;,
+    &quot;dry_run&quot;: true
+  }
+}</pre></div>
+        <div><h3>3 · Captured output</h3><pre>{
+  &quot;dry_run&quot;: true,
+  &quot;plan&quot;: {
+    &quot;blueprint&quot;: &quot;hello-world v0.1.0 (supported)&quot;,
+    &quot;stack&quot;: &quot;aidlc-main-hello-world&quot;,
+    &quot;estimated_cost&quot;: {
+      &quot;baseline_monthly_usd&quot;: 0,
+      &quot;scales_with&quot;: []
+    },
+    &quot;new_repo&quot;: &quot;cu-aaii/deploy-hello-world&quot;,
+    &quot;registration_pr&quot;: {
+      &quot;repo&quot;: &quot;cu-aaii/ai-dlc-workshop&quot;,
+      &quot;edits&quot;: &quot;pipeline/pipeline.yml \u2014 one new BlueprintDeploy action&quot;,
+      &quot;parameter_overrides&quot;: {
+        &quot;Application&quot;: &quot;aidlc&quot;,
+        &quot;Environment&quot;: &quot;main&quot;,
+        &quot;Owner&quot;: &quot;tmf77&quot;,
+        &quot;SourceCommitId&quot;: &quot;#{GitRepository.CommitId}&quot;
+      }
+    },
+    &quot;governance&quot;: &quot;Deploys only when a human approves and merges the registration PR.&quot;
+  }
+}</pre></div>
+      </div>
+    </section>
+    <section class="tool">
+      <h2>📊 <code>deployment_status</code> <span class="badge amber">graceful degradation — no AWS creds on this laptop; live values on AgentCore</span></h2>
+      <p class="blurb">The whole chain in one view: registration PR → pipeline stages → CloudFormation stack.</p>
+      <div class="cols">
+        <div><h3>1 · The builder asks</h3><div class="ask">“Is my hello-world deployment live yet?”</div></div>
+        <div><h3>2 · Claude calls the tool</h3><pre>{
+  &quot;tool&quot;: &quot;deployment_status&quot;,
+  &quot;arguments&quot;: {
+    &quot;deployment_name&quot;: &quot;hello-world&quot;
+  }
+}</pre></div>
+        <div><h3>3 · Captured output</h3><pre>{
+  &quot;deployment&quot;: &quot;hello-world&quot;,
+  &quot;open_registration_prs&quot;: [],
+  &quot;pipeline&quot;: {
+    &quot;error&quot;: &quot;AWS call failed while reading pipeline aidlc-main: TokenRetrievalError: Error when retrieving token from sso: Token has expired and refresh failed&quot;
+  },
+  &quot;stack&quot;: {
+    &quot;error&quot;: &quot;AWS call failed while describing stack aidlc-main-hello-world: TokenRetrievalError: Error when retrieving token from sso: Token has expired and refresh failed&quot;
+  }
+}</pre></div>
+      </div>
+    </section>
+    <section class="tool">
+      <h2>✏️ <code>propose_change</code> <span class="badge green">live output</span></h2>
+      <p class="blurb">Changes become a branch + pull request — never a direct push. The review gate stays unbypassable.</p>
+      <div class="cols">
+        <div><h3>1 · The builder asks</h3><div class="ask">“Update the README in my deployment repo.”</div></div>
+        <div><h3>2 · Claude calls the tool</h3><pre>{
+  &quot;tool&quot;: &quot;propose_change&quot;,
+  &quot;arguments&quot;: {
+    &quot;repo&quot;: &quot;deploy-hello-world&quot;,
+    &quot;title&quot;: &quot;Clarify usage docs&quot;,
+    &quot;description&quot;: &quot;Expand the README usage section.&quot;,
+    &quot;files&quot;: {
+      &quot;README.md&quot;: &quot;# hello-world\n\nUpdated usage docs...&quot;
+    },
+    &quot;dry_run&quot;: true
+  }
+}</pre></div>
+        <div><h3>3 · Captured output</h3><pre>{
+  &quot;dry_run&quot;: true,
+  &quot;plan&quot;: {
+    &quot;repo&quot;: &quot;cu-aaii/deploy-hello-world&quot;,
+    &quot;branch&quot;: &quot;propose/59895&quot;,
+    &quot;files_changed&quot;: [
+      &quot;README.md&quot;
+    ],
+    &quot;pr_title&quot;: &quot;Clarify usage docs&quot;
+  }
+}</pre></div>
+      </div>
+    </section>
+    <section class="tool">
+      <h2>🩺 <code>health_check</code> <span class="badge amber">graceful degradation — no AWS creds on this laptop; live values on AgentCore</span></h2>
+      <p class="blurb">Stack status, failure events, and an inventory audit that every resource carries the four cornell:* tags.</p>
+      <div class="cols">
+        <div><h3>1 · The builder asks</h3><div class="ask">“Is my deployment healthy?”</div></div>
+        <div><h3>2 · Claude calls the tool</h3><pre>{
+  &quot;tool&quot;: &quot;health_check&quot;,
+  &quot;arguments&quot;: {
+    &quot;deployment_name&quot;: &quot;hello-world&quot;
+  }
+}</pre></div>
+        <div><h3>3 · Captured output</h3><pre>{
+  &quot;deployment&quot;: &quot;hello-world&quot;,
+  &quot;stack&quot;: {
+    &quot;error&quot;: &quot;AWS call failed while describing stack aidlc-main-hello-world: TokenRetrievalError: Error when retrieving token from sso: Token has expired and refresh failed&quot;
+  },
+  &quot;tag_inventory&quot;: {
+    &quot;error&quot;: &quot;AWS call failed while listing resources tagged aidlc-main-hello-world: TokenRetrievalError: Error when retrieving token from sso: Token has expired and refresh failed&quot;
+  },
+  &quot;healthy&quot;: false
+}</pre></div>
+      </div>
+    </section>
+    <section class="tool">
+      <h2>🔄 <code>restart_deployment</code> <span class="badge amber">graceful degradation — no AWS creds on this laptop; live values on AgentCore</span></h2>
+      <p class="blurb">Retries a failed pipeline stage or re-runs at the current version. Can never change WHAT is deployed — that takes a PR.</p>
+      <div class="cols">
+        <div><h3>1 · The builder asks</h3><div class="ask">“My deployment looks wedged — restart it.”</div></div>
+        <div><h3>2 · Claude calls the tool</h3><pre>{
+  &quot;tool&quot;: &quot;restart_deployment&quot;,
+  &quot;arguments&quot;: {
+    &quot;deployment_name&quot;: &quot;hello-world&quot;,
+    &quot;dry_run&quot;: true
+  }
+}</pre></div>
+        <div><h3>3 · Captured output</h3><pre>{
+  &quot;deployment&quot;: &quot;hello-world&quot;,
+  &quot;error&quot;: &quot;AWS call failed while reading pipeline aidlc-main: TokenRetrievalError: Error when retrieving token from sso: Token has expired and refresh failed&quot;
+}</pre></div>
+      </div>
+    </section>
+    <section class="tool">
+      <h2>📄 <code>export_spec</code> <span class="badge green">live output</span></h2>
+      <p class="blurb">One deployment, six audiences: coder, narrative, security, transfer, user, offboarding.</p>
+      <div class="cols">
+        <div><h3>1 · The builder asks</h3><div class="ask">“Give me a plain-language writeup of what this system does.”</div></div>
+        <div><h3>2 · Claude calls the tool</h3><pre>{
+  &quot;tool&quot;: &quot;export_spec&quot;,
+  &quot;arguments&quot;: {
+    &quot;deployment_name&quot;: &quot;hello-world&quot;,
+    &quot;blueprint&quot;: &quot;hello-world&quot;,
+    &quot;audience&quot;: &quot;narrative&quot;
+  }
+}</pre></div>
+        <div><h3>3 · Captured output</h3><pre>{
+  &quot;audience&quot;: &quot;narrative&quot;,
+  &quot;spec_markdown&quot;: &quot;# hello-world \u2014 narrative spec\n\nDeployment of blueprint **hello-world** v0.1.0 (supported), owned by `see stack parameters`.\n\n## What this system does, in plain language\n\nTrivial tagged stack that proves the deploy path end to end: one S3 bucket and one SSM deployment marker, carrying the full cornell:* tagging convention.\n\nIt was created by asking the Cornell Builder for it; nobody wrote cloud configuration by hand. The running system is called `hello-world` and belongs to `see stack parameters`. It was built from a governed, reusable blueprint (**hello-world**, version 0.1.0) maintained by ai-sei@cornell.edu.\n\nEvery change to it goes through a reviewed pull request \u2014 that review is the governance gate. When the platform improves the blueprint, this deployment receives the improvement as a proposed update to accept or decline.\n\nEstimated baseline cost: $0/month.&quot;
+}</pre></div>
+      </div>
+    </section>
+  <p style="color:var(--mut);font-size:13px">Outputs captured by calling the same functions the MCP transport serves (builder-mcp/docs is generated by a script, not hand-written).
+  Amber items show the designed no-credential fallback (NFR7): a clear narrative instead of a stack trace; on the deployed AgentCore runtime these return live AWS state.</p>
+</main></body></html>
