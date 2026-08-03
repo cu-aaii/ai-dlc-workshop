@@ -7,10 +7,16 @@ Adapted from the AI Innovation Lab reference pipeline. Its mechanics were preser
 deliberately; what changed is its shape — it deploys stacks from blueprint subdirectories
 rather than one application.
 
-> **This repository is public.** Never commit a credential, key, connection string, or
-> anything else that should stay private. Secrets belong in AWS Secrets Manager; blueprints
-> are configured to *use* them without ever containing them. Secret-scanning push protection
-> is on, but treat it as a backstop, not permission to be careless.
+> **This repository is public, and there is no secret-scanning safety net.** Never commit a
+> credential, key, connection string, or anything else that should stay private. Secrets
+> belong in AWS Secrets Manager; blueprints are configured to *use* them without ever
+> containing them.
+>
+> Public repositories normally get secret-scanning push protection for free, but the
+> `cu-aaii` org applies an enforced security configuration (`cu-aaii-org-config-1`) that
+> disables secret scanning, and an enforced configuration cannot be overridden per
+> repository. So nothing will stop you pushing a key — and once pushed to a public repo, a
+> credential must be treated as compromised and rotated, not just deleted.
 
 ## Layout
 
