@@ -237,12 +237,19 @@ for the builder-facing category. This is a rename decision, flagged in §8, not 
 
 ---
 
-## 5. Composition — the Track D horizon (future, not workshop scope)
+## 5. Composition — the Track D horizon (no longer purely hypothetical)
 
 The roadmap step after bundled blueprints is **true composition**: a deployment that assembles two
 or three independently maintained blueprints that plug together through a defined protocol (Track
 D handles how blocks communicate and stay isolated). This document does not design that protocol,
-but the observability contract has to *not preclude* it. Two requirements fall out:
+but the observability contract has to *not preclude* it.
+
+**Update (2026-08-03, branch survey):** Track D is not a future abstraction — it has an owner and is
+in progress. `origin/team-d` is running the AI-DLC workflow explicitly scoped to *"inter-block
+communication and deployment isolation,"* currently at Reverse Engineering. That turns the two
+requirements below from "design against an imagined protocol" into "coordinate with a track that is
+actively defining it." The concrete emission-side treatment moved to the companion doc
+`observability-contract.md` §6; the two requirements themselves stand:
 
 1. **The join key must be composition-stable.** When a dashboard block and a chatbot block are
    assembled into one deployment, telemetry from both must remain attributable. `cornell:deployment-id`
@@ -263,10 +270,13 @@ but the observability contract has to *not preclude* it. Two requirements fall o
    another's data) must hold for telemetry too — a block emits its own signal and cannot read a
    peer's, even though both feed the same central view. The Layer-2 emission mechanism (§2.2) has to
    support write-own / no-read-peer, which rules out some shared-bus designs and favours per-deployment
-   scoped destinations.
+   scoped destinations. `observability-contract.md` §3 recommends CloudWatch EMF-to-own-log-group on
+   exactly this basis; that recommendation should be agreed *jointly with* `team-d`'s isolation model,
+   not settled on the dashboard branch alone.
 
 Marking these now is the point: the workshop builds bundled blueprints, but the *contract* is where
-composition will either be possible or blocked, so the contract is where to be careful.
+composition will either be possible or blocked, so the contract is where to be careful — and the
+`team-d` track is now the right place to be careful *with*.
 
 ---
 
@@ -335,22 +345,23 @@ now in Application Design where the join-key shape gets fixed. Flagged in §8, d
 
 ## 8. Open decisions (for review — not resolved here)
 
-Per methodology, these are surfaced rather than decided unilaterally:
+Per methodology, these are surfaced rather than decided unilaterally. **Concrete proposals for
+several of these now live in the companion `observability-contract.md`, grounded against the real
+`blueprint.yaml` manifest and the branches in flight — the items below cross-reference it.**
 
-1. **Contract ratification.** Is the two-layer contract (§2) the right shape? Specifically: is
-   central cost-derivation-from-tags (no per-blueprint cost emission) accepted, and is a standard
-   health record the right Layer-2 minimum?
-2. **Emission mechanism (§2.2).** CloudWatch (EMF/metrics + platform log destination) vs.
-   EventBridge bus vs. metrics endpoint. Constraints: serverless-first, `us-east-1`, no cross-deployment
-   read, no blueprint knowing central internals.
-3. **`cornell:deployment-id` under composition (§5.1) — NARROWED, and time-sensitive.** The
-   schema-forward-compatibility half is *resolved* (C-02 `schema_version` + sibling-key headroom,
-   Application Design `291ad4e`). What remains open is only the **composition id semantics**: flat id
-   vs. parent+sub-id vs. per-block-id-with-relationship. Application Design bakes in **one deployment =
-   one flat id**, which is right for v1 but propagates into Units Generation now. Either (a) confirm
-   flat-id is acceptable and accept a later migration if Track D ever needs composed attribution, or
-   (b) decide the composed-id shape before it hardens further. This is the one item on this list that
-   is actively getting more expensive with each downstream stage.
+1. **Contract ratification.** Is the contract the right shape? *(Concretely proposed as three parts —
+   tags / manifest declaration / runtime emission — in `observability-contract.md` §2. Note the
+   correction: the Layer-2 minimum is usage counters, not a health record; see §2.2 of this doc.)*
+2. **Emission mechanism (§2.2).** CloudWatch vs. EventBridge bus vs. metrics endpoint. *(Recommended:
+   CloudWatch EMF to the blueprint's own log group, dimensioned by `cornell:deployment-id` —
+   `observability-contract.md` §3. Ratify or overrule.)*
+3. **`cornell:deployment-id` under composition (§5.1) — now a JOINT decision, still time-sensitive.**
+   The schema-forward-compatibility half is *resolved* (C-02 `schema_version` + sibling-key headroom,
+   `291ad4e`). What remains open is the **composition id semantics** (flat vs. parent+sub-id). This is
+   no longer a solo dashboard-branch call: `origin/team-d` is actively defining Track D isolation, and
+   the emission key and the isolation model must agree. Either (a) confirm flat-id and accept a later
+   migration, or (b) decide the composed-id shape jointly with `team-d` before it hardens. Dashboard is
+   in Units Generation; team-d is at Reverse Engineering — the window to shape both is now.
 4. **Naming (§4).** Rename the current `dashboard` blueprint to `observability` /
    `platform-observability`, reserving `dashboard` for the builder-facing category? Or keep `dashboard`
    and name the builder-facing one differently?
@@ -360,3 +371,24 @@ Per methodology, these are surfaced rather than decided unilaterally:
 6. **Per-tenant view timing (§3).** The workshop calls it "paper architecture." Confirm it stays
    paper for now, given §3 shows it is central-view-plus-a-filter and therefore cheap once the central
    view exists.
+7. **Non-AWS resources (surfaced by `origin/add-terraform-stage`).** The tag contract (Part A) is
+   AWS-only — the Resource Groups Tagging API cannot see Azure/Entra resources created via the new
+   Terraform stage. Decide whether non-AWS resources get a provider-side tag equivalent, a manifest
+   declaration, or an explicit "not centrally inventoried" status. See `observability-contract.md` §7#7.
+8. **Manifest adoption is not universal.** `hello-world` has a `blueprint.yaml`; the `knowledgebase`
+   blueprint on `origin/b-knowledgeBase` does **not**. Since the contract's declarative half rides on
+   that manifest, decide whether a `blueprint.yaml` is *required* of every blueprint (a PR check) and
+   backfill the missing ones. See `observability-contract.md` §7#8.
+
+---
+
+## 9. The "second emitter" trigger — honest status
+
+The `observability/` extraction trigger is *"when a second blueprint emits usage metrics."* The
+branch survey shows this is **nearer but not yet fired**: `origin/b-knowledgeBase` adds the first
+blueprint with compute (`AWS::Lambda::Function`), but that Lambda is a *deploy-time ingestion
+verifier*, not a runtime usage path — it has no ongoing usage to count (`observability-contract.md`
+§4). A blueprint that genuinely emits usage (the Teams chatbot's queries-answered) still does not
+exist on any surveyed branch. So: build the declarative halves (tags + manifest) now against real
+blueprints, prove runtime emission against a deliberately trivial emitter, and hold the
+`blueprints/dashboard/` → `observability/` move until a real usage-emitter lands.
