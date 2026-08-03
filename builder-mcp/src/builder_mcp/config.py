@@ -8,9 +8,12 @@ neither -- that boundary is the point of the design (proposal D3).
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def _find_repo_root() -> Path | None:
@@ -81,5 +84,13 @@ def _resolve_github_token(region: str) -> str | None:
             SecretId=secret_name
         )
         return response.get("SecretString") or None
-    except Exception:
+    except Exception as error:
+        # Degrade to read-only rather than crash (NFR7) — but never silently
+        # (SECURITY-03): the operator must be able to see why writes became dry-runs.
+        logger.warning(
+            "could not fetch GitHub token secret %r (%s); GitHub writes degrade to "
+            "dry-run plans",
+            secret_name,
+            error.__class__.__name__,
+        )
         return None

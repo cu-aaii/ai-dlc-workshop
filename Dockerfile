@@ -5,7 +5,11 @@
 # --- builder-mcp: Cornell Builder MCP server on Bedrock AgentCore ------------------------
 # AgentCore Runtime contract: linux/arm64, MCP over streamable HTTP on 0.0.0.0:8000/mcp,
 # stateless. Built by the ARM CodeBuild project; deployed by digest.
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder-mcp
+# Base image pinned by digest (SECURITY-10): this is the multi-arch index digest of
+# ghcr.io/astral-sh/uv:python3.13-bookworm-slim as of 2026-08-03, obtained via
+# `docker buildx imagetools inspect`. Bump deliberately; a mutable tag could change
+# the production image between builds with no diff in this repo.
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim@sha256:531f855bda2c73cd6ef67d56b733b357cea384185b3022bd09f05e002cd144ca AS builder-mcp
 
 WORKDIR /app
 
@@ -21,6 +25,11 @@ RUN uv sync --frozen --no-dev
 ENV BUILDER_MCP_HOST=0.0.0.0 \
     BUILDER_MCP_STATELESS=1 \
     BUILDER_MCP_PORT=8000
+
+# Non-root runtime (SECURITY-09 hardening): the server needs no root capability. The
+# venv stays root-owned and world-readable; `uv run --no-sync` never writes to it.
+RUN useradd --create-home --shell /usr/sbin/nologin app
+USER app
 
 EXPOSE 8000
 

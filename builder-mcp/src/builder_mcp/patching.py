@@ -14,7 +14,10 @@ from __future__ import annotations
 import json
 import re
 
-DEPLOYMENT_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,28}[a-z0-9]$")
+# 2-30 chars, lowercase alphanumeric with single hyphens between; consecutive hyphens
+# are forbidden (the lookahead) because pascal_case would otherwise collide distinct
+# names ('a-a' and 'a--a' both map to 'AA' — non-injectivity found by property testing).
+DEPLOYMENT_NAME_PATTERN = re.compile(r"^(?!.*--)[a-z0-9][a-z0-9-]{0,28}[a-z0-9]$")
 
 
 def pascal_case(name: str) -> str:

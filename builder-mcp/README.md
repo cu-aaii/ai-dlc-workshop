@@ -57,6 +57,7 @@ Tests: `uv run pytest -q` (also run repo-level `tools/check` before pushing).
 | `BUILDER_MCP_TRANSPORT` | `streamable-http` | `stdio` for local stdio use |
 | `BUILDER_MCP_HOST` / `BUILDER_MCP_PORT` | `127.0.0.1` / `8000` | Bind address |
 | `BUILDER_MCP_STATELESS` | off | Set `1` on AgentCore (no session affinity) |
+| `BUILDER_MCP_LOG_LEVEL` | `INFO` | Stdlib logging level (configured in `main()` only); `DEBUG` adds per-operation detail |
 
 ## AWS access is read-mostly by design
 

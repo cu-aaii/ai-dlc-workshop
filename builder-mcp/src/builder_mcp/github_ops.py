@@ -13,6 +13,7 @@ so the tool surface is demonstrable on a clean machine (NFR7).
 from __future__ import annotations
 
 import base64
+import logging
 from typing import Any
 
 import httpx
@@ -20,6 +21,8 @@ import httpx
 from .config import Settings
 
 API = "https://api.github.com"
+
+logger = logging.getLogger(__name__)
 
 
 class GitHubOps:
@@ -32,6 +35,17 @@ class GitHubOps:
         if settings.github_token:
             headers["Authorization"] = f"Bearer {settings.github_token}"
         self.client = httpx.Client(base_url=API, headers=headers, timeout=30)
+
+    def close(self) -> None:
+        """Release the underlying httpx connection pool. GitHubOps instances are
+        per-tool-call in a long-lived container; leaking them leaks sockets."""
+        self.client.close()
+
+    def __enter__(self) -> "GitHubOps":
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
 
     @property
     def can_write(self) -> bool:
@@ -97,6 +111,7 @@ class GitHubOps:
     ) -> dict[str, Any]:
         if not self.can_write:
             return {"dry_run": True, "would": f"write {path} on {repo_full}@{branch}"}
+        logger.debug("put_file repo=%s path=%s branch=%s bytes=%d", repo_full, path, branch, len(content))
         body: dict[str, Any] = {
             "message": message,
             "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),

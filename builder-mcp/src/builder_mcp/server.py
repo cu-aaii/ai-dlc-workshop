@@ -17,8 +17,11 @@ spec_export, ...). Design constraints this code is downstream of:
 
 from __future__ import annotations
 
+import functools
+import logging
 import os
-from typing import Any
+import uuid
+from typing import Any, Callable
 
 try:  # SDK renamed FastMCP -> MCPServer; support both so the pinned version can float
     from mcp.server.mcpserver import MCPServer as _ServerClass
@@ -26,7 +29,7 @@ except ImportError:  # pragma: no cover
     from mcp.server.fastmcp import FastMCP as _ServerClass
 
 from . import aws_ops
-from .catalog import load_catalog, search, validate_inputs
+from .catalog import CatalogError, load_catalog, search, validate_inputs
 from .config import Settings
 from .github_ops import GitHubOps
 from .patching import (
@@ -38,8 +41,57 @@ from .patching import (
     render_pipeline_action,
 )
 from .spec_export import render_spec
+from .validation import (
+    files_problem,
+    owner_netid_problem,
+    safe_error,
+    title_description_problem,
+)
+
+logger = logging.getLogger(__name__)
 
 settings = Settings.from_env()
+
+
+def _guarded(func: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+    """Wrap a tool so it never raises to the transport (C3 error contract / NFR7) and
+    logs exactly one structured line per call (SECURITY-03).
+
+    Any exception becomes a redacted {"error": ...} narrative (SECURITY-09); CatalogError
+    messages are crafted caller-safe and pass through verbatim.
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        subject = (
+            kwargs.get("deployment_name")
+            or kwargs.get("blueprint")
+            or kwargs.get("repo")
+            or kwargs.get("query")
+            or (args[0] if args else "")
+        )
+        error_class: str | None = None
+        try:
+            result = func(*args, **kwargs)
+        except CatalogError as error:
+            result = {"error": str(error)}
+            error_class = error.__class__.__name__
+        except Exception as error:  # the transport must only ever see a narrative
+            logger.debug("tool %s raised", func.__name__, exc_info=True)
+            result = safe_error(error, f"running {func.__name__}")
+            error_class = error.__class__.__name__
+        if error_class is None and isinstance(result, dict) and "error" in result:
+            error_class = "handled"
+        logger.info(
+            "tool=%s subject=%s dry_run=%s outcome=%s",
+            func.__name__,
+            str(subject)[:80],
+            kwargs.get("dry_run", "n/a"),
+            f"error:{error_class}" if error_class else "ok",
+        )
+        return result
+
+    return wrapper
 
 mcp = _ServerClass(
     "cornell-builder",
@@ -65,6 +117,7 @@ def _blueprint_or_error(name: str):
 
 
 @mcp.tool()
+@_guarded
 def blueprint_search(query: str) -> dict[str, Any]:
     """Search the blueprint catalog with a plain-language description of what you want.
 
@@ -82,6 +135,7 @@ def blueprint_search(query: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+@_guarded
 def deployment_create(
     blueprint: str,
     deployment_name: str,
@@ -96,6 +150,9 @@ def deployment_create(
     PR to be opened, stack name, parameters, estimated cost) for confirmation. Nothing
     deploys until a human approves the PR — merge is the only deploy trigger.
     """
+    netid_problem = owner_netid_problem(owner_netid)
+    if netid_problem:
+        return {"error": netid_problem}
     found = _blueprint_or_error(blueprint)
     if isinstance(found, dict):
         return found
@@ -138,53 +195,82 @@ def deployment_create(
         },
         "governance": "Deploys only when a human approves and merges the registration PR.",
     }
+    # F1 denylist: every path this tool writes is validated, even the server-generated
+    # shell files — no write can ever land under .github/ or outside the repo.
+    files_issue = files_problem(shell_files)
+    if files_issue:
+        return {"error": files_issue}
+
     if dry_run:
         return {"dry_run": True, "plan": plan}
 
-    github = GitHubOps(settings)
     results: dict[str, Any] = {"plan": plan}
-    results["repo"] = github.create_org_repo(
-        repo_name, f"{found.name} v{found.version} deployment owned by {owner_netid}"
-    )
-    for path, content in shell_files.items():
-        github.put_file(
-            f"{settings.github_org}/{repo_name}", path, content,
-            f"Initialize {deployment_name} shell", "main",
-        )
+    completed_steps: list[str] = []
     branch = f"deploy/{deployment_name}"
-    github.create_branch(settings.workshop_repo_full, branch)
-    if github.can_write:
-        pipeline_text, sha = github.get_file(
-            settings.workshop_repo_full, "pipeline/pipeline.yml", ref=branch
-        )
-        patched = insert_blueprint_action(pipeline_text, action_block, stack_name)
-        github.put_file(
-            settings.workshop_repo_full, "pipeline/pipeline.yml", patched,
-            f"Register {stack_name} deployment of {found.name} v{found.version}",
-            branch, sha=sha,
-        )
-    results["pull_request"] = github.create_pull(
-        settings.workshop_repo_full,
-        branch,
-        f"Deploy {found.name} v{found.version} as {stack_name} for {owner_netid}",
-        f"Registration PR opened by the Cornell Builder.\n\n"
-        f"- Blueprint: `{found.name}` v{found.version}\n- Stack: `{stack_name}`\n"
-        f"- Owner: `{owner_netid}`\n- Deployment repo: {settings.github_org}/{repo_name}\n\n"
-        "Merging this PR is the deploy action. Review the pipeline action diff carefully.",
-    )
+    try:
+        with GitHubOps(settings) as github:
+            results["repo"] = github.create_org_repo(
+                repo_name, f"{found.name} v{found.version} deployment owned by {owner_netid}"
+            )
+            completed_steps.append(f"created repo {settings.github_org}/{repo_name}")
+            for path, content in shell_files.items():
+                github.put_file(
+                    f"{settings.github_org}/{repo_name}", path, content,
+                    f"Initialize {deployment_name} shell", "main",
+                )
+            completed_steps.append("initialized deployment repo shell files")
+            github.create_branch(settings.workshop_repo_full, branch)
+            completed_steps.append(f"created branch {branch} on {settings.workshop_repo_full}")
+            if github.can_write:
+                pipeline_text, sha = github.get_file(
+                    settings.workshop_repo_full, "pipeline/pipeline.yml", ref=branch
+                )
+                patched = insert_blueprint_action(pipeline_text, action_block, stack_name)
+                github.put_file(
+                    settings.workshop_repo_full, "pipeline/pipeline.yml", patched,
+                    f"Register {stack_name} deployment of {found.name} v{found.version}",
+                    branch, sha=sha,
+                )
+                completed_steps.append("registered the deploy action on pipeline/pipeline.yml")
+            results["pull_request"] = github.create_pull(
+                settings.workshop_repo_full,
+                branch,
+                f"Deploy {found.name} v{found.version} as {stack_name} for {owner_netid}",
+                f"Registration PR opened by the Cornell Builder.\n\n"
+                f"- Blueprint: `{found.name}` v{found.version}\n- Stack: `{stack_name}`\n"
+                f"- Owner: `{owner_netid}`\n- Deployment repo: {settings.github_org}/{repo_name}\n\n"
+                "Merging this PR is the deploy action. Review the pipeline action diff carefully.",
+            )
+            completed_steps.append("opened the registration PR")
+    except Exception as error:
+        # SECURITY-15: the multi-step sequence is not atomic — report exactly how far
+        # it got and what may need cleanup, instead of raising mid-way.
+        return {
+            **safe_error(error, f"creating deployment {deployment_name!r}"),
+            "completed_steps": completed_steps,
+            "cleanup": (
+                f"Partial state may remain: check for repo "
+                f"{settings.github_org}/{repo_name} and branch {branch!r} on "
+                f"{settings.workshop_repo_full}; delete whichever exists before "
+                "retrying, or ask the platform team."
+            ),
+        }
     return results
 
 
 @mcp.tool()
+@_guarded
 def deployment_read(deployment_name: str) -> dict[str, Any]:
     """Full-chain status of a deployment: registration PR, pipeline stages, and
     CloudFormation stack state."""
     stack_name = settings.stack_name(deployment_name)
-    github = GitHubOps(settings)
-    try:
-        prs = github.open_prs(settings.workshop_repo_full, head_contains=f"deploy/{deployment_name}")
-    except Exception as error:  # GitHub unreachable should not hide AWS state
-        prs = [{"error": f"could not list PRs: {error}"}]
+    with GitHubOps(settings) as github:
+        try:
+            prs = github.open_prs(
+                settings.workshop_repo_full, head_contains=f"deploy/{deployment_name}"
+            )
+        except Exception as error:  # GitHub unreachable should not hide AWS state
+            prs = [safe_error(error, "listing registration PRs")]
     return {
         "deployment": deployment_name,
         "open_registration_prs": prs,
@@ -194,6 +280,7 @@ def deployment_read(deployment_name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+@_guarded
 def deployment_update(
     repo: str,
     title: str,
@@ -208,7 +295,24 @@ def deployment_update(
     the user what will change.
     """
     repo_full = repo if "/" in repo else f"{settings.github_org}/{repo}"
-    branch = f"propose/{abs(hash(title)) % 100000}"
+    # F1: the server's credential only ever writes to the workshop repo or a deploy-*
+    # deployment repo — never an arbitrary org/name the caller typed.
+    if repo_full != settings.workshop_repo_full and not repo_full.startswith(
+        f"{settings.github_org}/deploy-"
+    ):
+        return {
+            "error": (
+                f"repo {repo_full!r} is outside this server's write scope: only "
+                f"{settings.workshop_repo_full} and {settings.github_org}/deploy-* "
+                "deployment repos can be targeted"
+            )
+        }
+    issue = title_description_problem(title, description) or files_problem(files)
+    if issue:
+        return {"error": issue}
+    # uuid4, not hash(): hash() is randomized per process (PYTHONHASHSEED), so the
+    # branch would differ between the dry-run plan and a post-restart execute.
+    branch = f"propose/{uuid.uuid4().hex[:8]}"
     if dry_run:
         return {
             "dry_run": True,
@@ -219,22 +323,39 @@ def deployment_update(
                 "pr_title": title,
             },
         }
-    github = GitHubOps(settings)
-    github.create_branch(repo_full, branch)
+    completed_steps: list[str] = []
     written = []
-    for path, content in files.items():
-        sha = None
-        if github.can_write:
-            try:
-                _, sha = github.get_file(repo_full, path, ref=branch)
-            except Exception:
-                sha = None  # new file
-        written.append(github.put_file(repo_full, path, content, f"{title}: {path}", branch, sha=sha))
-    pr = github.create_pull(repo_full, branch, title, description)
+    try:
+        with GitHubOps(settings) as github:
+            github.create_branch(repo_full, branch)
+            completed_steps.append(f"created branch {branch} on {repo_full}")
+            for path, content in files.items():
+                sha = None
+                if github.can_write:
+                    try:
+                        _, sha = github.get_file(repo_full, path, ref=branch)
+                    except Exception:
+                        sha = None  # new file
+                written.append(
+                    github.put_file(repo_full, path, content, f"{title}: {path}", branch, sha=sha)
+                )
+                completed_steps.append(f"wrote {path}")
+            pr = github.create_pull(repo_full, branch, title, description)
+            completed_steps.append("opened the PR")
+    except Exception as error:
+        return {
+            **safe_error(error, f"proposing change {title!r}"),
+            "completed_steps": completed_steps,
+            "cleanup": (
+                f"Partial state may remain: branch {branch!r} on {repo_full} can be "
+                "deleted safely and the change retried."
+            ),
+        }
     return {"files": written, "pull_request": pr}
 
 
 @mcp.tool()
+@_guarded
 def deployment_health(deployment_name: str) -> dict[str, Any]:
     """Health of a running deployment: stack status, failure events if any, and an
     inventory audit that every resource carries the four required cornell:* tags."""
@@ -249,6 +370,7 @@ def deployment_health(deployment_name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+@_guarded
 def deployment_restart(deployment_name: str, dry_run: bool = True) -> dict[str, Any]:
     """Re-run the deployment at its current version: retries the failed pipeline stage if
     one exists, otherwise starts a fresh pipeline execution. Cannot change what is
@@ -259,6 +381,7 @@ def deployment_restart(deployment_name: str, dry_run: bool = True) -> dict[str, 
 
 
 @mcp.tool()
+@_guarded
 def deployment_delete(deployment_name: str, dry_run: bool = True) -> dict[str, Any]:
     """Delete a deployment the governed way: a deregistration pull request that removes
     its action from the pipeline, symmetric with deployment_create's registration PR.
@@ -293,36 +416,52 @@ def deployment_delete(deployment_name: str, dry_run: bool = True) -> dict[str, A
     if dry_run:
         return {"dry_run": True, "plan": plan}
 
-    github = GitHubOps(settings)
     results: dict[str, Any] = {"plan": plan}
-    results["branch"] = github.create_branch(settings.workshop_repo_full, branch)
-    if github.can_write:
-        pipeline_text, sha = github.get_file(
-            settings.workshop_repo_full, "pipeline/pipeline.yml", ref=branch
-        )
-        try:
-            patched = remove_blueprint_action(pipeline_text, deployment_name)
-        except ValueError as error:
-            return {"error": str(error)}
-        github.put_file(
-            settings.workshop_repo_full, "pipeline/pipeline.yml", patched,
-            f"Deregister {stack_name}", branch, sha=sha,
-        )
-    results["pull_request"] = github.create_pull(
-        settings.workshop_repo_full,
-        branch,
-        f"Undeploy {stack_name}",
-        f"Deregistration PR opened by the Cornell Builder.\n\n"
-        f"- Deployment: `{deployment_name}`\n- Stack: `{stack_name}`\n"
-        f"- Removes: the `{action_name}` action from the BlueprintDeploy stage\n\n"
-        "Merging this PR is the teardown action: the platform deletes the stack per its "
-        "DeletionPolicy. If this was the blueprint's *last* deployment, its "
-        "`pipeline/stacks.yml` entry should be removed in a follow-up PR.",
-    )
+    completed_steps: list[str] = []
+    try:
+        with GitHubOps(settings) as github:
+            results["branch"] = github.create_branch(settings.workshop_repo_full, branch)
+            completed_steps.append(f"created branch {branch}")
+            if github.can_write:
+                pipeline_text, sha = github.get_file(
+                    settings.workshop_repo_full, "pipeline/pipeline.yml", ref=branch
+                )
+                try:
+                    patched = remove_blueprint_action(pipeline_text, deployment_name)
+                except ValueError as error:
+                    return {"error": str(error)}
+                github.put_file(
+                    settings.workshop_repo_full, "pipeline/pipeline.yml", patched,
+                    f"Deregister {stack_name}", branch, sha=sha,
+                )
+                completed_steps.append("removed the deploy action on the branch")
+            results["pull_request"] = github.create_pull(
+                settings.workshop_repo_full,
+                branch,
+                f"Undeploy {stack_name}",
+                f"Deregistration PR opened by the Cornell Builder.\n\n"
+                f"- Deployment: `{deployment_name}`\n- Stack: `{stack_name}`\n"
+                f"- Removes: the `{action_name}` action from the BlueprintDeploy stage\n\n"
+                "Merging this PR is the teardown action: the platform deletes the stack per its "
+                "DeletionPolicy. If this was the blueprint's *last* deployment, its "
+                "`pipeline/stacks.yml` entry should be removed in a follow-up PR.",
+            )
+            completed_steps.append("opened the deregistration PR")
+    except Exception as error:
+        return {
+            **safe_error(error, f"deleting deployment {deployment_name!r}"),
+            "completed_steps": completed_steps,
+            "cleanup": (
+                f"Partial state may remain: branch {branch!r} on "
+                f"{settings.workshop_repo_full} can be deleted safely and the delete "
+                "retried."
+            ),
+        }
     return results
 
 
 @mcp.tool()
+@_guarded
 def spec_export(deployment_name: str, blueprint: str, audience: str = "coder") -> dict[str, Any]:
     """Export a reviewable spec of a deployment for a given audience: coder (validation),
     narrative (business logic for non-coders), security (auth review), transfer (rebuild
@@ -355,6 +494,12 @@ def spec_export(deployment_name: str, blueprint: str, audience: str = "coder") -
 
 
 def main() -> None:
+    # SECURITY-03: logging is configured here and only here — importing the package
+    # never touches global logging state. Stdout is where AgentCore forwards logs from.
+    logging.basicConfig(
+        level=os.environ.get("BUILDER_MCP_LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
     transport = os.environ.get("BUILDER_MCP_TRANSPORT", "streamable-http")
     if transport == "stdio":
         mcp.run(transport="stdio")
