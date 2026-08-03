@@ -67,7 +67,7 @@ D) **S3 object for inventory now, with the option of DynamoDB later if cost data
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ### Question 2 — Is aggregation computed when the snapshot is written, or when it is read?
 
@@ -93,7 +93,7 @@ C) **Both — store precomputed groupings and let the API recompute on demand** 
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ### Question 3 — What fronts the read API?
 
@@ -122,7 +122,7 @@ D) **Lambda Function URL plus a WAF rate-based rule** — keeps the simplicity o
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ### Question 4 — Does the API sit behind the same CloudFront distribution as the UI?
 
@@ -144,7 +144,7 @@ B) **No — separate endpoints; the UI calls the API's own domain** — simpler 
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ### Question 5 — What is the API's surface shape?
 
@@ -167,7 +167,7 @@ C) **One path returning everything** — inventory, all three groupings, and tag
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ### Question 6 — Where does the health endpoint live?
 
@@ -182,7 +182,7 @@ B) **A separate Lambda** — isolated, so a failure in the read path doesn't aff
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ### Question 7 — How is the UI built?
 
@@ -206,7 +206,7 @@ C) **Vanilla JS plus one CDN-hosted library** for table rendering — less hand-
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:B
 
 ### Question 8 — How does the API signal the degraded states in US-06?
 
@@ -231,7 +231,43 @@ C) **HTTP status codes only** — no status field; staleness is inferred by the 
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
+
+---
+
+## Part A2 — Resolved decisions (Q1–Q8)
+
+Step 8 analysis found Q1–Q6 and Q8 clean: single selections, no vagueness, no contradiction, no
+option-merging, mutually consistent. **Q7 = B is a clean selection but incomplete**, so three
+follow-ups were raised in `application-design-plan-clarification.md` (Step 9). Generation does not
+begin until those are answered.
+
+| # | Decision | Answer | Consequence for the design |
+|---|---|---|---|
+| Q1 | Snapshot store | **A** | One JSON object in S3, versioned and encrypted. A later cost dataset is another key or top-level field (FR-2.4). No query layer; the API reads the whole snapshot. |
+| Q2 | Aggregation timing | **A** | Computed at **read time**. The snapshot holds raw inventory only, so grouping is a pure function of it — satisfying §4.5 and giving the PBT properties in §4.2 a clean target. No derived data can disagree with its own source. |
+| Q3 | API front door | **A** | API Gateway HTTP API. Built-in throttling satisfies FR-3.5 / SECURITY-12 directly — **no rate-limiting exception is needed**. |
+| Q4 | Distribution topology | **A** | One CloudFront distribution, two origins: S3 for the site, API Gateway for `/api/*`. One web ACL covers both (FR-5.2), and the browser call is same-origin so **CORS does not arise** (SECURITY-08 satisfied structurally). Requires a no-cache behaviour on `/api/*`. |
+| Q5 | API surface | **A** | Distinct paths: `/api/inventory`, `/api/groups/{tag}`, `/api/tag-gaps`, `/api/health`. Makes SECURITY-05 validation largely structural — an unknown path is a 404, not a value to validate. |
+| Q6 | Health endpoint | **A** | Same Lambda and same API as the read endpoints, so the check exercises the code path and IAM role viewers actually depend on (RESILIENCY-06 deep check). |
+| Q7 | UI build | **B** — pending Q9–Q11 | A framework with a build step. Diverges from the recommendation; consequences recorded in the clarification file. Framework/bundler, the S3 deployment mechanism, and SECURITY-10's scope over npm all need settling. |
+| Q8 | Degraded-state signalling | **A** | HTTP status codes **plus** a body status field. Normal and stale-but-present are 200 with an explicit stale flag and true timestamp; no-snapshot and unreadable are distinct error statuses with generic messages — so US-13's alarms can watch status codes, and "stale" stays a server judgement (US-05 consistency). |
+
+### Interactions worth recording
+- **Q1 = A + Q2 = A compose cleanly.** A whole-object read plus read-time aggregation means the API
+  has exactly one dependency on storage — read the current object — and everything else is pure. That
+  is the simplest arrangement that satisfies §4.5's testability requirement, and it makes the
+  round-trip and idempotence properties in §4.2 assertions about bytes rather than about a schema.
+- **Q3 = A removes a threatened exception.** Had Q3 = B been chosen, FR-3.5's rate limiting would have
+  had no direct mechanism and would have needed recording as a fifth accepted exception in §4.6. It
+  does not; §4.6 stays at four.
+- **Q4 = A + Q5 = A interact with the cache.** Distinct paths under one distribution means the
+  `/api/*` behaviour must be no-cache while the site behaviour is cached. Getting that backwards
+  serves stale JSON under a fresh-looking timestamp — the exact failure US-05 exists to prevent — so
+  it is called out in `component-dependency.md` rather than left to Infrastructure Design to notice.
+- **Q7 = B is the only answer that adds scope.** Every other answer either matches the requirements'
+  expectations or reduces work. Q7 = B introduces a second dependency ecosystem, a build step, and a
+  second thing that must reach S3 — which is what Q9–Q11 exist to pin down.
 
 ---
 
