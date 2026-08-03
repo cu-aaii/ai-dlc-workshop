@@ -1,0 +1,49 @@
+# Blueprint manifest -- the contract the Cornell Builder MCP reads (product proposal §04).
+# Not a CloudFormation template: it declares no template format version, so
+# validate_stacks.py and cfn-lint ignore it by design (that check is a text scan, so even
+# naming the marker key here would trip it). The CFN template it points at is registered
+# in pipeline/stacks.yml as usual.
+apiVersion: builder.cornell.edu/v1
+kind: Blueprint
+metadata:
+  name: tiny-chatbot
+  version: 0.1.0        # keep in lockstep with BlueprintVersion default in the template
+  maintainer: ai-sei@cornell.edu
+  maturity: experimental
+summary: >-
+  The world's tiniest chatbot: one Lambda container behind a public Function URL, serving
+  a self-contained chat page with canned, pattern-matched replies. No LLM, no state. The
+  first blueprint that deploys something you can see in a browser.
+matches:
+  - "chatbot"
+  - "a bot my students can talk to"
+  - "tiny demo chatbot"
+  - "a web page I can actually see"
+inputs:
+  owner_netid:
+    type: string
+    required: true
+    description: NetID of the person who owns the deployment (cornell:owner)
+  deployment_name:
+    type: string
+    required: false
+    default: tiny-chatbot
+    description: >-
+      Instance name (the DeploymentName parameter); part of the function name and the
+      cornell:deployment-id, so several chatbots can coexist per environment.
+template: blueprints/tiny-chatbot/infra/tiny-chatbot.yml
+# CodePipeline-level parameters, resolved by the pipeline at deploy time (not by the MCP).
+# ContainerImageUri is the digest the Build stage exports once the tiny-chatbot Build
+# action is wired; until then the blueprint is parked (deployed_by: manual in stacks.yml).
+pipeline_parameters:
+  ContainerImageUri: "#{TinyChatbotContainer.CONTAINER_DIGEST}"
+# Unlike hello-world (which hardcodes its name and is a deliberate singleton), this
+# blueprint takes DeploymentName properly, so multiple deployments can coexist.
+singleton: false
+cost:
+  baseline_monthly_usd: 0
+  scales_with: [requests]
+data_classification: [public]
+# Backup/recovery contract (see versioning-releases-and-recovery-options.md):
+# stateless | derived | authoritative. Canned replies, nothing stored, nothing to back up.
+state: []

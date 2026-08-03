@@ -34,3 +34,16 @@ USER app
 EXPOSE 8000
 
 CMD ["uv", "run", "--no-sync", "builder-mcp"]
+
+# --- tiny-chatbot: the world's tiniest chatbot, a canned-response Lambda -----------------
+# Lambda container contract: the AWS base image provides the runtime interface client, the
+# handler lands in ${LAMBDA_TASK_ROOT}, and CMD names it. Built by the ARM CodeBuild
+# project (linux/arm64) once its Build stage action is wired -- see "Adding a container
+# image build" in pipeline/README.md. The blueprint is parked (deployed_by: manual) until
+# then; pin this base image by digest (SECURITY-10, like builder-mcp above) in the PR that
+# wires the Build action.
+FROM public.ecr.aws/lambda/python:3.13 AS tiny-chatbot
+
+COPY blueprints/tiny-chatbot/src/app.py ${LAMBDA_TASK_ROOT}/
+
+CMD ["app.handler"]

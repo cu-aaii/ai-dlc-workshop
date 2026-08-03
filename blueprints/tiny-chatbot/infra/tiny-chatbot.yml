@@ -1,0 +1,204 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'The world''s tiniest chatbot: a canned-response Lambda (container image, arm64) behind a public Function URL. No LLM, no state -- exists so the deploy path produces something you can see in a browser. Image built from the root Dockerfile (target tiny-chatbot) once its Build stage action is wired.'
+
+Parameters:
+
+  # Metadata Parameters
+
+  Application:
+    Default: 'aidlc'
+    AllowedPattern: '[a-z0-9-]{1,10}'
+    Description: 'Name used for billing and other tracking/identification purposes'
+    Type: 'String'
+
+  Environment:
+    Default: 'main'
+    AllowedPattern: '[a-z0-9]{1,4}'
+    Description: 'Name of the deployment branch'
+    Type: 'String'
+
+  # Tagging Convention Parameters
+  #
+  # cornell:owner, cornell:blueprint, cornell:blueprint-version and cornell:deployment-id
+  # are required on every resource. Owner and deployment id vary per deployment; blueprint
+  # name and version are properties of this template, so they live here as defaults and are
+  # bumped in the PR that changes the blueprint.
+
+  Owner:
+    Default: 'ai-sei'
+    AllowedPattern: '.{1,128}'
+    Description: 'Who owns this deployment (cornell:owner)'
+    Type: 'String'
+
+  BlueprintVersion:
+    Default: '0.1.0'
+    AllowedPattern: '[0-9]+\.[0-9]+\.[0-9]+'
+    Description: 'Version of the tiny-chatbot blueprint (cornell:blueprint-version)'
+    Type: 'String'
+
+  # Deploy Parameters
+
+  # Unlike hello-world (a deliberate singleton), this blueprint takes a DeploymentName so
+  # several chatbots can coexist per environment. It is part of the function name and the
+  # cornell:deployment-id. The lookahead caps total length at 2-20 characters; the body
+  # forbids leading, trailing and consecutive hyphens.
+
+  DeploymentName:
+    Default: 'tiny-chatbot'
+    AllowedPattern: '(?=[a-z0-9-]{2,20}$)[a-z0-9]+(-[a-z0-9]+)*'
+    Description: 'Instance name for this deployment. Lowercase alphanumerics with single hyphens, 2-20 chars.'
+    Type: 'String'
+
+  # Mirrors builder-mcp's bootstrap pattern: the pipeline Build stage supplies a digest URI
+  # once its action is wired; empty deploys nothing but proves the template is valid, which
+  # is all a parked blueprint needs.
+
+  ContainerImageUri:
+    Default: ''
+    AllowedPattern: '.{0,512}'
+    Description: 'Image for the function, normally the digest URI the pipeline Build stage exports (#{TinyChatbotContainer.CONTAINER_DIGEST}). Empty deploys nothing, for validation while the blueprint is parked.'
+    Type: 'String'
+
+Conditions:
+
+  HasImage: !Not [!Equals [!Ref 'ContainerImageUri', '']]
+
+Resources:
+
+  # Execution role: basic logging only, scoped to this function's own log group. The
+  # chatbot's replies are hardcoded strings; it touches no other AWS service.
+
+  ChatbotFunctionRole:
+    Type: 'AWS::IAM::Role'
+    Condition: 'HasImage'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-${DeploymentName}-exec'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'lambda.${AWS::URLSuffix}'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'tiny-chatbot-logging'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  # AWS::Logs::LogGroup's Arn attribute ends in :* so it covers log streams.
+                  - !GetAtt 'ChatbotLogGroup.Arn'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'iam-role-tiny-chatbot-exec'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'tiny-chatbot'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # Created explicitly (rather than letting Lambda create it on first invoke) so it is
+  # tagged, retained deliberately, and cleaned up with the stack.
+
+  ChatbotLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Condition: 'HasImage'
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Application}-${Environment}-${DeploymentName}'
+      RetentionInDays: 30
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'log-group-tiny-chatbot'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'tiny-chatbot'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  ChatbotFunction:
+    Type: 'AWS::Lambda::Function'
+    Condition: 'HasImage'
+    Properties:
+      FunctionName: !Sub '${Application}-${Environment}-${DeploymentName}'
+      Description: 'Canned-response chatbot serving its own chat page. No LLM; every reply is hardcoded in src/app.py.'
+      PackageType: 'Image'
+      Code:
+        ImageUri: !Ref 'ContainerImageUri'
+      # Lambda means container images (CLAUDE.md); the ARM CodeBuild project builds arm64.
+      Architectures:
+        - 'arm64'
+      Role: !GetAtt 'ChatbotFunctionRole.Arn'
+      MemorySize: 128
+      Timeout: 10
+      LoggingConfig:
+        LogGroup: !Ref 'ChatbotLogGroup'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'lambda-function-tiny-chatbot'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'tiny-chatbot'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # Public on purpose: this is a demo page with data_classification public, canned replies,
+  # and nothing stored. AuthType NONE still requires an explicit InvokeFunctionUrl grant.
+  # AWS::Lambda::Url and AWS::Lambda::Permission are not taggable resource types.
+
+  ChatbotFunctionUrl:
+    Type: 'AWS::Lambda::Url'
+    Condition: 'HasImage'
+    Properties:
+      TargetFunctionArn: !GetAtt 'ChatbotFunction.Arn'
+      AuthType: 'NONE'
+
+  ChatbotFunctionUrlPublicAccess:
+    Type: 'AWS::Lambda::Permission'
+    Condition: 'HasImage'
+    Properties:
+      FunctionName: !GetAtt 'ChatbotFunction.Arn'
+      Action: 'lambda:InvokeFunctionUrl'
+      Principal: '*'
+      FunctionUrlAuthType: 'NONE'
+
+Outputs:
+
+  DeploymentId:
+    Description: 'Value of the cornell:deployment-id tag on every resource in this stack'
+    Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  BlueprintVersion:
+    Description: 'Value of the cornell:blueprint-version tag'
+    Value: !Ref 'BlueprintVersion'
+
+  FunctionUrl:
+    Condition: 'HasImage'
+    Description: 'The public chat page -- open it in a browser'
+    Value: !GetAtt 'ChatbotFunctionUrl.FunctionUrl'
