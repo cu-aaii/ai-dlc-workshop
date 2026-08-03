@@ -49,6 +49,11 @@ approved PR merged to main
 `Environment=main` is what makes "merges to main deploy". A `test` branch deployed with
 `Environment=test` gets its own pipeline and its own `aidlc-test-*` stacks.
 
+> `Environment` is capped at **four lowercase alphanumerics** (`[a-z0-9]{1,4}`) — it lands in
+> stack names and in the IAM scoping prefix. `main`, `test`, `dev` fit; `staging` and anything
+> hyphenated are rejected by CloudFormation before the stack is created. So a parallel
+> environment needs a short branch name, not just any branch name.
+
 **CodePipeline does not enforce review.** Branch protection on the GitHub side is what makes
 "a merge" mean "an approved PR" — see below.
 

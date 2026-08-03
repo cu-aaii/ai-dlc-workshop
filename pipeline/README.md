@@ -27,6 +27,13 @@ merge to main
 `Environment=main` is what makes "merges to main deploy", and a `test` branch deployed with
 `Environment=test` gets its own parallel pipeline and its own `aidlc-test-*` stacks.
 
+`Environment` has `AllowedPattern: '[a-z0-9]{1,4}'` — **four characters, no hyphens**, because
+it is a component of every stack name and of the `stack/${Application}-${Environment}*` prefix
+that `BuildPipelineRole` scopes to. `test` fits with nothing to spare; `staging` or
+`feature-x` fail CloudFormation's parameter validation before anything is created. Pick a short
+branch name for a parallel environment, or widen the pattern in both `pipeline.yml` and every
+blueprint template together.
+
 Note what CodePipeline does *not* give you: the GitHub side is what makes "a merge" mean "an
 approved PR". Without branch protection this pipeline happily deploys a direct push to main.
 

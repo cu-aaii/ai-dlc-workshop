@@ -42,6 +42,12 @@ approved PR merged to main
 That is why `Environment=main` means "merges to main deploy". Deploying the pipeline with
 `Environment=test` gives a parallel pipeline with its own `aidlc-test-*` stacks.
 
+`Environment` is capped at `[a-z0-9]{1,4}` — four characters, no hyphens — in `pipeline.yml`
+and in every blueprint template, because it is part of each stack name and of the
+`stack/${Application}-${Environment}*` prefix `BuildPipelineRole` scopes to. A parallel
+environment therefore needs a short branch name; `staging` fails parameter validation. Widening
+it means editing every template that declares the parameter, not just the pipeline.
+
 `Application` is `aidlc`. Its `AllowedPattern` caps it at 10 characters, which is why it isn't
 the repo name.
 
