@@ -233,6 +233,72 @@ Resources:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
 
+  # ARM container build -- same mechanics as ContainerBuildProject, aarch64 compute.
+  # Bedrock AgentCore runtimes require linux/arm64 images, which the x86 reference project
+  # cannot produce natively. Added alongside rather than modifying the reference project,
+  # so its known-good definition stays untouched for future x86 Lambda images.
+
+  ArmContainerBuildLogs:
+    Type: 'AWS::Logs::LogGroup'
+    DeletionPolicy: 'Delete'
+    UpdateReplacePolicy: 'Delete'
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${Application}-${Environment}-container-arm'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'log-group-build-project-container-arm'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  ArmContainerBuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-container-arm'
+      Description: !Sub 'Builds linux/arm64 container images for the ${Application}-${Environment} pipeline (AgentCore runtimes)'
+      ServiceRole: !GetAtt 'ContainerBuildRole.Arn'
+      TimeoutInMinutes: 60
+      Visibility: 'PRIVATE'
+      Artifacts:
+        Type: 'CODEPIPELINE'
+      Cache:
+        Type: 'NO_CACHE'
+      Environment:
+        ComputeType: 'BUILD_GENERAL1_SMALL'
+        Image: 'aws/codebuild/amazonlinux2-aarch64-standard:3.0'
+        ImagePullCredentialsType: 'CODEBUILD'
+        PrivilegedMode: true
+        Type: 'ARM_CONTAINER'
+        EnvironmentVariables:
+          - Name: 'APPLICATION'
+            Value: !Ref 'Application'
+          - Name: 'ENVIRONMENT'
+            Value: !Ref 'Environment'
+          - Name: 'CONTAINER_REPOSITORY_URI'
+            Value: !Sub '${ContainerRepository.RepositoryUri}'
+          - Name: 'DOCKER_CLI_EXPERIMENTAL'
+            Value: 'enabled'
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref 'ArmContainerBuildLogs'
+          Status: 'ENABLED'
+      Source:
+        BuildSpec: 'pipeline/codebuild.yml'
+        GitCloneDepth: 0
+        Type: 'CODEPIPELINE'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'codebuild-project-container-arm'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
   # Deploy Pipeline
 
   BuildPipelineRole:
@@ -376,6 +442,28 @@ Resources:
                   "RemoteGitRepository": "${RemoteGitRepository}"
                   }
 
+        # Container images, built before anything deploys. One action per named target in
+        # the root Dockerfile; CONTAINER_DIGEST is exported so the deploy action below can
+        # pin by digest rather than tag (see pipeline/codebuild.yml).
+        - Name: 'Build'
+          Actions:
+            - Name: 'BuilderMcpContainer'
+              Namespace: 'BuilderMcpContainer'
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'ArmContainerBuildProject'
+                EnvironmentVariables: >-
+                  [
+                  {"name": "CONTAINER_TARGET", "value": "builder-mcp", "type": "PLAINTEXT"},
+                  {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
+                  ]
+
         # One action per blueprint stack. Register the template in pipeline/stacks.yml and
         # add an action here; the stack name convention is <application>-<environment>-<name>
         # so it stays inside the BuildPipelineRole's CloudFormation resource scope.
@@ -405,6 +493,34 @@ Resources:
                   "Environment": "${Environment}",
                   "Owner": "${Owner}",
                   "SourceCommitId": "#{GitRepository.CommitId}"
+                  }
+
+            - Name: 'BuilderMcpCloudFormation'
+              Namespace: 'BuilderMcpCloudFormation'
+              RunOrder: 1
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-builder-mcp'
+                TemplatePath: 'GitRepositoryArtifact::builder-mcp/infra/builder-mcp.yml'
+                # ContainerImageUri arrives as the digest the Build stage just pushed, so
+                # the runtime always runs exactly the image this commit produced.
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "BlueprintVersion": "0.1.0",
+                  "ContainerImageUri": "#{BuilderMcpContainer.CONTAINER_DIGEST}",
+                  "GitHubTokenSecretName": "${Application}/${Environment}/builder-mcp/github-token"
                   }
 
 Outputs:
