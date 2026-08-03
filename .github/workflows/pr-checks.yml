@@ -43,6 +43,16 @@ jobs:
       - name: 'Install uv'
         run: 'pip install --disable-pip-version-check uv'
 
+      # The one non-github-owned action the cu-aaii allowed-actions policy permits, which is
+      # why Terraform checks can run here at all. terraform_wrapper must be false: the wrapper
+      # replaces the binary with a script that captures stdout/stderr, and tools/check parses
+      # neither but does rely on real exit codes.
+      - name: 'Install Terraform'
+        uses: 'hashicorp/setup-terraform@v3'
+        with:
+          terraform_version: '1.15.8'
+          terraform_wrapper: false
+
       # Deliberately the same script contributors run locally, so there is no second code path
       # to drift: green on a laptop means green here.
       - name: 'Run checks'
