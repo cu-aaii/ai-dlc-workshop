@@ -139,6 +139,18 @@ CI runs that same script. `uv` is its only prerequisite. Never document or run t
   with no job logs, which reads like a broken workflow file. Install tools via `pip`/`run:`
   instead of reaching for a marketplace action.
 - **Nobody can approve their own PR**, so every change needs a second person.
+- **`AWS::Bedrock::KnowledgeBase` takes `Tags` as a map**, like `AWS::SSM::Parameter` and unlike
+  everything else here. Copying a `Key`/`Value` tag block onto it fails cfn-lint.
+- **`AWS::Bedrock::DataSource` has no `Tags` property at all**, so the four-tag rule is impossible
+  on it. `blueprints/knowledgebase` mirrors its id into SSM so inventory has a join key; that is
+  the pattern for any future untaggable resource.
+- **`ConnectorParameters` on a Bedrock data source is free-form `Json`.** cfn-lint validates
+  nothing inside it, so a misspelled key passes `tools/check` and fails at deploy — in the shared
+  account. Treat edits in that block as untested code.
+- **CloudFormation never ingests through a Bedrock data source.** `CREATE_COMPLETE` is compatible
+  with an entirely empty knowledge base, and Bedrock has no native scheduled sync. Something in
+  the stack has to start the job, and on this repo's no-CLI deploy path it should also assert the
+  result — see `blueprints/knowledgebase/docs/decisions.md`.
 
 ## Deliberately not built
 

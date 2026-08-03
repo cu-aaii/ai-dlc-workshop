@@ -33,3 +33,8 @@ templates:
     template: 'blueprints/hello-world/infra/hello-world.yml'
     deployed_by: 'pipeline'
     description: 'Trivial tagged stack that proves the deploy path end to end.'
+
+  - name: 'knowledgebase'
+    template: 'blueprints/knowledgebase/infra/knowledgebase.yml'
+    deployed_by: 'pipeline'
+    description: 'Bedrock managed knowledge base over the existing document bucket. Verifies at deploy time that the documents are indexed and answerable, so a green deploy is the acceptance test.'

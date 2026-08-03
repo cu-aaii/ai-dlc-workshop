@@ -15,6 +15,7 @@ alongside `infra/`.
 | Blueprint | State |
 |---|---|
 | `hello-world` | Fully deploys. Proves the pipeline and the tagging convention. |
+| `knowledgebase` | Bedrock managed knowledge base over an existing S3 document bucket. Verifies its own ingestion at deploy time, so a green deploy is the acceptance test. SharePoint and web sources pinned. |
 
 ## Required of every blueprint
 

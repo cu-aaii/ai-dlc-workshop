@@ -1,0 +1,240 @@
+// SAMPLE ONLY -- NOT DEPLOYED, NOT DEPLOYABLE.
+//
+// The .tf.sample extension is deliberate: no pipeline stage runs Terraform in this repo
+// (CLAUDE.md lists that stage under "deliberately not built"), and the AWS-side SharePoint
+// connector is blocked on an auth-type mismatch regardless. Read infra/azure/README.md before
+// touching this. Renaming it to .tf will not make it work.
+//
+// WARNING: this repo is public and has NO secret scanning -- an enforced org security
+// configuration disables it. Nothing mechanical stops a committed credential. Every value below
+// is either a reference or a placeholder; keep it that way.
+
+terraform {
+  required_version = ">= 1.9"
+
+  required_providers {
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 3.0"
+    }
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
+  // NOTE: no backend block. State has nowhere durable to live until the Terraform CodeBuild
+  // stage exists, and a local backend inside CodeBuild means every run starts from nothing and
+  // re-creates the app registration. This is blocker #2 in the README.
+}
+
+// ---------------------------------------------------------------------------------------------
+// Variables
+// ---------------------------------------------------------------------------------------------
+
+variable "application" {
+  description = "Matches the CloudFormation Application parameter"
+  type        = string
+  default     = "aidlc"
+}
+
+variable "environment" {
+  description = "Branch name. Capped at 4 chars by the CloudFormation side; mirrored here so names line up."
+  type        = string
+  default     = "main"
+
+  validation {
+    condition     = can(regex("^[a-z0-9]{1,4}$", var.environment))
+    error_message = "Environment must match [a-z0-9]{1,4}, same as every CloudFormation template here."
+  }
+}
+
+variable "owner" {
+  description = "cornell:owner"
+  type        = string
+  default     = "ai-sei"
+}
+
+variable "blueprint_version" {
+  description = "cornell:blueprint-version. Keep in step with the CloudFormation template default."
+  type        = string
+  default     = "0.1.0"
+}
+
+variable "sharepoint_site_url" {
+  description = "SharePoint site the knowledge base would crawl"
+  type        = string
+  default     = "https://cornell.sharepoint.com/sites/PLACEHOLDER"
+}
+
+variable "certificate_pem" {
+  description = <<-EOT
+    ASSUMPTION, and the crux of why this is pinned. A managed knowledge base's SharePoint
+    connector supports only ENTRA_ID_APP_ONLY (certificate mandatory) or OAUTH2_APP (an M365
+    user's password). The Entra app already provisioned for the workshop uses a CLIENT SECRET,
+    which fits neither -- so unpinning means a new app registration with a certificate.
+
+    This variable must be supplied at apply time from a secure source. Never default it, never
+    write a PEM into this repo.
+  EOT
+  type        = string
+  sensitive   = true
+}
+
+locals {
+  // Same convention as the CloudFormation stack names.
+  name = "${var.application}-${var.environment}-knowledgebase"
+
+  // All four cornell:* tags, on everything, same as the AWS side.
+  tags = {
+    "Application"               = var.application
+    "Environment"               = var.environment
+    "cornell:owner"             = var.owner
+    "cornell:blueprint"         = "knowledgebase"
+    "cornell:blueprint-version" = var.blueprint_version
+    "cornell:deployment-id"     = local.name
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Read the existing secret -- never create or write one
+// ---------------------------------------------------------------------------------------------
+//
+// The Entra app and SharePoint site were set up by hand during workshop prep. Terraform reads
+// the identifiers it needs; the secret values stay in Secrets Manager. This data source is the
+// pattern to copy: reference credentials, never contain them.
+
+data "aws_secretsmanager_secret" "entra_sharepoint" {
+  name = "dev/workshop/entra/sharepoint"
+}
+
+data "aws_secretsmanager_secret_version" "entra_sharepoint" {
+  secret_id = data.aws_secretsmanager_secret.entra_sharepoint.id
+}
+
+locals {
+  // Keys: entraAppID, entraAppDirectoryID, entraAppSecretID, entraAppSecretValue.
+  // WARNING: anything derived from this is a Terraform-state secret. Do not put it in an output
+  // without `sensitive = true`, and do not echo it in a CodeBuild log.
+  entra = jsondecode(data.aws_secretsmanager_secret_version.entra_sharepoint.secret_string)
+}
+
+// ---------------------------------------------------------------------------------------------
+// The Entra application, if it were managed here
+// ---------------------------------------------------------------------------------------------
+//
+// Shown for shape only. Adopting the hand-made app means `terraform import`, not `apply` --
+// applying this as-is creates a SECOND app registration and the two will drift.
+//
+// The Graph permissions below are application-role permissions and require tenant admin
+// consent, which is a human step Terraform cannot perform. That is blocker #1.
+
+resource "azuread_application" "knowledgebase" {
+  display_name     = local.name
+  sign_in_audience = "AzureADMyOrg"
+
+  required_resource_access {
+    // Microsoft Graph
+    resource_app_id = "00000003-0000-0000-c000-000000000000"
+
+    resource_access {
+      // Sites.Read.All -- application permission. Needs admin consent.
+      id   = "332a536c-c7ef-4017-ab91-336970924f0d"
+      type = "Role"
+    }
+
+    resource_access {
+      // Files.Read.All -- application permission. Needs admin consent.
+      id   = "01d4889c-1287-42c6-ac1f-5d1e02578ef6"
+      type = "Role"
+    }
+  }
+}
+
+// A certificate, not a client secret. This is the whole point: azuread_application_password
+// would be the easier resource and would produce credentials the managed connector cannot use.
+
+resource "azuread_application_certificate" "knowledgebase" {
+  application_id = azuread_application.knowledgebase.id
+  type           = "AsymmetricX509Cert"
+  value          = var.certificate_pem
+  end_date       = "2027-08-04T00:00:00Z" // ASSUMPTION: expiry is a manual rotation event. No alarm exists.
+}
+
+resource "azuread_service_principal" "knowledgebase" {
+  client_id = azuread_application.knowledgebase.client_id
+}
+
+// ---------------------------------------------------------------------------------------------
+// Hand the certificate to the AWS side
+// ---------------------------------------------------------------------------------------------
+//
+// The Bedrock SharePoint connector reads its credentials from a Secrets Manager secret. This is
+// the only resource here that the CloudFormation template would actually consume -- by ARN.
+//
+// Note this creates a SECOND secret rather than touching dev/workshop/entra/sharepoint. Writing
+// into a hand-made secret from Terraform makes the hand-made one look managed when it isn't.
+
+resource "aws_secretsmanager_secret" "sharepoint_connector" {
+  name        = "${local.name}/sharepoint-connector"
+  description = "Certificate credentials the Bedrock SharePoint connector would use. ENTRA_ID_APP_ONLY."
+  tags        = local.tags
+}
+
+resource "aws_secretsmanager_secret_version" "sharepoint_connector" {
+  secret_id = aws_secretsmanager_secret.sharepoint_connector.id
+
+  secret_string = jsonencode({
+    clientId    = azuread_application.knowledgebase.client_id
+    tenantId    = local.entra.entraAppDirectoryID
+    certificate = var.certificate_pem
+  })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Outputs
+// ---------------------------------------------------------------------------------------------
+
+output "sharepoint_connector_secret_arn" {
+  description = "Pass this to the CloudFormation template as a parameter. It is what the SharePoint AWS::Bedrock::DataSource would reference."
+  value       = aws_secretsmanager_secret.sharepoint_connector.arn
+}
+
+output "sharepoint_site_url" {
+  description = "Site the SharePoint data source would crawl"
+  value       = var.sharepoint_site_url
+}
+
+output "entra_client_id" {
+  description = "Client id of the app registration. Not a secret, but the tenant id and certificate that accompany it are."
+  value       = azuread_application.knowledgebase.client_id
+}
+
+// ---------------------------------------------------------------------------------------------
+// What the CloudFormation side would then add -- sketch, do not paste without reading
+// ---------------------------------------------------------------------------------------------
+//
+//   SharePointDataSource:
+//     Type: 'AWS::Bedrock::DataSource'
+//     Properties:
+//       Name: !Sub '${Application}-${Environment}-knowledgebase-sharepoint'
+//       KnowledgeBaseId: !GetAtt 'KnowledgeBase.KnowledgeBaseId'
+//       DataDeletionPolicy: 'RETAIN'
+//       DataSourceConfiguration:
+//         Type: 'MANAGED_KNOWLEDGE_BASE_CONNECTOR'
+//         ManagedKnowledgeBaseConnectorConfiguration:
+//           ConnectorParameters:
+//             type: 'SHAREPOINT'
+//             version: '1'
+//             connectionConfiguration: { ... }
+//             authConfiguration:
+//               type: 'ENTRA_ID_APP_ONLY'
+//               credentialsSecretArn: !Ref 'SharePointConnectorSecretArn'
+//
+// WARNING: ConnectorParameters is free-form Json. cfn-lint validates NOTHING inside it, so the
+// exact key names above are unverified and a typo would pass tools/check and fail at deploy.
+// Check them against the current AWS docs before trusting the sketch.
+//
+// WARNING: the existing IngestionVerifier asserts on ONE ingestion job. Adding a second data
+// source without extending it means the stack can go green with SharePoint entirely empty --
+// which is exactly the silent failure the verifier was written to prevent.
