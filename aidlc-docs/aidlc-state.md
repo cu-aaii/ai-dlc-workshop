@@ -3,8 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: INCEPTION - User Stories (Part 2: Generation complete — awaiting explicit approval of
-  `inception/user-stories/stories.md` and `personas.md`)
+- **Current Stage**: INCEPTION - Workflow Planning
+- **User Stories Approved**: 2026-08-03 — user response "approve stories"
 - **Queued amendment (NOT blocking)**: 2026-08-03 — custom telemetry, answered in
   `inception/requirements/requirement-amendment-questions-telemetry.md` (Q1=A, Q2=C, Q3=B, Q4 free text).
   Q3=B routes it to a **second Requirements → Stories pass** after v1 stories are approved, so
@@ -60,14 +60,46 @@ than Requirements, and are NOT blocking requirements.md:
 - RESILIENCY-14: resiliency testing approach
 - RESILIENCY-15: incident response process
 
+## Execution Plan Summary
+See `inception/plans/execution-plan.md`. Risk level **Medium**; rollback Easy-to-Moderate; testing
+Moderate-to-Complex.
+- **Total stages**: 13 (incl. the Operations placeholder)
+- **Stages to execute**: Application Design, Units Generation, Functional Design, NFR Requirements,
+  NFR Design, Infrastructure Design, Code Generation, Build and Test
+- **Stages to skip**: Reverse Engineering only (rationale above). Every other conditional stage has
+  at least one blocking requirement that would otherwise have no home — a consequence of opting into
+  all three extensions.
+
+### Finding raised at Workflow Planning
+`pipeline/pipeline.yml` defines `ContainerRepository` and `ContainerBuildProject` but has only three
+stages (Source, PipelineDeploy, BlueprintDeploy); **no stage invokes the container build**. Lambda
+means container images, so this blueprint is the first to need one. US-15 does not cover adding the
+Build stage action or the Dockerfiles — recorded as a known story-coverage gap, carried by
+Infrastructure Design and Code Generation rather than by a story amendment.
+
 ## Stage Progress
 ### 🔵 INCEPTION PHASE
 - [x] Workspace Detection
 - [ ] Reverse Engineering (SKIPPED — see rationale above)
 - [x] Requirements Analysis
-- [ ] User Stories (WILL EXECUTE — new user-facing UI, multiple personas, multiple components)
-- [ ] Workflow Planning
-- [ ] Application Design
-- [ ] Units Generation
-- [ ] Per-Unit Construction
-- [ ] Build and Test
+- [x] User Stories
+- [x] Workflow Planning
+- [ ] Application Design — EXECUTE
+- [ ] Units Generation — EXECUTE
+
+### 🟢 CONSTRUCTION PHASE
+- [ ] Functional Design — EXECUTE (PBT-01 identifies properties here)
+- [ ] NFR Requirements — EXECUTE
+- [ ] NFR Design — EXECUTE (RESILIENCY-04, -14, -15 user decisions are due here)
+- [ ] Infrastructure Design — EXECUTE (SECURITY-01, -06, -14 SRI, RESILIENCY-08, container build)
+- [ ] Code Generation — EXECUTE (ALWAYS)
+- [ ] Build and Test — EXECUTE (ALWAYS)
+
+### 🟡 OPERATIONS PHASE
+- [ ] Operations — PLACEHOLDER
+
+## Current Status
+- **Lifecycle Phase**: INCEPTION
+- **Current Stage**: Workflow Planning complete
+- **Next Stage**: Application Design
+- **Status**: Awaiting execution-plan approval
