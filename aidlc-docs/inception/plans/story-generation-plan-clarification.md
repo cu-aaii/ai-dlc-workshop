@@ -46,7 +46,7 @@ C) **Keep Q7 = A intact and add a non-story "Global Definition of Done"** append
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:B
 
 ## Platform plumbing
 
@@ -75,7 +75,7 @@ D) **Treat FR-6 and FR-7 as out of story scope** — pure deploy mechanics, trac
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:B
 
 ---
 

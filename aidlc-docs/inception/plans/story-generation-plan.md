@@ -184,64 +184,120 @@ X) Other (please describe after [Answer]: tag below)
 
 ---
 
+## Part A2 — Resolved methodology (all 10 answers consolidated)
+
+Answers to Q1–Q8 above; Q9–Q10 in
+`aidlc-docs/inception/plans/story-generation-plan-clarification.md`. This is the methodology that
+Part B executes.
+
+| Decision | Answer | Effect on `stories.md` / `personas.md` |
+|---|---|---|
+| Personas | Q1 = **D** | **One** persona: "Dashboard viewer". No operator/builder split — everyone inside the WAF allowlist sees the same thing in v1. |
+| Granularity | Q2 = **A** | Thin vertical slices; each v1 story delivers one user-visible capability end to end (collector → store → API → UI). |
+| Format | Q3 = **A** | Classic "As a Dashboard viewer, I want …, so that …". **No** FR/NFR citation inside the story text. |
+| Organization | Q4 = **A** | User Journey-Based. Journeys are distinguished by *goal*, not by role (only one persona exists). |
+| Acceptance criteria | Q5 = **A** | Given/When/Then, 3–6 per story. **No** "Properties" sub-list. |
+| Cost stretch goal | Q6 = **B** | v1 inventory stories, plus clearly-marked placeholder cost stories in a "Deferred / Stretch" section with criteria explicitly TBD. |
+| Non-functional work | Q7 = **A**, amended by Q9 = **B** | Capability-specific NFRs → acceptance criteria on that capability's story. Cross-cutting NFRs with no user-visible slice → **explicitly-labelled enabler stories** (Q9 = B knowingly relaxes Q7 = A's "nothing is a story on its own"). |
+| Platform plumbing | Q10 = **B** | FR-6 + FR-7 get **their own story** ("the dashboard stack deploys through the pipeline"). |
+| Prioritization | Q8 = **A** | **No** priority or dependency markers. Sequencing is decided in Workflow Planning. |
+
+### Enabler stories to be written (Q9 = B)
+Exactly these, each labelled **[Enabler]** and citing its rule IDs — nothing else becomes an
+enabler story:
+1. Supply-chain integrity — SECURITY-10 (pinned deps, digest-pinned base image, vuln scanning, SBOM)
+2. Property-based test suite — PBT-01..10 (Hypothesis; complements example-based tests per PBT-10)
+3. Access logging — SECURITY-03 (CloudFront, S3, WAF logging so blocked requests are visible)
+4. Application logging — SECURITY-04 (structured JSON from both Lambdas, no secrets or PII)
+5. Resiliency alarms — RESILIENCY-07 (collector failure, snapshot staleness, Lambda errors/throttles)
+6. Operational monitoring — RESILIENCY-05 (metrics + health dashboard; tracing marked N/A)
+7. Pipeline deployment — FR-6 + FR-7 (Q10 = B; repurpose the stray template, register in
+   `stacks.yml`, add the matching `pipeline.yml` action, explicit parameters, stack-naming
+   conformance, `tools/check` green)
+
+### Three judgment calls recorded rather than asked
+1. **Deferred section is exempt from INVEST.** Q6 = B's placeholder cost stories carry TBD
+   criteria, so they cannot satisfy INVEST "Testable". The Deferred / Stretch section is exempted
+   from the B5 check and says so in the document; v1 stories are held to INVEST in full.
+2. **Q5 = A leaves no PBT gap.** PBT-01 identifies properties at **Functional Design**, a later
+   stage, and `requirements.md` §4.2 already carries the candidate property list. Properties get
+   derived there from these criteria.
+3. **Q10 = B's dependency stays in prose.** Q8 = A forbids dependency markers, so the fact that
+   every slice needs the pipeline story is stated in that story's narrative text rather than as a
+   structured marker field on the other stories.
+
+---
+
 ## Part B — Execution checklist (runs after you approve)
 
-These steps execute in order once the questions above are answered and the plan is approved.
-Checkboxes are marked `[x]` as each completes.
+These steps execute in order once the plan is approved. Checkboxes are marked `[x]` as each
+completes.
 
 ### B1. Preparation
-- [ ] Re-read `aidlc-docs/inception/requirements/requirements.md` and extract every FR/NFR that
+- [x] Re-read `aidlc-docs/inception/requirements/requirements.md` and extract every FR/NFR that
       needs story coverage
-- [ ] Confirm the answers above contain no vague, contradictory, or option-merging responses
-      (mandatory Step 9 analysis); raise a clarification file if any do
-- [ ] Fix the story ID scheme (e.g. `US-01`…) and the persona ID scheme (e.g. `P-01`…)
+- [x] Confirm the answers above contain no vague, contradictory, or option-merging responses
+      (mandatory Step 9 analysis); raise a clarification file if any do — **done: Round 2
+      clarification raised and answered (Q9 = B, Q10 = B)**
+- [x] Fix the story ID scheme and the persona ID scheme — **`US-nn` for stories (`US-nn [Enabler]`
+      for enabler stories), `P-01` for the single persona**
 
 ### B2. Personas
-- [ ] Generate `aidlc-docs/inception/user-stories/personas.md` with the persona set chosen in Q1
-- [ ] For each persona capture: name/label, role, goals, motivations, characteristics, technical
-      access level (AWS console? PR-only? neither?), and how they reach the dashboard
-- [ ] State explicitly, per persona, whether the v1 WAF IP allowlist admits them — and record any
-      audience knowingly excluded in v1
-- [ ] Note each persona's relationship to the deferred identity/auth work
+- [ ] Generate `aidlc-docs/inception/user-stories/personas.md` with the **single** persona `P-01`
+      "Dashboard viewer" (Q1 = D)
+- [ ] Capture: label, role, goals, motivations, characteristics, technical access level (AWS
+      console? PR-only? neither?), and how they reach the dashboard
+- [ ] State explicitly that admission is by **network position**, not identity — inside the WAF
+      allowlist or not — and record which audiences that knowingly excludes in v1 (anyone
+      off-network, including a legitimate Cornell user on a non-allowlisted connection)
+- [ ] Note the persona's relationship to the deferred identity/auth work, and that collapsing to
+      one persona means v1 draws no distinction between platform operators, workshop organizers,
+      and campus builders
 
 ### B3. Stories
-- [ ] Generate `aidlc-docs/inception/user-stories/stories.md` using the format from Q3 and the
-      organization from Q4, at the granularity from Q2
-- [ ] Cover all v1 functional requirements: FR-1 (tag inventory), FR-2 (periodic snapshot),
-      FR-3 (read API), FR-4 (web UI), FR-5 (network access control), FR-6 (repurpose the stray
-      `hello-world.yml`), FR-7 (platform wiring: template + `stacks.yml` + `pipeline.yml`)
-- [ ] Handle FR-8 (cost stretch goal) per the boundary chosen in Q6
-- [ ] Handle non-functional requirements per the placement chosen in Q7
-- [ ] Include explicit stories or criteria for the behaviours that fail silently if unspecified:
-      Tagging API **pagination** (truncation under-reports inventory), **snapshot staleness**
-      display, **fail-closed** error handling, and the `pipeline.yml` action whose absence
-      deploys nothing while reporting success
-- [ ] Apply the prioritization/dependency convention from Q8
+- [ ] Generate `aidlc-docs/inception/user-stories/stories.md`: classic format (Q3 = A), organized
+      by **user journey** (Q4 = A), as **thin vertical slices** (Q2 = A), IDs `US-nn`
+- [ ] Cover the viewer-facing v1 functional requirements as journey slices: FR-1 (tag inventory),
+      FR-2 (periodic snapshot + freshness), FR-3 (read API), FR-4 (web UI), FR-5 (network access
+      control)
+- [ ] Write the **7 enabler stories** listed in Part A2, each labelled `[Enabler]` and citing its
+      rule IDs (Q9 = B) — including the FR-6 + FR-7 pipeline-deployment story (Q10 = B)
+- [ ] Handle FR-8 in a clearly-marked **Deferred / Stretch** section with criteria explicitly TBD
+      pending the data-source decision (Q6 = B)
+- [ ] Cover the behaviours that fail silently if unspecified: Tagging API **pagination**
+      (truncation under-reports inventory), **snapshot staleness** display, **fail-closed** error
+      handling, and the `pipeline.yml` action whose absence deploys nothing while reporting success
+- [ ] Add **no** priority or dependency markers (Q8 = A); state the pipeline-story dependency in
+      prose only
 
 ### B4. Acceptance criteria
-- [ ] Write acceptance criteria for **every** story in the format from Q5
+- [ ] Write Given/When/Then criteria, 3–6 per story, for every v1 and enabler story (Q5 = A)
 - [ ] Ensure criteria are observable and testable — no "works correctly" or "is performant"
-- [ ] Where Q5 = B, name the PBT property category (round-trip / invariant / idempotence /
-      oracle / easy-verification) for each story that has one, and cross-check against the
-      candidate property list in `requirements.md` §4.2
-- [ ] Verify the exceptions in `requirements.md` §4.6 are reflected honestly in criteria — in
-      particular, no story may imply per-user authentication exists in v1
+- [ ] Attach capability-specific NFRs as criteria on their capability's story (Q7 = A) — e.g.
+      HTTPS-only and security headers on the UI story, input validation and rate limiting on the
+      API story
+- [ ] Add **no** "Properties" sub-list (Q5 = A); properties are identified at Functional Design
+      from `requirements.md` §4.2
+- [ ] Verify the exceptions in `requirements.md` §4.6 are reflected honestly — in particular, no
+      story may imply per-user authentication exists in v1
 
 ### B5. INVEST verification (mandatory artifact requirement)
-- [ ] **Independent** — each story deliverable without requiring another story's completion,
-      except where Q8's dependency notes make an ordering explicit
+- [ ] **Independent** — each story deliverable without requiring another's completion
 - [ ] **Negotiable** — stories state the need, not the implementation
-- [ ] **Valuable** — each story names a persona who gains something (or is explicitly flagged as
-      cross-cutting NFR work per Q7)
+- [ ] **Valuable** — each v1 story names the gain for `P-01`; enabler stories are explicitly
+      labelled as cross-cutting instead
 - [ ] **Estimable** — scope clear enough to size
-- [ ] **Small** — consistent with the granularity from Q2
+- [ ] **Small** — consistent with thin vertical slices
 - [ ] **Testable** — every story has criteria that can pass or fail unambiguously
+- [ ] Apply the above to v1 and enabler stories only; **exempt the Deferred / Stretch section**
+      (TBD criteria cannot be Testable) and state that exemption in the document
 
 ### B6. Traceability and coverage
-- [ ] Map personas → stories (every persona appears in at least one story; every story names a
-      persona or is marked cross-cutting)
-- [ ] Map stories → requirements (every v1 FR is covered by at least one story; every story
-      traces to at least one requirement — no orphan stories inventing new scope)
+- [ ] Map `P-01` → stories (the persona appears in every non-enabler story; every enabler story is
+      marked cross-cutting rather than naming a persona)
+- [ ] Map stories → requirements in a coverage table (Q3 = A keeps citations out of story *text*,
+      so traceability lives in this table instead): every v1 FR covered by at least one story,
+      every story tracing to at least one requirement — no orphan stories inventing new scope
 - [ ] Report any requirement left uncovered, rather than quietly padding the story list
 
 ### B7. Completion

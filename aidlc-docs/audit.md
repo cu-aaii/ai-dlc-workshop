@@ -121,3 +121,14 @@
 **Context**: User Stories, Part 1 Steps 9-10 — mandatory ambiguity analysis performed, follow-up clarification required before plan approval.
 
 ---
+
+## User Stories (Part 1 — Planning, Round 2 answers + plan approval prompt)
+**Timestamp**: 2026-08-03T00:00:00Z
+**User Input**: "questions answered" — filled `aidlc-docs/inception/plans/story-generation-plan-clarification.md`:
+- Q9 (where cross-cutting non-functional work goes): "B" — allow a small number of explicitly-labelled enabler stories, knowingly relaxing Q7=A's "nothing is a story on its own"
+- Q10 (where platform plumbing goes): "B" — FR-6 + FR-7 get their own story ("the dashboard stack deploys through the pipeline")
+**AI Response**: "Re-ran the Step 9 analysis over both answers: neither is vague, and they are mutually consistent — Q10=B is itself an instance of the enabler-story shape Q9=B authorizes, so the two compose rather than conflict. Q9=B supersedes Q7=A in part, which is recorded explicitly rather than left as a silent conflict: capability-specific NFRs still become acceptance criteria on their capability's story per Q7=A, while cross-cutting NFRs with no user-visible slice become labelled enabler stories per Q9=B. No ambiguities remain, so no Round 3 is needed. Consolidated all 10 answers into a new 'Part A2 — Resolved methodology' section of `story-generation-plan.md`: a decision table, the exact list of 7 enabler stories to be written (SECURITY-10 supply chain, PBT-01..10 test suite, SECURITY-03 access logging, SECURITY-04 application logging, RESILIENCY-07 alarms, RESILIENCY-05 monitoring, and the FR-6+FR-7 pipeline-deployment story), and 3 judgment calls recorded rather than asked. Third judgment call added this round: Q8=A forbids dependency markers while Q10=B creates a real dependency, so the pipeline story's relationship to every other slice is stated in its narrative prose rather than as a structured marker field. Rewrote the Part B execution checklist to name the resolved answers concretely instead of referring back to question letters, marked B1 complete, and added a B6 note that because Q3=A keeps rule-ID citations out of story text, traceability lives in a coverage table instead. Presenting the Part 1 plan approval prompt per Steps 12-13; generation does not begin until the plan is explicitly approved."
+**Approval prompt presented**: "The story plan is resolved and ready for your approval. Review `aidlc-docs/inception/plans/story-generation-plan.md` (Part A2 holds the consolidated methodology). You may: 🔧 Request Changes — adjust the methodology, the enabler-story list, or any of the three recorded judgment calls; ✅ Approve Plan — I execute Part B and generate `personas.md` and `stories.md`."
+**Context**: User Stories, Part 1 Steps 9-13 — ambiguities resolved, plan consolidated, awaiting explicit plan approval before Part 2 generation.
+
+---
