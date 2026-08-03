@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#
+# Run the checks that gate a merge. CI runs this exact script, so a green run here means a
+# green run on your PR -- there is no second code path to drift out of sync.
+#
+# uv is the only prerequisite. It fetches Python, pyyaml and cfn-lint on demand and caches
+# them, so nothing is installed globally and there is no venv to activate.
+
+set -euo pipefail
+
+# Pinned so local and CI resolve the same linter. Bump deliberately, in a PR.
+CFN_LINT='cfn-lint>=1.53,<2'
+REGION='us-east-1'
+
+cd "$(dirname "$0")/.."
+
+if ! command -v uv >/dev/null 2>&1; then
+  cat >&2 <<'MSG'
+error: uv is required and was not found.
+
+  macOS:  brew install uv
+  other:  curl -LsSf https://astral.sh/uv/install.sh | sh
+
+Nothing else needs installing -- uv fetches Python, pyyaml and cfn-lint itself.
+MSG
+  exit 127
+fi
+
+echo '==> stack registry'
+uv run --quiet pipeline/validate_stacks.py
+
+echo '==> cfn-lint'
+# Template paths come from the registry and contain no spaces, so word splitting is what we
+# want here: cfn-lint takes them as separate arguments.
+templates=$(uv run --quiet pipeline/validate_stacks.py --list)
+# The -- is required. cfn-lint's --region takes nargs='+', so without it these paths are
+# parsed as region names, nothing is linted, and the command still exits 0.
+# shellcheck disable=SC2086
+uvx --quiet --from "$CFN_LINT" cfn-lint --region "$REGION" -- $templates
+echo 'cfn-lint: clean'
+
+echo
+echo 'all checks passed'

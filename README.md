@@ -88,15 +88,21 @@ Three steps, in order. Only the first two are ever done by hand.
 `cfn-lint` plus the stack-registry check. Lint-and-validate only — no AWS calls, no
 credentials, so they come back in well under a minute.
 
-Run them locally exactly as CI does:
+Run them before you push:
 
 ```sh
-python pipeline/validate_stacks.py
-cfn-lint --region us-east-1 -- $(python pipeline/validate_stacks.py --list)
+tools/check
 ```
 
-The `--` matters: `cfn-lint`'s `--region` takes multiple values, and without it your template
-paths are parsed as region names and nothing gets linted.
+CI runs that exact script, so green locally means green on your PR.
+
+**`uv` is the only prerequisite.** It fetches Python, pyyaml and cfn-lint on demand at pinned
+versions, so there is nothing to install globally and no venv to activate:
+
+```sh
+brew install uv                                    # macOS
+curl -LsSf https://astral.sh/uv/install.sh | sh    # everything else
+```
 
 ## Conventions
 
