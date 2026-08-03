@@ -59,7 +59,7 @@ D) **A generic telemetry ingestion path** — the dashboard (or a sibling compon
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:A
 
 ## Question 2 — Where should it live?
 
@@ -78,7 +78,7 @@ C) **Inside the dashboard for now, with `observability/` explicitly noted as the
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:C
 
 ## Question 3 — When?
 
@@ -96,7 +96,7 @@ C) **Add it as a deferred/stretch item only** — record it next to the cost str
 
 X) Other (describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]:B
 
 ## Question 4 — What decision does the telemetry need to support?
 
@@ -108,13 +108,62 @@ For example: "tell me if a builder's blueprint is broken without them reporting 
 blueprints people actually deploy so we know what to invest in", "prove the workshop stayed inside
 its budget", "spot a runaway Lambda before the bill does".
 
-[Answer]:
+[Answer]:usage metrics to justify cost; feedback for business processes; metrics to determine value / how useful the system is.
 
 ---
 
-## What I'm not doing yet
+## Resolved decisions (2026-08-03)
 
-Nothing is being written to `requirements.md` or `stories.md` until these are answered. The
-User Stories approval gate stays open — I'd rather not have you approve a story set that a new
-requirement is about to invalidate, and Question 3 is where you decide whether that's actually a
-concern or whether v1 should be banked as-is.
+| Decision | Answer | Effect |
+|---|---|---|
+| What "custom telemetry" means | Q1 = **A** | Blueprints emit their own business-level metrics; the dashboard displays them alongside inventory, joined on `cornell:deployment-id`. Not dashboard usage analytics (B), not extra operational metrics for the dashboard's own components (C), not a generic push-anything ingestion path (D). |
+| Where it lives | Q2 = **C** | Built inside `blueprints/dashboard/` for now, with `observability/` recorded as the eventual home. |
+| Sequencing | Q3 = **B** | v1 inventory stories are approved as they stand; telemetry becomes a **second pass** through Requirements → Stories. No FR-9 is written into `requirements.md` in this pass, and `stories.md` is unchanged. |
+| Purpose | Q4 (free text) | "usage metrics to justify cost; feedback for business processes; metrics to determine value / how useful the system is." |
+
+### Q1 = A and Q4 agree, and Q4 narrows A usefully
+Q4 asks for *usage*, *value*, and *cost justification* — business-level questions, not technical
+ones. That settles what kind of metric matters under Q1 = A: counters that measure use of a
+deployed application (queries asked, documents indexed, sessions started), not latency or memory.
+It also confirms A over C: C's candidate metrics (collection duration, pages fetched) answer "is
+the dashboard healthy", which is not a question Q4 asks.
+
+### Q1 = A makes this a cross-blueprint contract, not a dashboard feature
+This is the most consequential thing the answers imply, and it should be visible before the second
+pass starts rather than discovered during it.
+
+Under Q1 = A the *emitting* side lives in each blueprint and only the *reading* side lives in the
+dashboard. The durable deliverable is therefore a **convention** — the metric equivalent of the four
+`cornell:*` tags — plus a reader. A blueprint that doesn't implement the convention is invisible to
+it, exactly as an untagged resource is invisible to inventory today.
+
+Today there is one blueprint besides the dashboard: `hello-world`, which is an S3 bucket and an SSM
+parameter. It has no compute and no usage to report. `course-chatbot` is deliberately not built.
+So the reading side has nothing real to display until a blueprint with an application in it exists,
+and the honest v2 deliverable is the contract plus a reader proven against a deliberately trivial
+emitter — not a populated usage dashboard. Worth deciding at the second pass whether that ordering
+is acceptable or whether telemetry should wait for a blueprint that would actually feed it.
+
+### "Usage metrics to justify cost" is partly gated on FR-8
+Usage counts on their own are deliverable. **Usage per dollar is not** — cost figures are FR-8, a
+stretch goal whose data source (Cost Explorer vs. CUR) was deliberately left undecided, and joining
+usage to spend needs that decision made first. The other two purposes in Q4 (value/usefulness,
+process feedback) need only the usage side and are not gated.
+
+### Q2 = C needs a trigger, not a date
+Recorded so "eventual" has a definition: the move to `observability/` is due **when a second
+blueprint emits metrics** — at that point the collector serves multiple blueprints and living inside
+one of them is structurally wrong. Not on a date, and not "when there's time".
+
+### One purpose left unspecified, deliberately not re-asked
+"Feedback for business processes" is the least concrete of the three purposes — it doesn't yet name
+a process or a decision, so it can't carry acceptance criteria. It is **not** being raised as a
+follow-up question now, because Q3 = B creates a later Requirements pass where it gets asked
+properly. It is recorded here so that pass starts from it rather than rediscovering it.
+
+## What this pass does and does not change
+- `requirements.md` — **unchanged**. FR-9 is queued for the second pass, not written now (Q3 = B).
+- `stories.md` / `personas.md` — **unchanged**. v1 stands as generated.
+- The User Stories approval gate — Q3 = B settles the *order*, but choosing a sequencing option in
+  this file is not the same act as approving 17 stories, so the gate is not recorded as approved on
+  the strength of it.

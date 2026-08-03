@@ -3,12 +3,15 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: INCEPTION - User Stories (Part 2: Generation complete — approval gate **held open**, see New Requirement below)
-- **Open item blocking the gate**: 2026-08-03 — user requested "custom telemetry" for the dashboard, a new
-  functional requirement arriving after `requirements.md` was approved. Questions pending in
-  `inception/requirements/requirement-amendment-questions-telemetry.md`. The stories gate is not
-  approved until Q3 (sequencing) is answered, since approving now could bank a story set that a
-  pending FR-9 invalidates.
+- **Current Stage**: INCEPTION - User Stories (Part 2: Generation complete — awaiting explicit approval of
+  `inception/user-stories/stories.md` and `personas.md`)
+- **Queued amendment (NOT blocking)**: 2026-08-03 — custom telemetry, answered in
+  `inception/requirements/requirement-amendment-questions-telemetry.md` (Q1=A, Q2=C, Q3=B, Q4 free text).
+  Q3=B routes it to a **second Requirements → Stories pass** after v1 stories are approved, so
+  `requirements.md` and `stories.md` are unchanged by it and the v1 gate is no longer held.
+  Resolved shape: blueprints emit business-level usage metrics, dashboard displays them joined on
+  `cornell:deployment-id`; built inside `blueprints/dashboard/` with `observability/` as the eventual
+  home, due when a second blueprint emits metrics.
 - **Story Plan Approved**: 2026-08-03 — user response "approve plan"
 - **Requirements Approved**: 2026-08-03 — user response "requirements approved"
 
