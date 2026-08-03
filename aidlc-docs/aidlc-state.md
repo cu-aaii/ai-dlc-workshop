@@ -3,7 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: INCEPTION - Requirements Analysis
+- **Current Stage**: INCEPTION - User Stories (Part 1: Planning — awaiting answers in `inception/plans/story-generation-plan.md`)
+- **Requirements Approved**: 2026-08-03 — user response "requirements approved"
 
 ## Workspace State
 - **Existing Code**: Yes — CloudFormation (YAML), Python (`pipeline/validate_stacks.py`), shell (`tools/check`)
