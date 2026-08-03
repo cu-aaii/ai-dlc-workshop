@@ -36,14 +36,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      # cfn-lint pulls in pyyaml, which validate_stacks.py uses.
-      - name: 'Install cfn-lint'
-        run: 'pip install --disable-pip-version-check "cfn-lint>=1,<2"'
+      # uv is the only thing installed here -- tools/check fetches pyyaml and cfn-lint itself
+      # at the versions pinned in that script. Installed with pip rather than the
+      # astral-sh/setup-uv action because the org allowed-actions policy blocks it (see above),
+      # which also avoids piping a remote installer into a shell.
+      - name: 'Install uv'
+        run: 'pip install --disable-pip-version-check uv'
 
-      - name: 'Stack registry matches the filesystem'
-        run: 'python pipeline/validate_stacks.py'
-
-      # The -- is required: cfn-lint's --region takes nargs='+', so without it the template
-      # paths are parsed as region names and every template is silently skipped.
-      - name: 'cfn-lint every registered template'
-        run: 'cfn-lint --region us-east-1 -- $(python pipeline/validate_stacks.py --list)'
+      # Deliberately the same script contributors run locally, so there is no second code path
+      # to drift: green on a laptop means green here.
+      - name: 'Run checks'
+        run: 'tools/check'

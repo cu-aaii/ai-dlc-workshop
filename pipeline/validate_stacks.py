@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["pyyaml"]
+# ///
 """Check that pipeline/stacks.yml and the CloudFormation templates on disk agree.
+
+Run this through `tools/check` rather than directly -- the inline script metadata above lets
+`uv run` fetch pyyaml on demand, so there is nothing to install and no venv to activate.
 
 Run with no arguments to validate; run with --list to print the registered template paths
 (what PR checks feeds to cfn-lint).
