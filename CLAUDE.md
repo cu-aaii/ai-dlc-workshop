@@ -54,7 +54,15 @@ work; ask instead.
 - **Secrets live only in AWS Secrets Manager.** Blueprints are configured to *use* credentials
   without ever containing them. **This repo is public and has no secret scanning** (an enforced
   org security configuration disables it), so nothing stops a committed key — never write one.
-- **`main` is PR-only**, one human approval, enforced by branch protection.
+  A secret's *resource* is declared in CloudFormation; its *value* is injected once by CLI and
+  is never in git. See `AzureCredentialsSecret` in `pipeline/pipeline.yml` for the pattern,
+  including why it must not use `SecretString`.
+- **`main` is PR-only**, enforced by branch protection: a pull request is required and direct
+  pushes are rejected, the `validate` check must pass, and only members of the
+  `ai-dlc-workshop` GitHub team may merge. **Zero approving reviews are required** — a team
+  member merges their own PR. That is a deliberate workshop-time relaxation of the original
+  one-human-approval rule, and it means the `validate` check is the only automated gate between
+  a branch and a deploy.
 - **All four `cornell:*` tags on every resource** (see below).
 
 ## How a merge becomes a deployment
@@ -64,7 +72,12 @@ approved PR merged to main
   └─ Source ............ webhook, starts within seconds
   └─ PipelineDeploy .... the pipeline deploys itself from pipeline/pipeline.yml
   └─ BlueprintDeploy ... one CloudFormation action per blueprint stack
+  └─ Terraform ......... one CodeBuild action per Azure/Entra module, plan then apply
 ```
+
+The `Terraform` stage **applies unattended**. There is no approval action, so a merge reaches
+the Azure/Entra tenant with whatever rights the stored service principal holds. Treat a change
+under `blueprints/*/infra/azure/` as a change that takes effect on merge.
 
 `Environment` is the **branch name** — the Source stage tracks `BranchName: !Ref Environment`.
 That is why `Environment=main` means "merges to main deploy". Deploying the pipeline with
@@ -78,6 +91,32 @@ it means editing every template that declares the parameter, not just the pipeli
 
 `Application` is `aidlc`. Its `AllowedPattern` caps it at 10 characters, which is why it isn't
 the repo name.
+
+## Terraform, for Azure/Entra only
+
+AWS is CloudFormation. Terraform exists here solely because CloudFormation cannot reach an
+Entra tenant. Don't reach for it for anything with an AWS resource type.
+
+Modules live at `blueprints/<name>/infra/azure/`, alongside the blueprint's `infra/`
+CloudFormation. One CodeBuild project — `TerraformProject` in `pipeline/pipeline.yml` — runs all
+of them; each `Terraform` stage action supplies `TF_WORKING_DIR` and `TF_STATE_KEY`, the way
+`CONTAINER_TARGET` parameterizes the container build. Adding a module means adding an action, not
+adding a project.
+
+- **State** is S3 (`TerraformStateBucket`), one key per module, locked with `use_lockfile=true`.
+  S3-native locking, so there is no DynamoDB table.
+- **Credentials** are the three `ARM_*` variables, resolved from
+  `<app>/<env>/azure/terraform-credentials` as CodeBuild `SECRETS_MANAGER` env vars. The
+  `azuread`/`azurerm` providers read them natively, so no credential reaches a `.tfvars`, a
+  Terraform variable, or state. Never pass one as `-var`.
+- **`backend "s3" {}` stays empty** in the module. Every value arrives via `-backend-config`, so
+  a module is environment-agnostic and the repo holds no bucket or account names.
+- **Entra objects can't take key/value tags.** Graph `application` takes `tags` as a flat string
+  list, so the four `cornell:*` values are encoded `"cornell:owner=..."`. That divergence is
+  forced by the API — see `blueprints/entra-probe/README.md`.
+- **`azurerm` will not work yet.** It needs an Azure subscription in the tenant *and* an Azure
+  RBAC assignment for the service principal. A Global Administrator directory role grants
+  neither — it is a directory role, not resource-plane access. `azuread` needs only the tenant.
 
 ## Conventions that are load-bearing
 
@@ -98,6 +137,12 @@ complaint. Same for the CodeBuild project name prefix.
 **Register every CloudFormation template in `pipeline/stacks.yml`.** That registry is what PR
 checks lint, and `pipeline/validate_stacks.py` fails the build on an unregistered template as
 well as a registered one that doesn't exist. Add the entry in the same PR as the template.
+
+**Terraform modules are not in that registry** — it is a CloudFormation registry, and Terraform
+is not CloudFormation. They get the equivalent protection from a different direction:
+`validate_stacks.py` cross-checks every `blueprints/*/infra/azure/` directory holding `.tf`
+files against the `TF_WORKING_DIR` values in `pipeline.yml`, in both directions. A module with
+no action, or an action naming a directory that isn't there, fails PR checks.
 
 **A `deployed_by: pipeline` entry needs a matching action in `pipeline.yml`.** Registering a
 blueprint is only step 2 of three — without the action the stack deploys nothing, and it fails
@@ -120,8 +165,10 @@ export.
 tools/check
 ```
 
-CI runs that same script. `uv` is its only prerequisite. Never document or run the bare
-`cfn-lint` / `python pipeline/validate_stacks.py` forms — they fail on a clean machine.
+CI runs that same script. Prerequisites are `uv` **and `terraform`** — uv fetches Python,
+pyyaml and cfn-lint itself; terraform has to be a real install (`brew install hashicorp/tap/terraform`),
+and CI gets it from `hashicorp/setup-terraform`. Never document or run the bare `cfn-lint` /
+`python pipeline/validate_stacks.py` / `terraform validate` forms — they fail on a clean machine.
 
 ## Gotchas that have already cost time
 
@@ -138,7 +185,19 @@ CI runs that same script. `uv` is its only prerequisite. Never document or run t
   `hashicorp/setup-terraform@*`.** Any other `uses:` fails the whole run as `startup_failure`
   with no job logs, which reads like a broken workflow file. Install tools via `pip`/`run:`
   instead of reaching for a marketplace action.
-- **Nobody can approve their own PR**, so every change needs a second person.
+- **`AWS::SecretsManager::Secret` must not use `SecretString` here.** That property is enforced
+  on every stack update, and `PipelineDeploy` redeploys the pipeline stack on every merge — so a
+  placeholder in the template resets the live credential to the placeholder several times a day.
+  Use `GenerateSecretString` (evaluated only at create) and inject the real value with
+  `put-secret-value`. Editing the `GenerateSecretString` block later *does* clobber it.
+- **Terraform state must not live in the artifact bucket.** `deployment-artifacts-*` expires
+  objects after 30 days, which would delete state and orphan everything Terraform manages.
+  `TerraformStateBucket` is separate, versioned, lifecycle-free and `Retain`-on-delete.
+- **`.terraform.lock.hcl` is committed, deliberately.** It was in `.gitignore` originally.
+  Committing it is what makes a laptop, PR checks and CodeBuild resolve identical provider
+  versions; ignoring it lets them drift silently.
+- **`terraform_wrapper: false`** in `hashicorp/setup-terraform`. The wrapper replaces the binary
+  with a script that captures output, and `tools/check` depends on real exit codes.
 
 ## Deliberately not built
 
@@ -147,7 +206,6 @@ asked:
 
 - `blueprints/course-chatbot/` — managed Bedrock Knowledge Base, Teams bot, Strands agent
 - `builder-mcp/` — the MCP server that searches blueprints and creates deployment repos
-- the Terraform stage for Azure/Entra resources
 - `observability/`
 
 `ContainerBuildProject`, `ContainerRepository` and `pipeline/codebuild.yml` **are** defined and

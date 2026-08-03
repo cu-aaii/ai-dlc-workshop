@@ -24,12 +24,14 @@ rather than one application.
 bootstrap/                  account baseline — deployed BY HAND, once per account
   account-bootstrap.yml       deploy role, artifact bucket, GitHub connection
 pipeline/                   the deploy path
-  pipeline.yml                CodePipeline / CodeBuild / ECR / IAM
+  pipeline.yml                CodePipeline / CodeBuild / ECR / IAM / TF state / Azure secret
   stacks.yml                  registry of every CloudFormation template in the repo
   validate_stacks.py          enforces registry ↔ filesystem ↔ pipeline agreement (PR checks)
   codebuild.yml               container image buildspec (ready, not yet wired to a stage)
+  terraform.yml               Azure/Entra Terraform buildspec (wired to the Terraform stage)
 blueprints/
   hello-world/                trivial tagged stack; proves the pipeline, and the demo floor
+  entra-probe/                one Entra app registration; proves the Terraform path
 aidlc-rules/                the AI-DLC methodology — vendored from awslabs, do not edit
 .github/workflows/
   pr-checks.yml               cfn-lint + registry check. No AWS calls, no credentials.
@@ -83,7 +85,12 @@ approved PR merged to main
   └─ Source ............ webhook fires within seconds (DetectChanges on the connection)
   └─ PipelineDeploy .... the pipeline deploys itself, so pipeline changes land on merge too
   └─ BlueprintDeploy ... one CloudFormation action per blueprint stack
+  └─ Terraform ......... one CodeBuild action per Azure/Entra module; plan, then apply
 ```
+
+AWS resources are CloudFormation. Terraform exists only because CloudFormation cannot reach an
+Entra tenant, and it **applies unattended** — a merge touching `blueprints/*/infra/azure/`
+reaches the tenant with no human in the loop.
 
 `Environment` is the branch name and the Source stage tracks the branch of that name, so
 `Environment=main` is what makes "merges to main deploy". A `test` branch deployed with
@@ -101,14 +108,20 @@ approved PR merged to main
 
 Enforced by branch protection, not convention:
 
-- Pull request required; direct pushes rejected, **including for admins**
-- One approving review required
+- Pull request required; direct pushes rejected
+- **Zero approving reviews required** — you merge your own PR
+- Only members of the `ai-dlc-workshop` GitHub team may merge
 - The `validate` check must pass
-- Stale approvals dismissed when new commits are pushed
 - Force pushes and branch deletion blocked
+- Repo admins can bypass (`enforce_admins` is off)
 
-Long-term this human approval gate becomes an automated reviewer agent. It is deliberately a
-human for this workshop.
+The one-approving-review rule was dropped during the workshop: requiring a second person meant
+nobody could merge their own work, which stalled attendees. The trade is real — with zero
+approvals, `validate` is the only automated gate between a branch and a deploy into the shared
+account, and the `Terraform` stage applies to the Azure tenant unattended. Restore the review
+requirement after the workshop.
+
+Long-term the approval gate becomes an automated reviewer agent.
 
 > Branch protection is why this repo is public. `cu-aaii` is on the GitHub Free plan, where
 > branch protection and rulesets are unavailable on private repositories — the API returns
@@ -130,8 +143,9 @@ Three steps, in order. Only the first two are ever done by hand.
 
 ## PR checks
 
-`cfn-lint` plus the stack-registry check. Lint-and-validate only — no AWS calls, no
-credentials, so they come back in well under a minute.
+`cfn-lint`, the stack-and-module registry check, and `terraform fmt`/`validate`.
+Lint-and-validate only — no AWS calls, no credentials, no Terraform backend access, so they come
+back in well under a minute.
 
 Run them before you push:
 
@@ -141,13 +155,20 @@ tools/check
 
 CI runs that exact script, so green locally means green on your PR.
 
-**`uv` is the only prerequisite.** It fetches Python, pyyaml and cfn-lint on demand at pinned
-versions, so there is nothing to install globally and no venv to activate:
+**Two prerequisites: `uv` and `terraform`.** uv fetches Python, pyyaml and cfn-lint on demand at
+pinned versions, so there is nothing Python to install globally and no venv to activate.
+Terraform is a single binary with no uv equivalent:
 
 ```sh
 brew install uv                                    # macOS
 curl -LsSf https://astral.sh/uv/install.sh | sh    # everything else
+
+brew install hashicorp/tap/terraform               # macOS
+# other: https://developer.hashicorp.com/terraform/install
 ```
+
+CI installs Terraform with `hashicorp/setup-terraform` — the one non-github-owned action the org
+allowed-actions policy permits, which is why these checks can run there at all.
 
 ## Conventions
 
@@ -171,6 +192,9 @@ be deployed by hand for debugging, not to be the real values.
 
 ## Not here yet
 
-This repo is currently the deploy path and nothing else. Still to come, per the workshop spec:
-the `course-chatbot` blueprint (managed Bedrock Knowledge Base, Teams bot, Strands agent), the
-`builder-mcp` keystone, the Terraform stage for Azure/Entra resources, and `observability/`.
+Still to come, per the workshop spec: the `course-chatbot` blueprint (managed Bedrock Knowledge
+Base, Teams bot, Strands agent), the `builder-mcp` keystone, and `observability/`.
+
+The Terraform stage exists but only reaches **Entra**. Managing Azure *resources* with `azurerm`
+additionally needs an Azure subscription in the tenant and an Azure RBAC role assignment for the
+service principal — a Global Administrator directory role grants neither.
