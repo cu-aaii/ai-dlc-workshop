@@ -3,7 +3,9 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: INCEPTION - Units Generation complete, awaiting approval (last INCEPTION stage)
+- **Current Stage**: **CONSTRUCTION** - Functional Design for U-01 Domain Core
+- **INCEPTION COMPLETE**: 2026-08-03
+- **Units Approved**: 2026-08-03 — user response "Approve & Continue"
 - **Application Design Approved**: 2026-08-03 — user response "approved"
 - **Execution Plan Approved**: 2026-08-03 — user response "Approve and Continue"
 - **User Stories Approved**: 2026-08-03 — user response "approve stories"
@@ -130,6 +132,8 @@ cleanup — deliberately not done.
 - [x] Workflow Planning
 - [x] Application Design
 - [x] Units Generation (2 units: U-01 Domain Core, U-02 Dashboard Platform)
+
+**🔵 INCEPTION PHASE COMPLETE — 2026-08-03**
 
 ### 🟢 CONSTRUCTION PHASE
 - [ ] Functional Design — EXECUTE (PBT-01 identifies properties here)

@@ -268,3 +268,13 @@
 **Context**: INCEPTION — Units Generation artifacts complete and corrected for A2. Awaiting explicit user approval to close INCEPTION.
 
 ---
+
+## Units Generation — Approval (INCEPTION complete)
+**Timestamp**: 2026-08-03T00:00:00Z
+**Approval Prompt**: "# 🔧 Units Generation Complete … ✅ **Approve & Continue** — closes **INCEPTION** and starts **CONSTRUCTION** with Functional Design for U-01" — presented with the two units and their verification asymmetry, the single acyclic U-02→U-01 import edge, my **own error disclosed** (Q4 = A does not resolve §6.4 and my Q4 text claimed it would, because the pipeline stage order puts Build before BlueprintDeploy), the A2 monorepo amendment including the root-Dockerfile correction to an artifact written minutes earlier, the WAF-dominated cost estimate, the flagged-not-done `aidlc-docs/` → `docs/aidlc/dashboard/` relocation question, and the 51 Dependabot vulnerabilities the push reported as a live data point for the open Q13.
+**User Input**: "Approve & Continue"
+**Decision**: **APPROVED** — Units Generation closed. **INCEPTION PHASE COMPLETE.** Accepted: two units (U-01 Domain Core, U-02 Dashboard Platform), the Q1-Q9 answers, all three artifacts, the story assignments with recorded spillover, and the amendments A1/A2 as recorded.
+**Carried into CONSTRUCTION unresolved**: §6.4 site-sync ordering (owner U-02, Infrastructure Design); US-15 story-coverage gap (Build action, Dockerfile targets, `blueprint.yaml`); Q12/Q13 non-blocking; RESILIENCY-04/-14/-15 due at NFR Design; the `aidlc-docs/` relocation question (user's call); `tools/check` unrunnable here (needs `uv` and `terraform`).
+**Context**: Transition INCEPTION → CONSTRUCTION. Next stage: Functional Design for U-01 Domain Core, per Q5 = A depth-first ordering.
+
+---
