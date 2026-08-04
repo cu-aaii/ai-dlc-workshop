@@ -713,6 +713,27 @@ Resources:
                   {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
                   ]
 
+            # The Teams front door's Lambda image. ARM because the function declares
+            # Architectures: ['arm64'] -- the project and the function have to agree, and a
+            # mismatch fails at cold start rather than at build time.
+            - Name: 'TeamsBotContainer'
+              Namespace: 'TeamsBotContainer'
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'ArmContainerBuildProject'
+                EnvironmentVariables: >-
+                  [
+                  {"name": "CONTAINER_TARGET", "value": "teams-bot", "type": "PLAINTEXT"},
+                  {"name": "CONTAINER_CONTEXT", "value": "blueprints/teams-bot", "type": "PLAINTEXT"},
+                  {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
+                  ]
+
         # One action per blueprint stack. Register the template in pipeline/stacks.yml and
         # add an action here; the stack name convention is <application>-<environment>-<name>
         # so it stays inside the BuildPipelineRole's CloudFormation resource scope.
@@ -897,6 +918,71 @@ Resources:
                   "EnableScheduledSync": "false",
                   "SyncScheduleExpression": "cron(0 7 ? * MON *)",
                   "SharePointSyncScheduleExpression": "cron(0 8 ? * MON *)",
+                  "SourceCommitId": "#{GitRepository.CommitId}"
+                  }
+
+            # Track C's Microsoft Teams chatbot blueprint -- "Chatbots (incl. Microsoft
+            # Teams-fronted)" in the participant brief's catalog. Generic by design: what any
+            # deployment of it does is set by SystemPrompt, not by this template.
+            #
+            # KnowledgeBaseId is empty here, so this instance answers from its system prompt with
+            # no retrieval. To ground it, put a real id in (retrieval is optional by design):
+            #   aws ssm get-parameter --name /aidlc/main/knowledgebase/knowledge-base-id \
+            #     --query Parameter.Value --output text
+            #
+            # The two Bot* values identify the Azure Bot
+            # registration this deployment fronts: they are one-time-per-bot onboarding rather
+            # than per-deployment configuration, and neither is a credential -- the app id
+            # ships inside every Teams manifest distributed to users, and the tenant id appears
+            # in every serviceUrl. The matching client secret is injected into Secrets Manager
+            # by CLI and appears nowhere in this repository.
+            #
+            # Deploying this needs two secret values put in place once, or the bot answers
+            # nothing: <app>/<env>/teams-bot/bot-client-secret and .../gateway-api-key.
+            # Both resources are created here with GenerateSecretString placeholders.
+
+            - Name: 'TeamsBotCloudFormation'
+              Namespace: 'TeamsBotCloudFormation'
+              # RunOrder 1, like everything else in this stage. This was briefly RunOrder 2, when
+              # the knowledge base id resolved at deploy time from another blueprint's SSM
+              # parameter. That coupling is gone -- retrieval is an optional plain parameter now --
+              # so there is no ordering dependency left to respect.
+              RunOrder: 1
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-teams-bot'
+                TemplatePath: 'GitRepositoryArtifact::blueprints/teams-bot/infra/teams-bot.yml'
+                # Every parameter passed explicitly rather than left to template defaults, so
+                # the stack deploys the same way by hand or by pipeline. BlueprintVersion is
+                # duplicated from the template default on purpose: bump both in the same PR, or
+                # the cornell:blueprint-version tag will lie.
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "BlueprintVersion": "0.1.0",
+                  "DeploymentName": "teams-bot",
+                  "ContainerImageUri": "#{TeamsBotContainer.CONTAINER_DIGEST}",
+                  "BotAppId": "e6ee0253-8949-4eba-ba9f-f9d5da45fa1d",
+                  "BotTenantId": "3ce7e7fb-ef51-4972-bfd5-f43f6668ccca",
+                  "ModelId": "claude-haiku-4-5",
+                  "GreetingText": "",
+                  "KnowledgeBaseId": "",
+                  "SystemPromptS3Bucket": "",
+                  "SystemPromptS3Key": "",
+                  "LogRetentionDays": "90",
+                  "ReservedConcurrency": "10",
+                  "AlarmTopicArn": "",
                   "SourceCommitId": "#{GitRepository.CommitId}"
                   }
 

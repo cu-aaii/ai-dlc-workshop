@@ -1,0 +1,36 @@
+# Resolved dependency set for the teams-bot Lambda image — the lock file SECURITY-10 requires.
+#
+# requirements.txt declares INTENT as version ranges; this file is the exact resolved set the image
+# installs, so two builds of the same commit cannot resolve differently. That drift is the whole
+# reason the rule exists.
+#
+# Regenerate after editing requirements.txt:
+#   uv pip compile blueprints/teams-bot/src/requirements.txt \
+#       --python-version 3.13 -o blueprints/teams-bot/src/requirements.lock
+#
+# boto3 is deliberately absent: the AWS Lambda Python base image ships it. Adding it here would
+# shadow the runtime's own copy with a second, unpinned-against-the-runtime version.
+#
+# Vulnerability scanning (SECURITY-10) is not wired into tools/check, which is a shared file. Run it
+# against this file before a release:
+#   uvx pip-audit -r blueprints/teams-bot/src/requirements.lock
+annotated-types==0.8.0
+anthropic==0.120.2
+anyio==4.14.2
+certifi==2026.7.22
+cffi==2.1.1
+cryptography==50.0.0
+distro==1.9.0
+docstring-parser==0.18.0
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.18
+jiter==0.16.0
+pycparser==3.0
+pydantic==2.13.4
+pydantic-core==2.46.4
+pyjwt==2.13.0
+sniffio==1.3.1
+typing-extensions==4.16.0
+typing-inspection==0.4.2
