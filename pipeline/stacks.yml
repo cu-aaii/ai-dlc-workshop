@@ -58,3 +58,7 @@ templates:
     template: 'blueprints/knowledgebase/infra/knowledgebase.yml'
     deployed_by: 'pipeline'
     description: 'Bedrock managed knowledge base over the existing document bucket. Verifies at deploy time that the documents are indexed and answerable, so a green deploy is the acceptance test.'
+  - name: 'dashboard-marker'
+    template: 'blueprints/dashboard/infra/dashboard-marker.yml'
+    deployed_by: 'manual'
+    description: 'Deployment marker for the cost & usage dashboard blueprint. Registered deployed_by manual on purpose: the BlueprintDeploy action belongs to the U-02 infrastructure work, and registering it as pipeline with no action would deploy nothing while reporting success -- the exact failure this registry exists to catch.'

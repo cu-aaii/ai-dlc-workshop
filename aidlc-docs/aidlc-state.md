@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - Code Generation for U-01 (Part 1 planning)
+- **Current Stage**: **CONSTRUCTION** - Code Generation U-01 complete, awaiting approval
 - **NFR Design U-01 Approved**: 2026-08-03 — user response "approve and proceed"
 - **NFR Requirements U-01 Approved**: 2026-08-03 — user response "approve and proceed"
 - **Functional Design U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
@@ -182,6 +182,38 @@ reasons (retry/circuit-breaker presupposes a call that can fail; U-01 makes none
 (generator coverage), which is **review-only**. So a blocking rule rests on something no tool checks.
 NFR-T5 and NFR-T7 are the two review-only requirements carrying disproportionate weight.
 
+## Code Generation U-01 — outputs and honest verification status
+Code at `blueprints/dashboard/` (**never** in `aidlc-docs/`). Summary:
+`construction/u-01-domain-core/code/implementation-summary.md`.
+
+**Actually ran and passed here**: `py_compile` on all 8 files · `bash -n` on `tools/check` · the
+core-boundary grep (clean) · registry consistency (**no orphans, none registered-but-missing**) ·
+**~45 behavioural assertions** over the real core logic via an ad-hoc stdlib script — possible because
+Python 3.14 is present and **U-01 has no runtime dependencies**. NFR-P2 measured at **0.012 s for
+10,000 records** against a 10 s bound.
+
+**Did NOT run**: `pytest` (Hypothesis absent — so **the ten properties are written but never executed
+as properties**), `mypy --strict`, `cfn-lint` (not even a YAML parse — `pyyaml` absent), `tools/check`
+end to end, `uv.lock` generation.
+
+### 🐛 One real bug found by running the code
+`_resource_type` preferred `/` over `:` unconditionally, so
+`arn:aws:logs:...:log-group:/aws/lambda/x` yielded **`"log-group:"`** — colon attached — which is what
+would have shown in the dashboard's type column. Fixed to take the **earliest** separator; the case is
+now a permanent annotated regression row, and `conftest.py`'s duplicate derivation was updated in step.
+
+### Deviations from the approved plan
+1. **Step 11 was wrong — the template had to be registered.** `validate_stacks.py` fails on any
+   unregistered template found by its `AWSTemplateFormatVersion` scan, independent of pipeline actions.
+   Registered `dashboard-marker` as **`deployed_by: manual`** (which its own error text suggests), so
+   both invariants hold with no pipeline action. U-02 flips it to `pipeline` with the BlueprintDeploy
+   action. **Pre-existing finding: the stray `hello-world.yml` was also unregistered, so `tools/check`
+   and CI were ALREADY failing on this branch before this work.** This change fixes that.
+2. **`blueprint.yaml` deliberately absent** — U-02's per `unit-of-work.md`, and now *required* absent
+   for consistency, since a manifest must name a registered pipeline-deployable template.
+3. **`DeploymentName` parameter added** to the marker template, implementing Q9b's `singleton: false`
+   rather than leaving it a manifest field with no template support.
+
 ### ⚠️ Flagged for the user, not decided
 
 ### Amendment A3 — layout superseded by `src/` conformance (2026-08-03)
@@ -243,6 +275,38 @@ above the declared level** — an enforcement consequence of choosing `[internal
 Q9a was answered. Also confirmed `singleton: false` is consistent with `deployment_create`, which forces
 `deployment_name = blueprint name` only for singletons.
 
+## Code Generation U-01 — outputs and honest verification status
+Code at `blueprints/dashboard/` (**never** in `aidlc-docs/`). Summary:
+`construction/u-01-domain-core/code/implementation-summary.md`.
+
+**Actually ran and passed here**: `py_compile` on all 8 files · `bash -n` on `tools/check` · the
+core-boundary grep (clean) · registry consistency (**no orphans, none registered-but-missing**) ·
+**~45 behavioural assertions** over the real core logic via an ad-hoc stdlib script — possible because
+Python 3.14 is present and **U-01 has no runtime dependencies**. NFR-P2 measured at **0.012 s for
+10,000 records** against a 10 s bound.
+
+**Did NOT run**: `pytest` (Hypothesis absent — so **the ten properties are written but never executed
+as properties**), `mypy --strict`, `cfn-lint` (not even a YAML parse — `pyyaml` absent), `tools/check`
+end to end, `uv.lock` generation.
+
+### 🐛 One real bug found by running the code
+`_resource_type` preferred `/` over `:` unconditionally, so
+`arn:aws:logs:...:log-group:/aws/lambda/x` yielded **`"log-group:"`** — colon attached — which is what
+would have shown in the dashboard's type column. Fixed to take the **earliest** separator; the case is
+now a permanent annotated regression row, and `conftest.py`'s duplicate derivation was updated in step.
+
+### Deviations from the approved plan
+1. **Step 11 was wrong — the template had to be registered.** `validate_stacks.py` fails on any
+   unregistered template found by its `AWSTemplateFormatVersion` scan, independent of pipeline actions.
+   Registered `dashboard-marker` as **`deployed_by: manual`** (which its own error text suggests), so
+   both invariants hold with no pipeline action. U-02 flips it to `pipeline` with the BlueprintDeploy
+   action. **Pre-existing finding: the stray `hello-world.yml` was also unregistered, so `tools/check`
+   and CI were ALREADY failing on this branch before this work.** This change fixes that.
+2. **`blueprint.yaml` deliberately absent** — U-02's per `unit-of-work.md`, and now *required* absent
+   for consistency, since a manifest must name a registered pipeline-deployable template.
+3. **`DeploymentName` parameter added** to the marker template, implementing Q9b's `singleton: false`
+   rather than leaving it a manifest field with no template support.
+
 ### ⚠️ Flagged for the user, not decided
 `CLAUDE.md` now says `docs/aidlc/` is "this repo's own AI-DLC record," and builder-mcp's record was
 relocated to `docs/aidlc/builder-mcp/`. By that convention this blueprint's record belongs at
@@ -283,7 +347,9 @@ cleanup — deliberately not done.
             workflow** (first: Reverse Engineering). `u-01-domain-core/infrastructure-design/` will not
             exist — see `construction/plans/u-01-infrastructure-design-applicability.md`
       - [ ] U-02 — full pass under every option; carries §6.4
-- [ ] Code Generation — **IN PROGRESS: U-01** (Part 1 plan awaiting approval). Depth-first per Q2 = A.
+- [ ] Code Generation — **U-01 complete (awaiting approval)**; U-02 follows
+      - [x] U-01 — 8 Python files + README, `tools/check` extended, template repurposed & registered.
+            **~45 behavioural assertions actually executed and passing**; one real bug found and fixed
 - [ ] Build and Test — EXECUTE (ALWAYS)
 
 ### 🟡 OPERATIONS PHASE

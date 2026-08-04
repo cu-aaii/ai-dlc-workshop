@@ -1,0 +1,55 @@
+# Python project for the `dashboard` blueprint.
+#
+# One project covers the whole blueprint: U-01 Domain Core (src/dashboard/core), and later
+# U-02's collector and api packages. They ship in the same two container images and are tested
+# by the same suite, so a single lockfile is what keeps them agreeing about their dependencies.
+#
+# Shape mirrors packages/builder-mcp deliberately -- tools/check invokes pytest by cd-ing into
+# the package directory and relying on testpaths + .python-version, so matching that shape means
+# the known-good invocation transfers unchanged rather than being reinvented here.
+
+[project]
+name = "dashboard"
+version = "0.1.0"
+description = "Cornell cost & usage dashboard blueprint: tag inventory collection and read-time aggregation"
+requires-python = ">=3.11"
+
+# U-01 Domain Core has NO runtime dependencies and must keep none -- see NFR-M5. That is not an
+# accident of a small codebase: a dependency appearing under src/dashboard/core/ is a signal the
+# AWS-free boundary has been crossed, not a dependency decision. boto3 arrives with U-02.
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6.100",
+    "mypy>=1.10",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dashboard"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# max_examples 100 matches packages/builder-mcp and sits inside the PBT rules' cap of 200.
+# Shrinking and seed reporting are Hypothesis defaults and are deliberately NOT disabled (PBT-08):
+# a shrunk minimal counterexample is most of the value of property testing.
+[tool.hypothesis]
+max_examples = 100
+
+# Strict typing is scoped to the core package ONLY (NFR-M3). It is nearly free over frozen
+# dataclasses and pure functions, and expensive over boto3 response shapes -- where it produces
+# noise that gets silenced with `# type: ignore`, and a checker people routinely silence is worse
+# than no checker. Extending this to U-02's collector/api is U-02's decision at its own NFR pass.
+[tool.mypy]
+python_version = "3.11"
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = "dashboard.core.*"
+strict = true

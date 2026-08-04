@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Trivial tagged stack that proves the deploy path end to end. Carries the full cornell:* tagging convention so the inventory and dashboard work has something real to read.'
+Description: 'Deployment marker for the cost & usage dashboard blueprint. Records which commit produced the running deployment and carries the full cornell:* tagging convention. NOT the dashboard itself -- the collector, API, edge and site are U-02 work and are not in this template.'
 
 Parameters:
 
@@ -33,7 +33,13 @@ Parameters:
   BlueprintVersion:
     Default: '0.1.0'
     AllowedPattern: '[0-9]+\.[0-9]+\.[0-9]+'
-    Description: 'Version of the hello-world blueprint (cornell:blueprint-version)'
+    Description: 'Version of the dashboard blueprint (cornell:blueprint-version)'
+    Type: 'String'
+
+  DeploymentName:
+    Default: 'dashboard'
+    AllowedPattern: '[a-z0-9-]{1,20}'
+    Description: 'Name of this deployment (part of cornell:deployment-id). The blueprint manifest sets singleton false, so more than one dashboard can exist per application/environment -- hello-world hardcodes its identity and its own manifest comment says real blueprints should take this parameter instead.'
     Type: 'String'
 
   # Pipeline Provided Parameters
@@ -48,11 +54,15 @@ Resources:
 
   # A real, taggable, near-free resource. Exists so tag-based inventory has something to
   # find and so the deploy path is proven against an actual resource creation.
+  #
+  # This bucket is NOT the snapshot store and NOT the site bucket. Both of those are U-02's,
+  # in dashboard-storage.yml, and they are deliberately in a separate stack so an application
+  # update cannot replace the stack that owns the data.
 
-  HelloWorldBucket:
+  MarkerBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Sub '${Application}-${Environment}-hello-world-${AWS::AccountId}'
+      BucketName: !Sub '${Application}-${Environment}-${DeploymentName}-marker-${AWS::AccountId}'
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -71,24 +81,24 @@ Resources:
         - Key: 'Environment'
           Value: !Ref 'Environment'
         - Key: 'Resource'
-          Value: 's3-bucket-hello-world'
+          Value: 's3-bucket-dashboard-marker'
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
         - Key: 'cornell:blueprint'
-          Value: 'hello-world'
+          Value: 'dashboard'
         - Key: 'cornell:blueprint-version'
           Value: !Ref 'BlueprintVersion'
         - Key: 'cornell:deployment-id'
-          Value: !Sub '${Application}-${Environment}-hello-world'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
 
   # Records which commit produced the running stack. Reading this back is the cheapest
   # proof that a merge actually flowed through to a deployed resource.
 
-  HelloWorldDeploymentMarker:
+  DashboardDeploymentMarker:
     Type: 'AWS::SSM::Parameter'
     Properties:
-      Name: !Sub '/${Application}/${Environment}/hello-world/deployed-commit'
-      Description: 'Commit id of the last pipeline deploy of the hello-world blueprint'
+      Name: !Sub '/${Application}/${Environment}/${DeploymentName}/deployed-commit'
+      Description: 'Commit id of the last pipeline deploy of the dashboard blueprint'
       Tier: 'Standard'
       Type: 'String'
       Value: !Ref 'SourceCommitId'
@@ -96,17 +106,17 @@ Resources:
       Tags:
         Application: !Ref 'Application'
         Environment: !Ref 'Environment'
-        Resource: 'ssm-parameter-hello-world-deployment-marker'
+        Resource: 'ssm-parameter-dashboard-deployment-marker'
         'cornell:owner': !Ref 'Owner'
-        'cornell:blueprint': 'hello-world'
+        'cornell:blueprint': 'dashboard'
         'cornell:blueprint-version': !Ref 'BlueprintVersion'
-        'cornell:deployment-id': !Sub '${Application}-${Environment}-hello-world'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-${DeploymentName}'
 
 Outputs:
 
   DeploymentId:
     Description: 'Value of the cornell:deployment-id tag on every resource in this stack'
-    Value: !Sub '${Application}-${Environment}-hello-world'
+    Value: !Sub '${Application}-${Environment}-${DeploymentName}'
 
   BlueprintVersion:
     Description: 'Value of the cornell:blueprint-version tag'
@@ -116,6 +126,6 @@ Outputs:
     Description: 'Commit this stack was deployed from'
     Value: !Ref 'SourceCommitId'
 
-  BucketName:
-    Description: 'The tagged bucket this blueprint creates'
-    Value: !Ref 'HelloWorldBucket'
+  MarkerBucketName:
+    Description: 'The tagged marker bucket this template creates. Not the snapshot store, and not the site bucket -- both are U-02 resources in dashboard-storage.yml.'
+    Value: !Ref 'MarkerBucket'

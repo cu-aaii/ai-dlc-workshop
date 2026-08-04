@@ -3,10 +3,10 @@
 # Run the checks that gate a merge. CI runs this exact script, so a green run here means a
 # green run on your PR -- there is no second code path to drift out of sync.
 #
-# Two prerequisites: uv and terraform. uv fetches Python, pyyaml, cfn-lint and the
-# builder-mcp test dependencies on demand and caches them, so nothing Python is installed
-# globally and there is no venv to activate. Terraform has to be a real install -- it is a
-# single binary and there is no uv equivalent.
+# Two prerequisites: uv and terraform. uv fetches Python, pyyaml, cfn-lint and the test
+# dependencies for both Python packages (builder-mcp, dashboard) on demand and caches them, so
+# nothing Python is installed globally and there is no venv to activate. Terraform has to be a
+# real install -- it is a single binary and there is no uv equivalent.
 
 set -euo pipefail
 
@@ -65,6 +65,61 @@ echo '==> builder-mcp tests'
   cd packages/builder-mcp
   uv run --quiet pytest -q
 )
+
+echo
+echo '==> dashboard tests'
+# Same shape as the builder-mcp block above, and deliberately so: cd into the package, let pytest
+# resolve its own testpaths and rootdir, and let .python-version pin the interpreter. Copying the
+# known-good invocation rather than inventing one matters here because this block was written on a
+# machine with neither uv nor terraform installed, so it had never been executed when it landed.
+(
+  cd blueprints/dashboard
+  uv run --quiet pytest -q
+)
+
+echo
+echo '==> dashboard core boundary'
+# U-01 Domain Core is pure by contract, not by convention: no AWS SDK, no environment read, no
+# clock, no logging, no serialization format other than JSON. Ten property-based tests depend on
+# that -- they are only runnable without an AWS account because the code underneath cannot reach
+# one. This grep is what keeps the contract true as the code grows.
+#
+# Patterns are anchored to statement position rather than matching bare words, so prose in a
+# docstring ("no logging", "never assert") does not trip the check while real code does.
+#
+# `assert` is forbidden for a specific reason: it is stripped entirely under `python -O`, and the
+# accounting identity it would otherwise guard is checked on a production read path. Invariants
+# here raise InvalidSnapshot instead.
+core='blueprints/dashboard/src/dashboard/core'
+forbidden='^[[:space:]]*(import|from)[[:space:]]+(os|logging|pickle|yaml|boto3|botocore)([[:space:]]|\.|$)'
+forbidden+='|os\.environ|datetime\.now\(|\.utcnow\(|time\.time\('
+forbidden+='|^[[:space:]]*assert[[:space:]]|[^[:alnum:]_]print[[:space:]]*\('
+if grep -rnE "$forbidden" "$core"; then
+  cat >&2 <<MSG
+
+error: the domain core boundary was crossed -- see the matches above.
+
+  $core must stay pure: no AWS SDK, no os/environ read, no clock read, no logging or print,
+  no pickle or yaml, and no bare assert (stripped under python -O).
+
+  A runtime dependency or an ambient read appearing here is not a dependency decision, it is a
+  signal that the AWS-free boundary has moved. Put it in the collector or the api package instead.
+MSG
+  exit 1
+fi
+echo 'dashboard core boundary: clean'
+
+echo
+echo '==> dashboard types'
+# Strict only over dashboard.core (see its pyproject override). Strict mode is nearly free over
+# frozen dataclasses and pure functions, and expensive over boto3 response shapes -- where it
+# produces noise that gets silenced with `type: ignore`, and a checker people routinely silence is
+# worse than no checker. Widening the scope is U-02's decision, deliberately.
+(
+  cd blueprints/dashboard
+  uv run --quiet mypy
+)
+echo 'dashboard types: clean'
 
 # Module list comes from the same script that enforces the pipeline mirroring, so there is one
 # definition of "a Terraform module in this repo" rather than a glob duplicated here.
