@@ -171,8 +171,19 @@ CloudFormation template — it declares no `AWSTemplateFormatVersion`, which is 
 `validate_stacks.py` and cfn-lint away from it. Do not add that key, even in a comment: the
 check is a text scan.
 
-Model it on `blueprints/hello-world/blueprint.yaml`. Keep `metadata.version` in lockstep with
-the `BlueprintVersion` default in the template.
+Model it on `blueprints/hello-world/blueprint.yaml`.
+
+**This step is enforced, not advisory.** `tools/check` fails a blueprint directory with no
+manifest, because skipping it is invisible otherwise: the blueprint deploys on every merge while
+`blueprint_search` silently skips the directory, and a builder asking for it gets the
+next-closest blueprint instead of nothing. It also fails a manifest whose `metadata.version` has
+drifted from the `BlueprintVersion` default in its template, whose `metadata.name` disagrees with
+the directory name, or whose `template:` is unregistered or missing.
+
+If a blueprint genuinely should **not** be in the catalog — a scaffold that deploys nothing, or a
+Terraform-only blueprint with no CloudFormation template to advertise — add it to
+`MANIFEST_EXEMPT` in `pipeline/validate_stacks.py` with the reason, rather than leaving the
+manifest out. `course-chatbot` and `entra-probe` are the current entries.
 
 ## Verify
 
@@ -183,6 +194,9 @@ tools/check
 The registry section prints `<- deployed by a pipeline action` next to each wired template.
 **Confirm your new stack shows that marker** — its absence is exactly the silent step-3 miss.
 
+The blueprints section below it prints `<- in the builder catalog` per directory, which is the
+same confirmation for step 4.
+
 Never run bare `cfn-lint` or `python pipeline/validate_stacks.py`; they fail on a clean
 machine. `tools/check` is what CI runs.
 
@@ -190,6 +204,7 @@ machine. `tools/check` is what CI runs.
 
 `validate_stacks.py` rglobs the entire repo for `*.yml`/`*.yaml` containing
 `AWSTemplateFormatVersion`, and its `SKIP_DIRS` is only
-`.git`, `.github`, `node_modules`, `.venv`, `__pycache__`. So a scratch or example template
+`.git`, `.github`, `node_modules`, `.venv`, `__pycache__`, `outputs-preview`. So a scratch or
+example template
 saved anywhere else — including `.claude/` or `docs/` — fails `tools/check` as an
 unregistered template. Keep examples inside markdown fences.
