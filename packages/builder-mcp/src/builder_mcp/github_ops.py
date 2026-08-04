@@ -13,6 +13,7 @@ so the tool surface is demonstrable on a clean machine (NFR7).
 from __future__ import annotations
 
 import base64
+import logging
 from typing import Any
 
 import httpx
@@ -20,6 +21,8 @@ import httpx
 from .config import Settings
 
 API = "https://api.github.com"
+
+logger = logging.getLogger(__name__)
 
 
 class GitHubOps:
@@ -32,6 +35,17 @@ class GitHubOps:
         if settings.github_token:
             headers["Authorization"] = f"Bearer {settings.github_token}"
         self.client = httpx.Client(base_url=API, headers=headers, timeout=30)
+
+    def close(self) -> None:
+        """Release the underlying httpx connection pool. GitHubOps instances are
+        per-tool-call in a long-lived container; leaking them leaks sockets."""
+        self.client.close()
+
+    def __enter__(self) -> "GitHubOps":
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
 
     @property
     def can_write(self) -> bool:
@@ -57,6 +71,19 @@ class GitHubOps:
         response = self.client.get(f"/repos/{repo_full}/git/ref/heads/{branch}")
         response.raise_for_status()
         return response.json()["object"]["sha"]
+
+    def list_dir(self, repo_full: str, path: str, ref: str | None = None) -> list[tuple[str, str]]:
+        """Return [(path, blob_sha)] for the files directly under a directory; [] when
+        the directory does not exist (contents API 404s on a missing path)."""
+        params = {"ref": ref} if ref else {}
+        response = self.client.get(f"/repos/{repo_full}/contents/{path}", params=params)
+        if response.status_code == 404:
+            return []
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, list):  # a file, not a directory
+            return [(payload["path"], payload["sha"])]
+        return [(item["path"], item["sha"]) for item in payload if item["type"] == "file"]
 
     def open_prs(self, repo_full: str, head_contains: str | None = None) -> list[dict[str, Any]]:
         response = self.client.get(f"/repos/{repo_full}/pulls", params={"state": "open"})
@@ -97,6 +124,7 @@ class GitHubOps:
     ) -> dict[str, Any]:
         if not self.can_write:
             return {"dry_run": True, "would": f"write {path} on {repo_full}@{branch}"}
+        logger.debug("put_file repo=%s path=%s branch=%s bytes=%d", repo_full, path, branch, len(content))
         body: dict[str, Any] = {
             "message": message,
             "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
@@ -105,6 +133,24 @@ class GitHubOps:
         if sha:
             body["sha"] = sha
         response = self.client.put(f"/repos/{repo_full}/contents/{path}", json=body)
+        response.raise_for_status()
+        return {"path": path, "branch": branch, "commit": response.json()["commit"]["sha"]}
+
+    def delete_file(
+        self, repo_full: str, path: str, message: str, branch: str, sha: str | None = None
+    ) -> dict[str, Any]:
+        """Mirror of put_file for the contents DELETE API: removes one file on a branch.
+        Dry-run aware; fetches the blob sha itself when the caller does not have it."""
+        if not self.can_write:
+            return {"dry_run": True, "would": f"delete {path} on {repo_full}@{branch}"}
+        if sha is None:
+            _, sha = self.get_file(repo_full, path, ref=branch)
+        logger.debug("delete_file repo=%s path=%s branch=%s", repo_full, path, branch)
+        response = self.client.request(
+            "DELETE",
+            f"/repos/{repo_full}/contents/{path}",
+            json={"message": message, "sha": sha, "branch": branch},
+        )
         response.raise_for_status()
         return {"path": path, "branch": branch, "commit": response.json()["commit"]["sha"]}
 

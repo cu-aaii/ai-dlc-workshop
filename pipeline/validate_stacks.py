@@ -28,6 +28,13 @@ registry <- blueprint manifests
     unregistered template advertises a blueprint whose deployment PR cannot deploy. Checked
     one direction only: a template with no manifest is normal (builder-mcp is platform
     infrastructure, not a catalog entry).
+
+terraform modules <-> pipeline.yml
+    The same failure, one directory over. Terraform modules are not CloudFormation and so are
+    not in the registry at all, which would leave a `blueprints/<name>/infra/azure/` directory
+    with no Terraform action applying nothing while every stage still reported Succeeded.
+    Checked in both directions against the TF_WORKING_DIR values in the pipeline's Terraform
+    actions.
 """
 
 from __future__ import annotations
@@ -49,6 +56,14 @@ BLUEPRINTS_DIR = REPO_ROOT / 'blueprints'
 # same reason discover_templates() uses one: pipeline.yml is full of CloudFormation short tags
 # (!Sub, !GetAtt) that yaml.safe_load cannot parse without a custom loader.
 TEMPLATE_PATH_PATTERN = re.compile(r'GitRepositoryArtifact::([^\s\'"]+)')
+
+# Terraform stage actions name their module as a CodeBuild environment-variable override,
+# {"name":"TF_WORKING_DIR","value":"<repo-relative-path>",...}. Matched by text scan for the
+# same reason as above: pipeline.yml cannot be yaml.safe_load'ed.
+TF_WORKING_DIR_PATTERN = re.compile(r'"name"\s*:\s*"TF_WORKING_DIR"\s*,\s*"value"\s*:\s*"([^"]+)"')
+
+# Terraform modules live alongside a blueprint's CloudFormation, per blueprints/README.md.
+TF_MODULE_GLOB = 'blueprints/*/infra/azure'
 
 # A YAML file is a CloudFormation template if it declares a template format version. Cheap
 # text scan rather than a YAML parse, because CloudFormation short tags (!Sub, !GetAtt)
@@ -83,6 +98,55 @@ def pipeline_deployed_templates() -> set[str]:
         return set()
     text = PIPELINE_PATH.read_text(encoding='utf-8')
     return set(TEMPLATE_PATH_PATTERN.findall(text))
+
+
+def discover_tf_modules() -> set[str]:
+    """Every Terraform module in the repo, as repo-relative posix paths.
+
+    A directory only counts once it holds at least one .tf file -- an empty directory is
+    something in progress, not a module the pipeline should be applying.
+    """
+    return {
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in REPO_ROOT.glob(TF_MODULE_GLOB)
+        if path.is_dir() and any(path.glob('*.tf'))
+    }
+
+
+def pipeline_applied_tf_modules() -> set[str]:
+    """Every Terraform module a Terraform action in pipeline/pipeline.yml applies."""
+    if not PIPELINE_PATH.is_file():
+        return set()
+    text = PIPELINE_PATH.read_text(encoding='utf-8')
+    return set(TF_WORKING_DIR_PATTERN.findall(text))
+
+
+def check_tf_modules() -> list[str]:
+    """Cross-check Terraform modules on disk against the pipeline's Terraform actions.
+
+    Same silent failure as check_pipeline_actions, for the half of the deploy path that has no
+    registry: a module nobody applies, or an action pointing at a directory that isn't there.
+    """
+    errors: list[str] = []
+    on_disk = discover_tf_modules()
+    applied = pipeline_applied_tf_modules()
+
+    for orphan in sorted(on_disk - applied):
+        errors.append(
+            f'Terraform module {orphan} has no TF_WORKING_DIR action in pipeline/pipeline.yml '
+            '-- it would apply nothing, silently. Add a Terraform stage action (see "Adding a '
+            'Terraform module" in pipeline/README.md), or delete the module.'
+        )
+
+    for missing in sorted(applied - on_disk):
+        path = REPO_ROOT / missing
+        why = 'directory does not exist' if not path.is_dir() else 'directory contains no .tf files'
+        errors.append(
+            f'pipeline/pipeline.yml applies Terraform in {missing}, but that {why} '
+            '-- the Terraform stage would fail after merge.'
+        )
+
+    return errors
 
 
 def load_registry() -> list[dict]:
@@ -150,6 +214,7 @@ def validate(entries: list[dict]) -> list[str]:
 
     errors.extend(check_pipeline_actions(declared))
     errors.extend(check_blueprint_manifests(declared))
+    errors.extend(check_tf_modules())
 
     return errors
 
@@ -233,9 +298,21 @@ def main() -> int:
     parser.add_argument(
         '--list',
         action='store_true',
-        help='print registered template paths, one per line, instead of validating',
+        help='print registered CloudFormation template paths, one per line, instead of validating',
+    )
+    parser.add_argument(
+        '--list-tf',
+        action='store_true',
+        help='print Terraform module directories, one per line, instead of validating',
     )
     args = parser.parse_args()
+
+    # Kept out of the registry-loading path: tools/check calls this to find directories to
+    # fmt and validate, and a broken stacks.yml should not stop Terraform from being linted.
+    if args.list_tf:
+        for module in sorted(discover_tf_modules()):
+            print(module)
+        return 0
 
     entries = load_registry()
 
@@ -253,7 +330,7 @@ def main() -> int:
 
     errors = validate(entries)
     if errors:
-        print(f'pipeline/stacks.yml: {len(errors)} problem(s)', file=sys.stderr)
+        print(f'stack and module registry: {len(errors)} problem(s)', file=sys.stderr)
         for error in errors:
             print(f'  - {error}', file=sys.stderr)
         return 1
@@ -265,6 +342,13 @@ def main() -> int:
         # blueprint stack" visible rather than something you find out by its absence.
         wired = ' <- deployed by a pipeline action' if entry['template'] in deployed else ''
         print(f"  {entry['deployed_by']:<9} {entry['template']}{wired}")
+
+    modules = discover_tf_modules()
+    applied = pipeline_applied_tf_modules()
+    print(f'terraform: {len(modules)} module(s) present')
+    for module in sorted(modules):
+        wired = ' <- applied by a pipeline action' if module in applied else ''
+        print(f'  {"terraform":<9} {module}{wired}')
     return 0
 
 

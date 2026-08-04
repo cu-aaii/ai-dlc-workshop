@@ -1,5 +1,12 @@
 {
   "mcpServers": {
+    "cornell-builder": {
+      "command": "uv",
+      "args": ["run", "--directory", "packages/builder-mcp", "builder-mcp"],
+      "env": {
+        "BUILDER_MCP_TRANSPORT": "stdio"
+      }
+    },
     "github": {
       "type": "http",
       "url": "https://api.githubcopilot.com/mcp/",

@@ -6,6 +6,13 @@ them.
 
 ## Demo
 
+- **Restore Entra inbound auth after the testing phase.** The runtime currently deploys
+  with `AuthMode=open` (DECISION-22): the Entra JWT authorizer is masked — not removed —
+  and AgentCore falls back to its default IAM SigV4 inbound auth (there is no
+  unauthenticated mode). To restore: flip `AuthMode` to `entra` and re-add the two Entra
+  parameter overrides in `pipeline/pipeline.yml`, after the Entra pre-flight — exact
+  checklist in `deploy/HANDOFF.md`, section "Testing phase: AuthMode=open". (SPEC C5)
+
 - **Time-critical — the demo is 2026-08-04.** Make the process reliably showable two ways:
   (1) record a successful end-to-end run as a fallback, (2) drive the real server live from
   Claude Cowork. Live Cowork use depends on the deployed AgentCore endpoint plus an OAuth
@@ -48,14 +55,31 @@ them.
 
 ## Operations & guardrails
 
-- Cap `deployment_restart` at 3 restarts per deployment per window (window TBD by the mob);
-  past the cap the tool refuses and directs the builder to open a PR / contact the platform
-  team. Unbounded retries mask real failures and burn pipeline runs. Open design question:
-  this needs restart-count state, which the stateless server (SPEC C4) does not keep. (SPEC C3)
+- Cap `deployment_restart` at 3 restarts per deployment per window (window TBD by the mob)
+  **and** time-box each restart at 30 minutes (mob 2026-08-03): a re-run that has not gone
+  green in 30 minutes is treated as failed and counts against the cap. Past the cap the tool
+  refuses and directs the builder to open a PR / contact the platform team. Unbounded retries
+  mask real failures and burn pipeline runs. Open design questions: this needs restart-count
+  state, which the stateless server (SPEC C4) does not keep, and the time-box enforcement
+  mechanism is open — possibly `codepipeline:StopPipelineExecution` after timeout. (SPEC C3)
+
+## UX
+
+- Revisit the `dry_run` confirm UX (deprioritized by the mob 2026-08-03). `dry_run` stays in
+  the code — it is how every mutating tool works — but refining it as a confirmation
+  *experience* is not current work. Includes re-checking whether true MCP elicitation becomes
+  possible if the transport constraints change (SPEC C4).
 
 ## Platform (P1+, from the product proposal)
 
 - GitHub App installation replaces the org PAT (SPEC C5, D3)
-- Entra ID (NetID) replaces Cognito client-credentials as inbound auth (SPEC C5)
+- ~~Entra ID replaces Cognito client-credentials as inbound auth (SPEC C5)~~ **done
+  2026-08-03** — pulled forward by platform-lead directive; see DECISION-20
+- Per-user (NetID) identity via the Entra **authorization-code flow** replacing the shared
+  client-credentials grant: client-credentials is app identity, not user identity, so
+  object-level authorization (security F2) still needs the user-identity step (SPEC C5)
 - AI Gateway registration of the AgentCore endpoint
 - Upgrade-bot: version-bump PRs to deployment repos when a blueprint releases (SPEC C2)
+- Strands agent pilot — parked by the mob 2026-08-03. The research concluded a rewrite is a
+  category error; the coherent build is an agent *wrapping* the MCP tool surface (~2–4 days,
+  needs an LLM at runtime). See `aidlc-docs/construction/strands-research.md`.

@@ -3,9 +3,10 @@
 # Run the checks that gate a merge. CI runs this exact script, so a green run here means a
 # green run on your PR -- there is no second code path to drift out of sync.
 #
-# uv is the only prerequisite. It fetches Python, pyyaml, cfn-lint and the builder-mcp test
-# dependencies on demand and caches them, so nothing is installed globally and there is no venv
-# to activate.
+# Two prerequisites: uv and terraform. uv fetches Python, pyyaml, cfn-lint and the
+# builder-mcp test dependencies on demand and caches them, so nothing Python is installed
+# globally and there is no venv to activate. Terraform has to be a real install -- it is a
+# single binary and there is no uv equivalent.
 
 set -euo pipefail
 
@@ -22,7 +23,20 @@ error: uv is required and was not found.
   macOS:  brew install uv
   other:  curl -LsSf https://astral.sh/uv/install.sh | sh
 
-Nothing else needs installing -- uv fetches Python, pyyaml and cfn-lint itself.
+uv fetches Python, pyyaml and cfn-lint itself.
+MSG
+  exit 127
+fi
+
+if ! command -v terraform >/dev/null 2>&1; then
+  cat >&2 <<'MSG'
+error: terraform is required and was not found.
+
+  macOS:  brew tap hashicorp/tap && brew install hashicorp/tap/terraform
+  other:  https://developer.hashicorp.com/terraform/install
+
+Needed to check the Azure/Entra modules under blueprints/*/infra/azure. CI installs it with
+hashicorp/setup-terraform, the one non-github-owned action the org policy permits.
 MSG
   exit 127
 fi
@@ -40,6 +54,7 @@ templates=$(uv run --quiet pipeline/validate_stacks.py --list)
 uvx --quiet --from "$CFN_LINT" cfn-lint --region "$REGION" -- $templates
 echo 'cfn-lint: clean'
 
+echo
 echo '==> builder-mcp tests'
 # Run from the package directory rather than with `uv run --project`: pytest resolves the
 # `testpaths` in that package's pyproject.toml against its own rootdir, and rootdir follows the
@@ -50,6 +65,36 @@ echo '==> builder-mcp tests'
   cd packages/builder-mcp
   uv run --quiet pytest -q
 )
+
+# Module list comes from the same script that enforces the pipeline mirroring, so there is one
+# definition of "a Terraform module in this repo" rather than a glob duplicated here.
+modules=$(uv run --quiet pipeline/validate_stacks.py --list-tf)
+
+if [ -z "$modules" ]; then
+  echo
+  echo '==> terraform'
+  echo 'terraform: no modules to check'
+else
+  echo
+  echo '==> terraform fmt'
+  # -recursive so a module with subdirectories is covered too. -check does not rewrite.
+  echo "$modules" | while IFS= read -r module; do
+    terraform fmt -check -recursive -no-color "$module"
+  done
+  echo 'terraform fmt: clean'
+
+  echo
+  echo '==> terraform validate'
+  # -backend=false is what makes this runnable with no AWS credentials and no state access:
+  # it skips backend initialization while still resolving providers, so a bad resource
+  # attribute or an unknown provider argument is caught here rather than after merge.
+  echo "$modules" | while IFS= read -r module; do
+    echo "  $module"
+    terraform -chdir="$module" init -backend=false -input=false -no-color >/dev/null
+    terraform -chdir="$module" validate -no-color
+  done
+  echo 'terraform validate: clean'
+fi
 
 echo
 echo 'all checks passed'

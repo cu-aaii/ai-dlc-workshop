@@ -46,8 +46,15 @@ hyp_settings.load_profile("builder-mcp-pbt")
 # Strategies (PBT-07: domain generators, centralized and reused)
 # ---------------------------------------------------------------------------
 
-# Generated straight from the grammar the tool layer enforces.
-deployment_names = st.from_regex(DEPLOYMENT_NAME_PATTERN, fullmatch=True)
+# Mirrors the grammar the tool layer enforces. DEPLOYMENT_NAME_PATTERN now carries a
+# negative lookahead (no consecutive hyphens — the '--' non-injectivity fix), which
+# st.from_regex cannot generate reliably, so build names segment-wise and confirm each
+# against the real pattern; the filter also enforces the 2-30 length bounds.
+deployment_names = (
+    st.lists(st.from_regex(r"[a-z0-9]{1,8}", fullmatch=True), min_size=1, max_size=3)
+    .map("-".join)
+    .filter(lambda s: DEPLOYMENT_NAME_PATTERN.fullmatch(s) is not None)
+)
 
 cfn_param_names = st.from_regex(r"[A-Za-z][A-Za-z0-9]{0,19}", fullmatch=True)
 semvers = st.from_regex(r"[0-9]{1,2}\.[0-9]{1,3}\.[0-9]{1,3}", fullmatch=True)
@@ -249,8 +256,10 @@ def test_insert_two_distinct_deployments_composes(name_a, name_b, overrides):
     blocks restores the original file."""
     assume(_fresh_in_pipeline(name_a) and _fresh_in_pipeline(name_b))
     assume(name_a != name_b)
-    # pascal_case is not injective ('a-a' and 'a--a' both map to 'AA'); colliding pairs
-    # are rejected as duplicates by design, so restrict to distinct action names here.
+    # The '--' collision ('a-a' vs 'a--a') is now rejected by DEPLOYMENT_NAME_PATTERN
+    # itself, but pascal_case is still not injective for digit-initial segments
+    # ('a-1b' and 'a1b' both map to 'A1b'); colliding pairs are rejected as duplicates
+    # by design, so restrict to distinct action names here.
     assume(_action_name(name_a) != _action_name(name_b))
     block_a, stack_a = _render(name_a, overrides)
     block_b, stack_b = _render(name_b, overrides)

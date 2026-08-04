@@ -17,14 +17,28 @@ blueprints/<name>/
 └── src/               application code, if the blueprint ships any
 ```
 
-`skills/`, `docs/` and `tests/` join them as blueprints get real. Everything a blueprint needs
-stays inside its own directory, with one exception: container images live as named targets in the
-repo-root `Dockerfile`, because `pipeline/codebuild.yml` builds with the repo root as context.
+Later blueprints add `src/`, `skills/`, `docs/`, and `tests/` alongside `infra/`. Everything a
+blueprint needs stays inside its own directory — including its container image, which is a
+`Dockerfile` with a named target here rather than at the repo root; the Build stage action sets
+`CONTAINER_CONTEXT` to this directory.
 
-| Blueprint | State |
-|---|---|
-| `hello-world` | Fully deploys. Proves the pipeline and the tagging convention, and is the reference for every convention below. |
-| `course-chatbot` | **Scaffold — deploys nothing.** Lambda handler and READMEs only: no template, no image target, no registry entry, no pipeline action, and no manifest. Tracks B, C and D. |
+`infra/azure/` holds Terraform, for Azure/Entra resources only — CloudFormation cannot reach an
+Entra tenant, and Terraform is not used for anything with an AWS resource type. A blueprint may
+have either directory or both. See "Adding a Terraform module" in `pipeline/README.md`.
+
+**A blueprint without a `blueprint.yaml` is invisible to the Builder.** `blueprint_search` loads
+the catalog by globbing `blueprints/*/blueprint.yaml`, so a blueprint that deploys perfectly well
+but has no manifest is one no builder can ever be offered. That is correct for a scaffold and
+wrong for anything finished — the "Manifest" column below is the catalog, not a formality.
+
+| Blueprint | Manifest | State |
+|---|---|---|
+| `hello-world` | yes | Fully deploys. Proves the pipeline and the tagging convention, and is the reference for every convention below. |
+| `notify-topic` | yes | Fully deploys. One SNS topic with an optional email subscription — the simplest "tell me when X happens" channel, with no compute. |
+| `knowledgebase` | yes | Bedrock managed knowledge base over an existing S3 document bucket. Verifies its own ingestion at deploy time, so a green deploy is the acceptance test. SharePoint and web sources pinned. |
+| `entra-probe` | no | Fully deploys. Proves the Terraform-from-CodeBuild path reaches the Entra tenant. Terraform only — no AWS resources, so there is no CloudFormation template to advertise. |
+| `tiny-chatbot` | yes | Registered `deployed_by: manual` and parked. Flipped to `pipeline` in the PR that wires its Build stage action. |
+| `course-chatbot` | **no, on purpose** | **Scaffold — deploys nothing.** Lambda handler and READMEs only: no template, no image target, no registry entry, no pipeline action. Withheld from the catalog until its template exists, so the Builder cannot offer a blueprint that can't deploy. Tracks C and D. |
 
 ## Required of every blueprint
 
@@ -36,6 +50,11 @@ makes it invisible in the demo.
 Owner and deployment id vary per deployment and arrive as stack parameters. Blueprint name
 and version are properties of the template itself: hardcode the name, and bump the version
 default in the same PR that changes the blueprint.
+
+One forced exception, in Terraform only: Entra directory objects have no key/value tag field.
+Graph's `application` type takes `tags` as a flat list of strings, so the same four values are
+encoded as `"cornell:owner=..."` entries. Still greppable, still required — just the only shape
+the API offers. See `entra-probe/README.md`.
 
 **Registered in `pipeline/stacks.yml`, and wired to an action in `pipeline/pipeline.yml`.**
 Unregistered templates are not linted by PR checks and PR checks fail on finding one. A

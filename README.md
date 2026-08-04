@@ -25,14 +25,20 @@ A monorepo: one deploy path, a deploy surface, and one package per component.
 ```
 blueprints/                 THE DEPLOY SURFACE — one directory per blueprint
   hello-world/                trivial tagged stack; proves the pipeline, and the demo floor
+  notify-topic/               one SNS topic, optional email subscription; no compute
+  knowledgebase/              Bedrock managed knowledge base; verifies its own ingestion
+  entra-probe/                one Entra app registration; proves the Terraform path
+  tiny-chatbot/               canned-response Lambda behind a Function URL; parked
   course-chatbot/             the workshop MVP — scaffold only, deploys nothing yet
 packages/                   components, one package each
   builder-mcp/                the Cornell Builder MCP server (track A)
+    Dockerfile                its image — per component, named target, no root Dockerfile
 pipeline/                   the deploy path
-  pipeline.yml                CodePipeline / CodeBuild / ECR / IAM
+  pipeline.yml                CodePipeline / CodeBuild / ECR / IAM / TF state / Azure secret
   stacks.yml                  registry of every CloudFormation template in the repo
-  validate_stacks.py          enforces registry ↔ filesystem ↔ pipeline ↔ manifest agreement
+  validate_stacks.py          enforces registry ↔ filesystem ↔ pipeline ↔ manifest ↔ TF agreement
   codebuild.yml               container image buildspec
+  terraform.yml               Azure/Entra Terraform buildspec (wired to the Terraform stage)
 bootstrap/                  account baseline — deployed BY HAND, once per account
   account-bootstrap.yml       deploy role, artifact bucket, GitHub connection
 observability/              seeing what's running (track E) — scaffold only
@@ -40,7 +46,6 @@ docs/
   aidlc-rules/                the AI-DLC methodology — vendored from awslabs, do not edit
   aidlc/                      how things here were built — a record, not a backlog
   decisions/                  one file per decision made on purpose
-Dockerfile                  every container image, one target per component
 tools/check                 the checks that gate a merge; CI runs this exact script
 .github/workflows/
   pr-checks.yml               runs tools/check. No AWS calls, no credentials.
@@ -105,7 +110,12 @@ approved PR merged to main
   └─ Source ............ webhook fires within seconds (DetectChanges on the connection)
   └─ PipelineDeploy .... the pipeline deploys itself, so pipeline changes land on merge too
   └─ BlueprintDeploy ... one CloudFormation action per blueprint stack
+  └─ Terraform ......... one CodeBuild action per Azure/Entra module; plan, then apply
 ```
+
+AWS resources are CloudFormation. Terraform exists only because CloudFormation cannot reach an
+Entra tenant, and it **applies unattended** — a merge touching `blueprints/*/infra/azure/`
+reaches the tenant with no human in the loop.
 
 `Environment` is the branch name and the Source stage tracks the branch of that name, so
 `Environment=main` is what makes "merges to main deploy". A `test` branch deployed with
@@ -123,14 +133,20 @@ approved PR merged to main
 
 Enforced by branch protection, not convention:
 
-- Pull request required; direct pushes rejected, **including for admins**
-- One approving review required
+- Pull request required; direct pushes rejected
+- **Zero approving reviews required** — you merge your own PR
+- Only members of the `ai-dlc-workshop` GitHub team may merge
 - The `validate` check must pass
-- Stale approvals dismissed when new commits are pushed
 - Force pushes and branch deletion blocked
+- Repo admins can bypass (`enforce_admins` is off)
 
-Long-term this human approval gate becomes an automated reviewer agent. It is deliberately a
-human for this workshop.
+The one-approving-review rule was dropped during the workshop: requiring a second person meant
+nobody could merge their own work, which stalled attendees. The trade is real — with zero
+approvals, `validate` is the only automated gate between a branch and a deploy into the shared
+account, and the `Terraform` stage applies to the Azure tenant unattended. Restore the review
+requirement after the workshop.
+
+Long-term the approval gate becomes an automated reviewer agent.
 
 > Branch protection is why this repo is public. `cu-aaii` is on the GitHub Free plan, where
 > branch protection and rulesets are unavailable on private repositories — the API returns
@@ -152,8 +168,9 @@ Three steps, in order. Only the first two are ever done by hand.
 
 ## PR checks
 
-The stack-registry check, `cfn-lint`, and the `builder-mcp` test suite. Lint, validate and unit
-tests only — no AWS calls, no credentials, so they come back in about a minute.
+The stack-and-module registry check, `cfn-lint`, the `builder-mcp` test suite, and
+`terraform fmt`/`validate`. Lint, validate and unit tests only — no AWS calls, no credentials, no
+Terraform backend access, so they come back in about a minute.
 
 Run them before you push:
 
@@ -163,14 +180,20 @@ tools/check
 
 CI runs that exact script, so green locally means green on your PR.
 
-**`uv` is the only prerequisite.** It fetches Python, pyyaml, cfn-lint and the `builder-mcp` test
-dependencies on demand at pinned versions, so there is nothing to install globally and no venv to
-activate:
+**Two prerequisites: `uv` and `terraform`.** uv fetches Python, pyyaml, cfn-lint and the
+`builder-mcp` test dependencies on demand at pinned versions, so there is nothing Python to install
+globally and no venv to activate. Terraform is a single binary with no uv equivalent:
 
 ```sh
 brew install uv                                    # macOS
 curl -LsSf https://astral.sh/uv/install.sh | sh    # everything else
+
+brew install hashicorp/tap/terraform               # macOS
+# other: https://developer.hashicorp.com/terraform/install
 ```
+
+CI installs Terraform with `hashicorp/setup-terraform` — the one non-github-owned action the org
+allowed-actions policy permits, which is why these checks can run there at all.
 
 ## GitHub MCP server
 
@@ -229,16 +252,22 @@ one would advertise a blueprint whose deployment PR cannot deploy.
 be deployed by hand for debugging, not to be the real values.
 
 **One package per component, under `packages/`.** Code that isn't a blueprint and isn't the deploy
-path goes there, self-contained with its own `pyproject.toml` and lockfile. Container images stay
-in the one root `Dockerfile` as named targets, because `pipeline/codebuild.yml` builds
-`docker build $CODEBUILD_SRC_DIR --target $CONTAINER_TARGET` — repo-root context, default
-filename, so per-package Dockerfiles are not an option.
+path goes there, self-contained with its own `pyproject.toml` and lockfile — including its
+`Dockerfile`. `pipeline/codebuild.yml` builds
+`docker build $CODEBUILD_SRC_DIR/${CONTAINER_CONTEXT:-.} --target $CONTAINER_TARGET`, so the Build
+stage action names the component's directory as the context and its named target. Keep the two in
+step with where the component lives: a stale `CONTAINER_CONTEXT` fails the build on a missing path
+and says nothing about the move that caused it.
 
 ## Not here yet
 
-The deploy path works and the Cornell Builder is written. Still to come, per the workshop spec:
-the `course-chatbot` blueprint itself — `blueprints/course-chatbot/` has the Lambda handler and a
+The deploy path works, the Cornell Builder is written, and the Terraform stage and the managed
+Bedrock Knowledge Base have both landed. Still to come, per the workshop spec: the
+`course-chatbot` blueprint itself — `blueprints/course-chatbot/` has the Lambda handler and a
 README of what's missing, but no template, no image target and no pipeline action, so it deploys
-nothing — the managed Bedrock Knowledge Base behind it, the Terraform stage for Azure/Entra
-resources, and `observability/`. Each has a scaffolded directory with a README saying what goes in
-it and how to wire it.
+nothing — its Teams bot and Strands agent, and `observability/`. Each has a scaffolded directory
+with a README saying what goes in it and how to wire it.
+
+The Terraform stage exists but only reaches **Entra**. Managing Azure *resources* with `azurerm`
+additionally needs an Azure subscription in the tenant and an Azure RBAC role assignment for the
+service principal — a Global Administrator directory role grants neither.

@@ -70,7 +70,8 @@ Stories no tool serves today (full gap detail + demo-blocking flags in the
   have?"). Would be a new `deployment_list` tool — a C3 contract change. Not
   demo-blocking → logged.
 - **ST-20 — Restart cap** (Platform Operator). Agreed future guardrail on
-  `deployment_restart`; needs state the stateless server doesn't keep. Not
+  `deployment_restart` — cap of 3 per window plus a 30-minute time box per restart
+  (mob, 2026-08-03); needs state the stateless server doesn't keep. Not
   demo-blocking → logged.
 
 Demo-blocking gaps are operational, not tool gaps: GAP-D1 (org-scoped GitHub

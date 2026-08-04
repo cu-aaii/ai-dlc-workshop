@@ -6,10 +6,11 @@ from blueprint subdirectories rather than one application.
 
 | File | What it is |
 |---|---|
-| `pipeline.yml` | CodePipeline, CodeBuild project, ECR repository and the IAM roles for all of it. |
+| `pipeline.yml` | CodePipeline, both CodeBuild projects, ECR repository, Terraform state bucket, Azure credentials secret, and the IAM roles for all of it. |
 | `stacks.yml` | Registry of every CloudFormation template in the repo. |
-| `validate_stacks.py` | Enforces that `stacks.yml`, the filesystem and `pipeline.yml` agree. Run by PR checks. |
+| `validate_stacks.py` | Enforces that `stacks.yml`, the filesystem and `pipeline.yml` agree — for CloudFormation templates and Terraform modules both. Run by PR checks. |
 | `codebuild.yml` | Buildspec for container image builds. Ready, not yet wired to a stage. |
+| `terraform.yml` | Buildspec for Azure/Entra Terraform. Wired to the `Terraform` stage. |
 
 ## How a merge becomes a deployment
 
@@ -21,6 +22,8 @@ merge to main
   │                      (so a PR that edits the pipeline takes effect on merge;
   │                       RestartExecutionOnUpdate reruns from the top under the new definition)
   └─ BlueprintDeploy ... one CloudFormation action per blueprint stack
+  └─ Terraform ......... one CodeBuild action per Azure/Entra module; plan, then apply
+                         the saved plan. No approval action — applies unattended.
 ```
 
 `Environment` is the branch name, and the Source stage tracks the branch of that name. So
@@ -83,14 +86,57 @@ that no action deploys, and an action whose template is unregistered. If a templ
 should not be pipeline-deployed, register it `deployed_by: manual` and say why in its
 `description`.
 
+## Adding a Terraform module
+
+Terraform is for **Azure/Entra only** — anything with an AWS resource type is CloudFormation.
+`TerraformProject` and `terraform.yml` are generic, so adding a module does not mean adding a
+CodeBuild project.
+
+1. Write the module under `blueprints/<name>/infra/azure/`. Declare `backend "s3" {}` empty —
+   values arrive from `-backend-config`. Take credentials from the provider's native `ARM_*`
+   environment variables, never as a Terraform variable, so nothing lands in the plan or in state.
+2. Commit `.terraform.lock.hcl` (`terraform init -backend=false` generates it). It is *not*
+   gitignored, on purpose — it is what pins provider versions across a laptop, CI and CodeBuild.
+3. Add a `Terraform` stage action modelled on `EntraProbeTerraform`, setting `TF_WORKING_DIR` to
+   the module directory and `TF_STATE_KEY` to a key nothing else uses.
+
+Nothing goes in `stacks.yml` — that registry is for CloudFormation templates. The mirroring is
+still enforced: `validate_stacks.py` cross-checks module directories against `TF_WORKING_DIR`
+values in both directions, so a module with no action fails PR checks rather than silently
+applying nothing, and an action naming a missing directory fails before it can fail after merge.
+
+### One-time: the credential
+
+The `Terraform` stage cannot succeed until the real credential is injected. `pipeline.yml`
+creates the secret with a *placeholder* — `GenerateSecretString`, never `SecretString`, because
+`SecretString` would be reapplied on every merge and overwrite the live value. So the first run
+after the secret is created fails on authentication, expectedly. Then, once:
+
+```sh
+umask 077 && cat > /tmp/az.json <<'EOF'
+{"tenant_id":"...","client_id":"...","client_secret":"..."}
+EOF
+aws secretsmanager put-secret-value \
+  --profile ai-dlc-workshop --region us-east-1 \
+  --secret-id aidlc/main/azure/terraform-credentials \
+  --secret-string file:///tmp/az.json
+rm -f /tmp/az.json
+```
+
+`file://` rather than an inline string keeps the value out of shell history and out of `ps`.
+Rotating the credential later is this command again and nothing else — no code references it.
+
 ## Adding a container image build
 
 `ContainerBuildProject`, `ContainerRepository` and `codebuild.yml` are defined and ready but
 no stage invokes them, because `hello-world` is pure CloudFormation with nothing to build.
 When a blueprint needs a Lambda image:
 
-1. Add a `Dockerfile` with a named target for the component.
+1. Add a `Dockerfile` in the component's own directory (e.g. `builder-mcp/Dockerfile`)
+   with a named target for the component. The build context is that directory, so COPY
+   paths are relative to it.
 2. Add a `Build` stage action before `BlueprintDeploy` that runs `ContainerBuildProject` with
-   `CONTAINER_TARGET` and `DATE_TAG` set (see the reference pattern in `codebuild.yml`).
+   `CONTAINER_TARGET`, `CONTAINER_CONTEXT` (the component directory containing the
+   Dockerfile) and `DATE_TAG` set (see the reference pattern in `codebuild.yml`).
 3. Pass `#{<Namespace>.CONTAINER_DIGEST}` into the blueprint's CloudFormation action and
    deploy by digest, not by tag.

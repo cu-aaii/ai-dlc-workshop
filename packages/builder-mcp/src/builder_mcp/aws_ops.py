@@ -11,12 +11,16 @@ without AWS credentials shows a clear message rather than a stack trace (NFR7).
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 from .config import Settings
+from .validation import safe_error
+
+logger = logging.getLogger(__name__)
 
 REQUIRED_TAGS = (
     "cornell:owner",
@@ -33,7 +37,10 @@ def _client(settings: Settings, service: str):
 
 
 def _friendly(error: Exception, doing: str) -> dict[str, Any]:
-    return {"error": f"AWS call failed while {doing}: {error.__class__.__name__}: {error}"}
+    # SECURITY-09: the caller gets class + redacted one-liner; the detail goes to the
+    # server-side log where the platform team can read it.
+    logger.debug("AWS call failed while %s", doing, exc_info=True)
+    return safe_error(error, f"AWS call while {doing}")
 
 
 def stack_status(settings: Settings, stack_name: str) -> dict[str, Any]:
