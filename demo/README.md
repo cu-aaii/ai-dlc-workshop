@@ -82,8 +82,20 @@ Environment variables, no editing required:
 | `DEMO_PAUSE` | `2` | Seconds between beats. `--fast` sets `0`. |
 | `DEMO_QUESTION` | `What is the late homework policy?` | The question scene 5 asks. |
 | `DEMO_ENVIRONMENT` | `main` | Which environment's SSM parameters scene 5 reads. |
-| `DEMO_MODEL_ARN` | Claude 3.5 Sonnet | Model `retrieve-and-generate` answers with. |
+| `DEMO_SHOW_SERVER_LOG` | unset | Set it to see the MCP server's stderr, for debugging. |
 | `NO_COLOR` | unset | Set it to drop the ANSI colour. |
 
 Scene 5's question has to be answerable from the corpus in `IngestionBucketName`, for the same
 reason `SmokeQuery` does — see `blueprints/knowledgebase/docs/warnings.md`.
+
+Scene 5 uses `bedrock-agent-runtime retrieve`, and there is no model parameter to set, because
+**`RetrieveAndGenerate` is not supported on a managed knowledge base** — it fails with *"This
+operation is not supported for managed knowledge bases."* Retrieval returns passages; turning
+them into prose is the consuming chatbot's job. The blueprint's own deploy-time verifier uses
+`retrieve` for the same reason.
+
+## Verified against the live account
+
+Run on 2026-08-04 against `890349359349` / `us-east-1`, with `AWS_PROFILE=ai-dlc-workshop`:
+all five scenes, including scene 5 reading knowledge base `I7JT3U0RH7` out of SSM and retrieving
+a real passage from the CS1112 syllabus.
