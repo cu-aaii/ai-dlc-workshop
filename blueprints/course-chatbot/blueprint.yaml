@@ -11,11 +11,18 @@ metadata:
   maintainer: ai-sei@cornell.edu
   maturity: experimental
 summary: >-
-  A Microsoft Teams chatbot that answers students' questions about a course. Bot Framework
-  activities arrive at a public Lambda Function URL, are validated against the Bot Framework
-  JWKS, answered through Cornell's LiteLLM gateway, and replied to in the chat. Internal
-  chatbots at Cornell front on Teams, so the Microsoft side is a one-time registration and
-  everything behind it runs on AWS.
+  A Microsoft Teams chatbot that answers students' questions from the course's own materials.
+  Bot Framework activities arrive at a public Lambda Function URL, are validated against the
+  Bot Framework JWKS, grounded in passages retrieved from the course knowledge base, answered
+  through Cornell's LiteLLM gateway, and replied to in the chat. It refuses rather than guessing
+  when the materials do not cover a question. Internal chatbots at Cornell front on Teams, so
+  the Microsoft side is a one-time registration and everything behind it runs on AWS.
+# REQUIRES the knowledgebase blueprint. This one resolves the knowledge base id at deploy time
+# from the SSM parameter knowledgebase publishes, which is what lets the execution role name a
+# single knowledge base ARN instead of a wildcard. So it cannot deploy into an environment where
+# knowledgebase has not deployed -- the pipeline action runs at RunOrder 2 for that reason, and a
+# missing parameter fails the deploy with a resolution error rather than shipping a chatbot with
+# nothing behind it.
 # The first phrase is the demo's opening line, verbatim. blueprint_search matches on these, so
 # they are written the way a person asks rather than the way the catalog is organised.
 matches:

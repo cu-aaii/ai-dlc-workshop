@@ -15,8 +15,11 @@ Design constraints this code is downstream of:
   Anthropic client -- ``messages.create()`` is unchanged.
 - **Always return 200, including on a rejected token.** A 4xx makes Azure Bot Service retry a
   request that can never succeed, forever.
-- **Answer only from the system prompt.** Retrieval over course materials is the Knowledge
-  Base work; this says it does not know rather than inventing a due date.
+- **Answers are grounded in retrieved course material**, from the managed knowledge base the
+  ``knowledgebase`` blueprint deploys. Retrieval uses ``Retrieve`` and nothing else: the
+  alternatives invoke a Bedrock model internally, which would move generation off the gateway.
+  When retrieval returns nothing the model is told so, and refuses rather than inventing a due
+  date -- a confident wrong answer about a real course is worse than no answer.
 - **Conversation history is not carried.** Teams hands over one activity and no history, so
   there is nothing to thread. Multi-turn arrives with AgentCore -- see below.
 
@@ -55,6 +58,10 @@ EFFORT = os.environ.get("EFFORT", "low")
 # expensive request (SECURITY-05).
 MAX_MESSAGE_CHARS = 4000
 MAX_BODY_BYTES = 256 * 1024
+
+# Bedrock caps a retrieval query at 10,000 characters and rejects longer ones outright.
+MAX_QUERY_CHARS = 10_000
+RETRIEVAL_RESULTS = 5
 
 GENERIC_FAILURE = (
     "Sorry, something went wrong answering that. If you report it, quote this reference: {ref}"
@@ -96,6 +103,7 @@ class _Config:
         self.bot_tenant_id = os.environ.get("BOT_TENANT_ID", "")
         self.deployment_id = os.environ.get("DEPLOYMENT_ID", "unknown")
         self.gateway_base_url = os.environ.get("GATEWAY_BASE_URL", "")
+        self.knowledge_base_id = os.environ.get("KNOWLEDGE_BASE_ID", "")
         self.course_name = _param(os.environ.get("COURSE_NAME_PARAM", ""), "this course")
         self.model_id = _param(os.environ.get("MODEL_ID_PARAM", ""), "claude-haiku-4-5")
         # `or`, not a .get default: the stack passes GREETING_TEXT through unconditionally, so
@@ -129,17 +137,19 @@ DEFAULT_SYSTEM_PROMPT = """You are a teaching assistant for {course} at Cornell 
 Answer students' questions about the course clearly and directly, at the level of someone
 taking it for the first time. Lead with the answer, then the reasoning.
 
-You do not have access to this course's syllabus, assignments, grades, or any other course
-materials beyond what appears in these instructions. When a question depends on specifics you
-were not given -- a due date, what is on an exam, an individual student's standing -- say you
-don't have that and point the student at the course staff or the course site. Never guess at a
-date, a policy, or a grade.
+You are given passages from the course's own materials with each question. Answer from those
+passages, and quote a specific figure or date only when a passage states it. When the passages
+do not cover what was asked -- an individual student's standing, something not in the materials
+-- say you don't have that and point the student at the course staff or the course site. Never
+guess at a date, a policy, or a grade: a confident wrong answer about a real course is worse
+than no answer.
 
 Keep responses short. You are answering in a Teams chat, not writing a document. Skip preamble
 and do not restate the question.
 
 You cannot change grades, grant extensions, or make policy exceptions. Refer those to the
 course staff."""
+
 
 class _Runtime:
     """Config, secrets and clients, resolved on first invocation rather than at import.
@@ -160,6 +170,8 @@ class _Runtime:
                 client_secret=_secret(os.environ.get("BOT_CLIENT_SECRET_ARN", "")),
             )
         )
+        # Retrieval only -- this client never generates. See _retrieve.
+        self.knowledge = boto3.client("bedrock-agent-runtime")
         # The gateway, not Bedrock. Anthropic-compatible, so only the construction differs.
         self.model = Anthropic(
             base_url=self.config.gateway_base_url,
@@ -177,13 +189,71 @@ def _runtime() -> _Runtime:
     return _RUNTIME
 
 
+def _retrieve(rt: _Runtime, question: str) -> list[str]:
+    """Fetch course-material passages relevant to the question.
+
+    **`Retrieve`, never `RetrieveAndGenerate` or `AgenticRetrieveStream.`** Those two invoke a
+    Bedrock foundation model internally, which would put generation outside Cornell's LiteLLM
+    gateway and break the routing mandate. `Retrieve` makes no model call: it returns passages,
+    and every generated token still comes from the gateway.
+
+    Best effort by design. A knowledge base that is slow or unreachable should cost the student
+    a grounded answer, not their answer -- the model is told when it has no passages, and refuses
+    on that basis rather than inventing a due date.
+    """
+    if not rt.config.knowledge_base_id:
+        return []
+    try:
+        response = rt.knowledge.retrieve(
+            knowledgeBaseId=rt.config.knowledge_base_id,
+            # Hard service cap is 10,000 characters. Truncating deliberately here beats a
+            # ValidationException on a long question.
+            retrievalQuery={"text": question[:MAX_QUERY_CHARS]},
+            retrievalConfiguration={
+                "vectorSearchConfiguration": {"numberOfResults": RETRIEVAL_RESULTS}
+            },
+        )
+    except Exception as exc:
+        LOG.error("retrieval failed, answering ungrounded: %s", exc)
+        return []
+    passages = [
+        text
+        for result in response.get("retrievalResults", [])
+        if (text := (result.get("content") or {}).get("text", "").strip())
+    ]
+    LOG.info("retrieved %d passage(s)", len(passages))
+    return passages
+
+
 def _ask(rt: _Runtime, question: str) -> str:
-    """Ask the model one question. **This is the seam AgentCore replaces** -- see the module
-    docstring. Narrow in, narrow out, deliberately."""
+    """Answer one question, grounded in the course material.
+
+    **This is the seam AgentCore replaces** -- see the module docstring. Retrieval lives inside
+    it rather than in the caller on purpose: an agent should own its own grounding, so when this
+    becomes an `invoke_agent_runtime` call both the retrieval and the model call move into the
+    agent together and the front door stays a front door.
+    """
+    passages = _retrieve(rt, question)
+    if passages:
+        context = "\n\n".join(
+            f"<passage {i}>\n{text}\n</passage {i}>" for i, text in enumerate(passages, 1)
+        )
+        grounding = (
+            "Course material relevant to this question is below. Answer using ONLY these "
+            "passages. If they do not contain the answer, say so and point the student at the "
+            f"course staff -- do not fall back on general knowledge.\n\n{context}"
+        )
+    else:
+        grounding = (
+            "No course material was retrieved for this question. Say you don't have that "
+            "information and point the student at the course staff or the course site. Do not "
+            "guess."
+        )
+
     reply = rt.model.messages.create(
         model=rt.config.model_id,
         max_tokens=MAX_TOKENS,
-        system=rt.config.system_prompt,
+        system=f"{rt.config.system_prompt}\n\n{grounding}",
         messages=[{"role": "user", "content": question}],
         # effort rides in extra_body so this works on any SDK version, typed or not. Sampling
         # parameters (temperature, top_p, top_k) are rejected by Claude 5 models -- steer with

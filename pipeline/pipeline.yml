@@ -861,7 +861,10 @@ Resources:
 
             - Name: 'CourseChatbotCloudFormation'
               Namespace: 'CourseChatbotCloudFormation'
-              RunOrder: 1
+              # RunOrder 2, not 1: this stack resolves the knowledge base id from the SSM
+              # parameter KnowledgeBaseCloudFormation writes, so it has to deploy after it
+              # rather than alongside it. Everything else in this stage is RunOrder 1.
+              RunOrder: 2
               InputArtifacts:
                 - Name: 'GitRepositoryArtifact'
               ActionTypeId:
@@ -892,6 +895,7 @@ Resources:
                   "ModelId": "claude-haiku-4-5",
                   "CourseName": "this course",
                   "GreetingText": "",
+                  "KnowledgeBaseIdParameter": "/${Application}/${Environment}/knowledgebase/knowledge-base-id",
                   "SystemPromptS3Bucket": "",
                   "SystemPromptS3Key": "",
                   "LogRetentionDays": "90",

@@ -113,6 +113,29 @@ Parameters:
     Description: 'Sent when a human joins the conversation. Empty falls back to a greeting derived from CourseName.'
     Type: 'String'
 
+  # Resolved at DEPLOY time from the id the knowledgebase blueprint publishes, rather than read
+  # at runtime. The value passed by the pipeline is the SSM parameter *name*; CloudFormation
+  # substitutes the parameter's value before the stack is created.
+  #
+  # Deploy-time resolution is what makes least privilege possible: the execution role's
+  # bedrock:Retrieve grant below names this one knowledge base's ARN. Reading the id at runtime
+  # instead would leave the role needing knowledge-base/* -- a wildcard resource, which
+  # SECURITY-06 forbids.
+  #
+  # It also sidesteps the defect that makes builder-supplied `inputs` arrive empty
+  # (#15 finding 2): the pipeline passes a path derived from Application and Environment, not a
+  # value a builder had to know.
+  #
+  # Consequence, stated plainly: this stack cannot deploy unless the knowledgebase blueprint has
+  # deployed and written that parameter. The CourseChatbotCloudFormation action runs at RunOrder
+  # 2 for exactly that reason. A missing parameter fails the deploy with a resolution error,
+  # which is the right failure -- the alternative is a bot that answers about a real Cornell
+  # course with nothing behind it.
+  KnowledgeBaseIdParameter:
+    Default: '/aidlc/main/knowledgebase/knowledge-base-id'
+    Description: 'Name of the SSM parameter holding the knowledge base id, published by the knowledgebase blueprint.'
+    Type: 'AWS::SSM::Parameter::Value<String>'
+
   LogRetentionDays:
     Default: 90
     AllowedValues: [90, 180, 365]
@@ -279,6 +302,18 @@ Resources:
               - Effect: 'Allow'
                 Action: 'ssm:GetParameter'
                 Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Application}/${Environment}/${DeploymentName}/*'
+        # Retrieve, and ONLY Retrieve. Not RetrieveAndGenerate and not
+        # AgenticRetrieveStream: those invoke a Bedrock foundation model internally, which would
+        # put generation outside Cornell's LiteLLM gateway and break the Q26 routing mandate.
+        # Retrieve makes no model call at all -- it returns passages, and every token of
+        # generation still goes through the gateway.
+        - PolicyName: 'knowledge-base'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: 'bedrock:Retrieve'
+                Resource: !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${KnowledgeBaseIdParameter}'
       Tags:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
@@ -343,6 +378,7 @@ Resources:
           GATEWAY_BASE_URL: 'https://api.ai.it.cornell.edu'
           COURSE_NAME_PARAM: !Ref 'CourseNameParameter'
           MODEL_ID_PARAM: !Ref 'ModelIdParameter'
+          KNOWLEDGE_BASE_ID: !Ref 'KnowledgeBaseIdParameter'
           SYSTEM_PROMPT_S3_BUCKET: !Ref 'SystemPromptS3Bucket'
           SYSTEM_PROMPT_S3_KEY: !Ref 'SystemPromptS3Key'
           DEPLOYMENT_ID: !Sub '${Application}-${Environment}-${DeploymentName}'
