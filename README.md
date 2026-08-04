@@ -30,6 +30,7 @@ blueprints/                 THE DEPLOY SURFACE — one directory per blueprint
   entra-probe/                one Entra app registration; proves the Terraform path
   tiny-chatbot/               canned-response Lambda behind a Function URL; parked
   aisei-site/                 an existing Angular + Hono app as a Lambda container; parked
+  teams-bot/                  Microsoft Teams chatbot; on the deploy path, needs onboarding
   course-chatbot/             the workshop MVP — scaffold only, deploys nothing yet
 packages/                   components, one package each
   builder-mcp/                the Cornell Builder MCP server (track A)
@@ -174,9 +175,9 @@ Three steps, in order. Only the first two are ever done by hand.
 
 ## PR checks
 
-The stack-and-module registry check, `cfn-lint`, the `builder-mcp` test suite, and
-`terraform fmt`/`validate`. Lint, validate and unit tests only — no AWS calls, no credentials, no
-Terraform backend access, so they come back in about a minute.
+The stack-and-module registry check, `cfn-lint`, the `builder-mcp` and `teams-bot` test suites,
+and `terraform fmt`/`validate`. Lint, validate and unit tests only — no AWS calls, no credentials,
+no Terraform backend access, so they come back in about a minute.
 
 Run them before you push:
 
@@ -186,9 +187,9 @@ tools/check
 
 CI runs that exact script, so green locally means green on your PR.
 
-**Two prerequisites: `uv` and `terraform`.** uv fetches Python, pyyaml, cfn-lint and the
-`builder-mcp` test dependencies on demand at pinned versions, so there is nothing Python to install
-globally and no venv to activate. Terraform is a single binary with no uv equivalent:
+**Two prerequisites: `uv` and `terraform`.** uv fetches Python, pyyaml, cfn-lint and both test
+suites' dependencies on demand at pinned versions, so there is nothing Python to install globally
+and no venv to activate. Terraform is a single binary with no uv equivalent:
 
 ```sh
 brew install uv                                    # macOS
@@ -300,12 +301,30 @@ Details in `blueprints/knowledgebase/README.md`.
 
 ## Not here yet
 
-The deploy path works, the Cornell Builder is written, and the Terraform stage and the managed
-Bedrock Knowledge Base have both landed. Still to come, per the workshop spec: the
-`course-chatbot` blueprint itself — `blueprints/course-chatbot/` has the Lambda handler and a
-README of what's missing, but no template, no image target and no pipeline action, so it deploys
-nothing — its Teams bot and Strands agent, and `observability/`. Each has a scaffolded directory
+The deploy path works, the Cornell Builder is written, and the Terraform stage, the managed
+Bedrock Knowledge Base and the `teams-bot` chatbot have all landed. Still to come, per the
+workshop spec: the `course-chatbot` blueprint itself — `blueprints/course-chatbot/` has the Lambda
+handler and a README of what's missing, but no template, no image target and no pipeline action,
+so it deploys nothing — its Strands agent, and `observability/`. Each has a scaffolded directory
 with a README saying what goes in it and how to wire it.
+
+`teams-bot` is the catalog's Teams-fronted chatbot, and it is fully wired: template registered,
+image built by the Build stage on arm64, one CloudFormation action passing every parameter. Being
+wired is not the same as answering, and the gap between them looks like a bug rather than
+onboarding. Two things are done by hand, once:
+
+- **Inject the two secret values.** CloudFormation creates both secrets with
+  `GenerateSecretString` placeholders, because a template that carried `SecretString` would reset
+  the live credential on every pipeline self-deploy. So the stack reaches `CREATE_COMPLETE`
+  authenticating with a random string, and CloudWatch shows `401`.
+- **Point a bot registration at the stack's `FunctionUrl` output** (`az bot update --endpoint`).
+  Nothing reaches the Lambda from Teams until that exists.
+
+One more thing that reads as a failure and isn't: a merge that *adds* a Build stage action updates
+the pipeline but does not run the new action, because an execution uses the structure that was in
+place when it started. The first execution after such a merge reports every stage green and
+deploys nothing. Start a second one. The runbook for all of this is in
+`blueprints/teams-bot/README.md`.
 
 The Terraform stage exists but only reaches **Entra**. Managing Azure *resources* with `azurerm`
 additionally needs an Azure subscription in the tenant and an Azure RBAC role assignment for the

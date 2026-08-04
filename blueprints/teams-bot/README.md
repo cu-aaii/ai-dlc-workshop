@@ -110,7 +110,7 @@ Recorded rather than left to be discovered. Detail in
 
 | Gap | |
 | --- | --- |
-| **FR-9 violated** | The handler works, then returns 200 — it cannot acknowledge first, because that is what the withdrawn worker Lambda existed for. Fine inside the 10–15s Teams budget, `504:GatewayTimeout` outside it |
+| **FR-9 violated** | The handler works, then returns 200 — it cannot acknowledge first, because that is what the withdrawn worker Lambda existed for. The model call is now bounded (12s, no retries), so a slow gateway becomes a reported failure inside the 10–15s Teams budget rather than a `504` the user cannot report — but the acknowledgement still comes last |
 | **No idempotency guard** | An Azure retry can produce a duplicate reply |
 | **No delivery seam** | Group and channel scopes would change the reply path rather than adding a strategy |
 | **No conversation memory** | Every message is single-turn, and Teams supplies no history to compensate |
