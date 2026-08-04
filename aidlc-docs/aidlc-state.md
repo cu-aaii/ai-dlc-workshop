@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: INCEPTION - Units Generation Part 1 (plan + 7 questions issued, awaiting answers)
+- **Current Stage**: INCEPTION - Units Generation complete, awaiting approval (last INCEPTION stage)
 - **Application Design Approved**: 2026-08-03 — user response "approved"
 - **Execution Plan Approved**: 2026-08-03 — user response "Approve and Continue"
 - **User Stories Approved**: 2026-08-03 — user response "approve stories"
@@ -110,7 +110,7 @@ its `pipeline.yml` on the container build; flagged for its owner, not edited her
 - [x] User Stories
 - [x] Workflow Planning
 - [x] Application Design
-- [ ] Units Generation — EXECUTE (Part 1 planning in progress)
+- [x] Units Generation (2 units: U-01 Domain Core, U-02 Dashboard Platform)
 
 ### 🟢 CONSTRUCTION PHASE
 - [ ] Functional Design — EXECUTE (PBT-01 identifies properties here)
@@ -153,14 +153,35 @@ See `inception/plans/application-design-plan.md` Part A2 (Q1–Q8) and Part A3 (
 
 ## Current Status
 - **Lifecycle Phase**: INCEPTION
-- **Current Stage**: Units Generation Part 1 (Planning) — Steps 1-5 complete. Application Design is
-  complete and approved; all five mandatory artifacts are in `inception/application-design/`
-  (`components.md`, `component-methods.md`, `services.md`, `component-dependency.md`,
-  `application-design.md`)
-- **Next Stage**: Units Generation Part 2 (Generation), after the plan is approved
-- **Status**: Awaiting answers in `inception/plans/unit-of-work-plan.md` — **9 questions, 22
-  `[Answer]:` tags** (Q9 has four sub-tags). Amended 2026-08-03: Q6 rewritten (false premise), Q3
-  corrected (omitted `blueprint.yaml`), Q8 and Q9 added. Q1, Q2, Q4, Q5, Q7 unaffected.
+- **Current Stage**: Units Generation — Parts 1 and 2 complete (Steps 1-15). All three mandatory
+  artifacts generated in `inception/application-design/`: `unit-of-work.md`,
+  `unit-of-work-dependency.md`, `unit-of-work-story-map.md`
+- **Next Stage**: **CONSTRUCTION** — Functional Design for U-01, after units are approved
+- **Status**: Awaiting explicit user approval of the units. This is the **last INCEPTION stage**.
+
+## Units of Work (approved decisions Q1-Q9, all "A")
+See `inception/plans/unit-of-work-plan.md` Part A2 and `inception/application-design/unit-of-work.md`.
+
+| Unit | Owns | Stories | Verifiable without AWS |
+|---|---|---|---|
+| **U-01 Domain Core** | C-04 Inventory Model, C-05 Aggregation Core | US-03, US-04, US-05, US-10 (4) | **Yes, entirely** |
+| **U-02 Dashboard Platform** | C-01, C-02, C-03, C-06, C-07, C-08, C-09, both templates, `blueprint.yaml`, pipeline/registry edits | the other 13 | No |
+
+One dependency edge: U-02 imports U-01 in-process. Acyclic. U-01 is on the critical path and nothing
+blocks it. Decisions: two units, enablers assigned with spillover recorded, group-by-kind layout with an
+enforceable no-`boto3` `core/` boundary, two CloudFormation templates, depth-first construction, human
+review requested though not required, **arm64**, and `blueprint.yaml` = `internal` /
+`singleton: false` + `DeploymentName` / snapshot `derived` / cost estimated (~$10-15/mo, WAF-dominated).
+
+### Correction recorded at this stage
+**Q4 = A does not resolve `application-design.md` §6.4, and my Q4 text wrongly said it would.** The
+pipeline order is `Source → PipelineDeploy → Build → BlueprintDeploy`, and `PipelineDeploy` deploys only
+the pipeline's own stack — so a storage stack registered as a BlueprintDeploy action still deploys after
+the Build stage's `s3 sync`. Splitting the template changes which stack owns the bucket, not when it
+exists. Q4 = A stands on its independent merit (stateful buckets stay out of the stack app updates
+replace). §6.4 remains **open, owner U-02, decided at Infrastructure Design**; likely resolution is Build
+emitting the bundle as a CodePipeline artifact with a `SiteSync` action at `RunOrder: 2` inside
+BlueprintDeploy. Options tabled in `unit-of-work-plan.md` Part A2 Interaction 1.
 
 ### What Units Generation actually decides here
 This blueprint deploys as one CloudFormation stack behind one CloudFront distribution, so the

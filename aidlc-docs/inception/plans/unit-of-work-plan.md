@@ -105,7 +105,7 @@ This is the consequential question; the rest mostly follow from it. Component ID
 
 X) Other (describe after the `[Answer]:` tag)
 
-[Answer]:
+[Answer]:A
 
 ---
 
@@ -138,7 +138,7 @@ Python, containers, and now npm.
 
 X) Other (describe after the `[Answer]:` tag)
 
-[Answer]:
+[Answer]:A
 
 ---
 
@@ -183,7 +183,7 @@ requirement in the tree.
 
 X) Other (describe after the `[Answer]:` tag)
 
-[Answer]:
+[Answer]:A
 
 ---
 
@@ -219,7 +219,7 @@ before the Build stage runs, because a separate stack deployed them.
 
 X) Other (describe after the `[Answer]:` tag)
 
-[Answer]:
+[Answer]:A
 
 ---
 
@@ -241,7 +241,7 @@ X) Other (describe after the `[Answer]:` tag)
 
 X) Other (describe after the `[Answer]:` tag)
 
-[Answer]:
+[Answer]:A
 
 ---
 
@@ -279,7 +279,7 @@ every merge to `main` still deploys to the shared account mid-workshop.
 
 X) Other (describe after the `[Answer]:` tag)
 
-[Answer]:
+[Answer]:A
 
 ---
 
@@ -304,7 +304,7 @@ a home even though no one is building them now.
 
 X) Other (describe after the `[Answer]:` tag)
 
-[Answer]:
+[Answer]:A
 
 ---
 
@@ -339,7 +339,7 @@ The rebase changed that: there are now two paths with asymmetric evidence. See
 
 X) Other (describe after the `[Answer]:` tag)
 
-[Answer]:
+[Answer]:A
 
 ---
 
@@ -356,7 +356,7 @@ inventory: resource ARNs, owner NetIDs, deployment ids, and eventually cost figu
    B) `[public]` — matches hello-world; hard to justify given ARNs and NetIDs
    C) Something stricter (`[confidential]`, or a Cornell-specific term you use)
 
-   [Answer]:
+   [Answer]:A
 
 **9b — `singleton`.** hello-world sets `singleton: true` and its own comment says "**Real blueprints
 should take a `DeploymentName` parameter instead**." The approved design has **no `DeploymentName`
@@ -369,7 +369,7 @@ environment.
       correct for a dashboard *of* that environment. *Cost*: knowingly diverges from the guidance
    C) You choose
 
-   [Answer]:
+   [Answer]:A
 
 **9c — `state`.** Vocabulary is `stateless | derived | authoritative`.
    A) `derived` for the snapshot, nothing authoritative ← *recommended* — the snapshot is fully
@@ -377,7 +377,7 @@ environment.
       RTO/RPO N/A. Declaring it `derived` makes that consistent rather than merely compatible
    B) Something else (describe)
 
-   [Answer]:
+   [Answer]:A
 
 **9d — `cost`.** `baseline_monthly_usd` and `scales_with`.
    A) Estimate now from the resource set, and record it as an estimate ← *recommended*
@@ -385,7 +385,7 @@ environment.
       is a bad look, and `0` is definitely wrong — CloudFront, WAF, and two Lambdas are not free
    C) You choose
 
-   [Answer]:
+   [Answer]:A
 
 ---
 
@@ -417,49 +417,159 @@ Recorded so their absence reads as a decision rather than an omission.
 ## Part B — Execution checklist (runs after you approve)
 
 ### B1. Preconditions
-- [ ] Confirm every `[Answer]:` tag in Part A is filled — **Q1-Q9, including the four Q9 sub-tags**
-- [ ] Run the mandatory Step 7 analysis over all answers — vagueness, undefined terms, contradiction,
+- [x] Confirm every `[Answer]:` tag in Part A is filled — **Q1-Q9, including the four Q9 sub-tags**
+- [x] Run the mandatory Step 7 analysis over all answers — vagueness, undefined terms, contradiction,
       missing detail, option-merging — and raise follow-ups rather than proceeding if any is found
-- [ ] Record resolved decisions and any interactions between answers in a `Part A2` section
+- [x] Record resolved decisions and any interactions between answers in a `Part A2` section
 
 ### B2. `unit-of-work.md` (mandatory artifact)
-- [ ] Define each unit: identity, purpose, components owned, and what it explicitly does **not** own
-- [ ] State the responsibility boundary for each unit in terms a reviewer can check
-- [ ] Record the verification method per unit — specifically, which units can be tested with no AWS
+- [x] Define each unit: identity, purpose, components owned, and what it explicitly does **not** own
+- [x] State the responsibility boundary for each unit in terms a reviewer can check
+- [x] Record the verification method per unit — specifically, which units can be tested with no AWS
       account and which cannot, since that is the asymmetry the decomposition turns on
-- [ ] Document the code organization strategy per Q3, including the enforceable no-`boto3` boundary if
+- [x] Document the code organization strategy per Q3, including the enforceable no-`boto3` boundary if
       option A is chosen
-- [ ] Record which units carry the known story-coverage gap (Build stage action, Dockerfiles) — now
+- [x] Record which units carry the known story-coverage gap (Build stage action, Dockerfiles) — now
       cheaper to close, since the `Build` stage exists and the root `Dockerfile` target pattern is
       established (amendment §A1.2)
-- [ ] Record the chosen Lambda architecture (Q8) and, if x86, that it reintroduces an uninvoked path
-- [ ] Include `blueprint.yaml` in the code-organization strategy with the Q9 values recorded
-- [ ] Carry forward `application-design.md` §6.4 and note whether Q4's answer resolves it
+- [x] Record the chosen Lambda architecture (Q8) and, if x86, that it reintroduces an uninvoked path
+- [x] Include `blueprint.yaml` in the code-organization strategy with the Q9 values recorded
+- [x] Carry forward `application-design.md` §6.4 and note whether Q4's answer resolves it
 
 ### B3. `unit-of-work-dependency.md` (mandatory artifact)
-- [ ] Dependency matrix, rows depending on columns, with the nature of each dependency
-- [ ] Verify acyclicity and state it, rather than implying it
-- [ ] Distinguish **runtime** dependencies from **build/deploy-order** dependencies — they differ here,
+- [x] Dependency matrix, rows depending on columns, with the nature of each dependency
+- [x] Verify acyclicity and state it, rather than implying it
+- [x] Distinguish **runtime** dependencies from **build/deploy-order** dependencies — they differ here,
       and conflating them is what produces the CloudFormation-error-that-looks-like-a-template-bug
-- [ ] Mermaid diagram with the mandated Material styling
-- [ ] Record the critical path and what blocks what
+- [x] Mermaid diagram with the mandated Material styling
+- [x] Record the critical path and what blocks what
 
 ### B4. `unit-of-work-story-map.md` (mandatory artifact)
-- [ ] Map all 17 stories — US-01..US-15, US-D1, US-D2 — to units per Q2 and Q7
-- [ ] Record cross-unit obligations where a story's work spills past its owning unit
-- [ ] Coverage table proving every story is assigned, in both directions
-- [ ] Preserve the requirement traceability from `stories.md` so FR→story→unit is followable end to end
+- [x] Map all 17 stories — US-01..US-15, US-D1, US-D2 — to units per Q2 and Q7
+- [x] Record cross-unit obligations where a story's work spills past its owning unit
+- [x] Coverage table proving every story is assigned, in both directions
+- [x] Preserve the requirement traceability from `stories.md` so FR→story→unit is followable end to end
 
 ### B5. Validation and honest reporting
-- [ ] Validate unit boundaries against the approved component and dependency graphs — no unit owning
+- [x] Validate unit boundaries against the approved component and dependency graphs — no unit owning
       half a component, no component owned twice
-- [ ] Confirm all 17 stories are assigned to exactly one owning unit
-- [ ] Confirm no unit depends on a unit that depends on it
-- [ ] Report anything that cannot be settled here, naming the later stage that carries it, rather than
+- [x] Confirm all 17 stories are assigned to exactly one owning unit
+- [x] Confirm no unit depends on a unit that depends on it
+- [x] Report anything that cannot be settled here, naming the later stage that carries it, rather than
       inventing a decision to look complete
 
 ### B6. Completion
-- [ ] Mark every step above `[x]`
-- [ ] Update `aidlc-docs/aidlc-state.md`
-- [ ] Append to `aidlc-docs/audit.md` with an ISO-8601 timestamp
+- [x] Mark every step above `[x]`
+- [x] Update `aidlc-docs/aidlc-state.md`
+- [x] Append to `aidlc-docs/audit.md` with an ISO-8601 timestamp
 - [ ] Present the `# 🔧 Units Generation Complete` message and wait for explicit approval
+
+---
+
+## Part A2 — Resolved decisions (Q1–Q9)
+
+Step 7 analysis. All twelve `[Answer]:` tags are filled with clean single selections — **A** in every
+case. No vagueness, undefined terms, contradiction, missing detail, or option-merging. No Step 8
+blocking follow-up was raised. Every answer matched the recommendation, which is worth stating
+explicitly: it means the recommendations were not doing the deciding, but it also means nothing in
+this set forced a rethink, so the interactions below are the whole of the analysis.
+
+| # | Decision | Answer |
+|---|---|---|
+| Q1 | Unit decomposition | **Two units** — U-01 Domain Core, U-02 Dashboard Platform |
+| Q2 | Enabler stories | Assigned to the unit owning the most of each, spillover recorded |
+| Q3 | Directory layout | Group by kind; `core/` as its own package; `blueprint.yaml` at blueprint root |
+| Q4 | Templates | Two — `dashboard-storage.yml`, then `dashboard.yml` |
+| Q5 | CONSTRUCTION order | Unit-by-unit, depth-first |
+| Q6 | Ownership | One PR per unit, human review requested although not required |
+| Q7 | Deferred cost stories | Assigned to their eventual owning unit, marked deferred |
+| Q8 | Lambda architecture | **arm64** |
+| Q9a | `data_classification` | `[internal]` |
+| Q9b | `singleton` | `false`, with a `DeploymentName` parameter |
+| Q9c | `state` | Snapshot is `derived`; nothing authoritative |
+| Q9d | `cost` | Estimate now, recorded as an estimate |
+
+### Interaction 1 — Q4 = A does NOT resolve §6.4, and my Q4 text said it would. That was my error.
+
+Q4's option A told you it "resolves §6.4 by construction rather than by a workaround — the buckets
+exist before the Build stage runs, because a separate stack deployed them." **That is wrong**, and I
+should have checked the pipeline's stage order before writing it.
+
+The order is fixed: `Source → PipelineDeploy → Build → BlueprintDeploy → Terraform`. `PipelineDeploy`
+deploys only the pipeline's own stack. So a `dashboard-storage.yml` registered as a `BlueprintDeploy`
+action still deploys **after** the Build stage runs — and `pipeline.yml`'s own comment on the Build
+stage says "Container images, built **before anything deploys**." Splitting the template changes which
+stack owns the bucket; it does not change when the bucket exists.
+
+**Q4 = A still stands on its own merits**, which were never in doubt: stateful buckets stay out of the
+stack that application updates replace, in a shared account where an accidental bucket replacement is
+unrecoverable. That reason is untouched by my error.
+
+**§6.4 therefore remains open and stays deferred to Infrastructure Design**, now with the option set
+enumerated rather than gestured at:
+
+| Option | Mechanism | Note |
+|---|---|---|
+| (a) New stage before Build | A `StorageDeploy` stage between `PipelineDeploy` and `Build` | Adds a stage. `CLAUDE.md` permits changing the pipeline's shape when a blueprint needs it, but this is the largest of the three changes. |
+| (b) Build the bundle, sync it later ← *likely* | Build emits the Vite output as a CodePipeline output artifact; a `SiteSync` CodeBuild action runs at `RunOrder: 2` inside `BlueprintDeploy`, after the stacks exist | Adds no stage, uses artifact passing as designed, and keeps the build in the Build stage where Q10 = A put it |
+| (c) Resolve by convention, tolerate absence | Sync targets a conventional bucket name and no-ops if absent | Rejected in advance: a blueprint whose first deployment fails is a broken blueprint |
+
+Recorded here so the gap is not carried forward as "resolved by Q4."
+
+### Interaction 2 — Q1 = A makes Q2 = A's spillover mechanism fire exactly once
+
+With two units, six of the seven enablers land wholly in U-02 — US-09 (supply chain), US-11, US-12,
+US-13, US-14 (logging, alarms, monitoring) and US-15 (deployment) are all infrastructure concerns, and
+U-01 has no infrastructure. **US-10 is the only genuine split**: the properties over C-04 and C-05
+belong to U-01, while generators for the collector's raw Tagging API inputs need U-02 to exist.
+
+So Q2 = A's "note the spillover" machinery is exercised on one story. That is not a criticism of the
+answer — it is what a two-unit split implies, and the alternative (Q2 = B) would have edited an
+approved artifact to achieve the same clarity on a single story.
+
+### Interaction 3 — the unit boundary is not the stack boundary
+
+Q1 = A gives two units; Q4 = A gives two templates; they do not line up. U-01 owns **zero** stacks and
+U-02 owns **both**. Worth stating plainly because "unit" and "stack" are the two decompositions in
+play and a reader will reasonably assume they correspond. They do not, and nothing requires them to —
+U-01 is a Python package, not a deployable.
+
+### Interaction 4 — Q9b = A changes the approved design, and it is the only answer here that does
+
+Adding a `DeploymentName` parameter propagates further than the manifest field it came from:
+
+- Both templates' resource names take it, so the snapshot bucket, site bucket, both Lambdas, the
+  distribution and the marker all become per-deployment
+- Both stack names take it, and both must still match `aidlc-<env>-*` for `BuildPipelineRole`'s
+  CloudFormation scope — `aidlc-main-dashboard-<name>` satisfies the prefix
+- It aligns cleanly with `cornell:deployment-id`, which already arrives as a stack parameter, so the
+  tag and the parameter become the same value rather than two things that must agree
+
+The approved Application Design never said `singleton`, so this is not a contradiction of it — it is a
+decision it did not make. Recorded as a design change carried into Infrastructure Design.
+
+**One thing Q9b = A does not settle**: whether two deployments in one environment share a storage stack
+or get one each. Per-deployment buckets follow naturally from the naming above; sharing would need
+deliberate design. Not asked, because the answer follows from the naming and inventing a question about
+it would manufacture doubt.
+
+### Interaction 5 — Q9d = A obliges an actual number, and WAF dominates it
+
+"Estimate now" means producing a defensible figure, not a placeholder. At this design's scale the
+per-request costs round to nothing and the fixed monthly charges are the whole estimate — the AWS WAF
+web ACL alone (a fixed monthly charge per ACL, plus per rule) exceeds everything else combined. The
+figure and its basis go in `unit-of-work.md`; the important property is that it is **not** `0`, which
+is what copying hello-world would have produced for a blueprint whose entire purpose is cost
+visibility.
+
+### Interaction 6 — Q8 = A and Q3 = A compose without friction
+
+arm64 needs `ArmContainerBuildProject` and a named target in the **root** `Dockerfile`. Q3 = A already
+places handlers in `blueprints/dashboard/collector/` and `api/` with no per-directory Dockerfile, which
+is exactly what a root Dockerfile using repo-root build context requires. The two answers were about
+different things and happen to fit.
+
+The one arm64 risk worth naming: a Python wheel with no aarch64 build compiles from source in the
+image. This design's runtime dependency is `boto3` plus the standard library, and the pure core has no
+dependencies at all, so the exposure is close to nil — but it is the thing to check first if an image
+build starts taking minutes.
