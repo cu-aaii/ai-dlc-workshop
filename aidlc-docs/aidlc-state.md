@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - U-02 Dashboard Platform, Functional Design
+- **Current Stage**: **CONSTRUCTION** - U-02 Functional Design (plan + 9 questions, awaiting answers)
 - **Build and Test U-01 Approved**: 2026-08-03 — "Approve". **U-01 COMPLETE END TO END.**
 - **Code Generation U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
 - **NFR Design U-01 Approved**: 2026-08-03 — user response "approve and proceed"
@@ -413,7 +413,9 @@ cleanup — deliberately not done.
 ### 🟢 CONSTRUCTION PHASE
 - [ ] Functional Design — **U-01 complete (awaiting approval)**; U-02 pass follows
       - [x] U-01 Domain Core — 3 artifacts, BR-01..BR-08, **10 PBT properties** (PBT-01 satisfied) — **APPROVED 2026-08-03**
-      - [ ] U-02 Dashboard Platform — incl. `frontend-components.md` for C-06
+      - [ ] U-02 Dashboard Platform — **IN PROGRESS**, 9 questions issued. Runs as **one pass over the
+            whole unit** (user decision 2026-08-03), incl. mandatory `frontend-components.md` for C-06,
+            and discharging all four inherited obligations plus RESILIENCY-04/-15
 - [ ] NFR Requirements — **U-01 complete (awaiting approval)**; U-02 pass follows
       - [x] U-01 — 26 requirements (**15 automated, 11 review-only**), 7 tech-stack decisions — **APPROVED 2026-08-03**
       - [ ] U-02
