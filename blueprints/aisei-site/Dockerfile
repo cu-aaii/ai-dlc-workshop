@@ -27,7 +27,7 @@ RUN npm prune --omit=dev
 FROM node:24-alpine AS aisei-site
 
 WORKDIR /var/task
-COPY --from=public.ecr.aws/awslambda/lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
