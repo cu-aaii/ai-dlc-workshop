@@ -15,7 +15,7 @@ a chatbot can query*. Track A's Builder MCP asks for it; Track C's Teams bot con
 | `AWS::Bedrock::DataSource` | The managed SharePoint connector — **only when `EnableSharePointSource` is `true`, and it defaults to `false`.** |
 | `AWS::IAM::Role` (×2) | One for Bedrock to read the bucket (and, when enabled, the certificate and secret), one for the verifier below. |
 | `AWS::Lambda::Function` + custom resource | Ingests **and verifies** at deploy time. See below — this is the interesting part. A second custom resource, same function, verifies SharePoint. |
-| `AWS::IAM::ManagedPolicy` | `bedrock:Retrieve` / `bedrock:RetrieveAndGenerate` on this one knowledge base. The handoff seam. |
+| `AWS::IAM::ManagedPolicy` | `bedrock:Retrieve` on this one knowledge base. The handoff seam. **Not** `RetrieveAndGenerate` — unsupported on a managed KB. |
 | `AWS::Scheduler::Schedule` + `ScheduleGroup` | Re-syncs between deploys — **only when `EnableScheduledSync` is `true`, and it defaults to `false`.** Fire-and-forget; see below. |
 | `AWS::SSM::Parameter` (×6, ×8 with SharePoint, ×9 with schedules) | The handoff itself, plus the mirrors the untaggable data sources need. |
 
@@ -132,8 +132,17 @@ aws ssm get-parameters-by-path --path /aidlc/main/knowledgebase --output table
 
 Read `/aidlc/main/knowledgebase/knowledge-base-id`, attach the managed policy at
 `/aidlc/main/knowledgebase/retrieval-policy-arn` to your role, then call
-`bedrock-agent-runtime`. Don't write your own `bedrock:Retrieve` statement — the managed policy
-exists so read access to this knowledge base stays one reviewable artifact.
+`bedrock-agent-runtime:Retrieve`. Don't write your own `bedrock:Retrieve` statement — the managed
+policy exists so read access to this knowledge base stays one reviewable artifact.
+
+Two API shapes to get right, both observed rather than assumed (`docs/sharepoint-runbook.md`):
+
+- **`retrieve` takes `managedSearchConfiguration`.** `vectorSearchConfiguration` is rejected on a
+  managed knowledge base.
+- **`retrieve-and-generate` does not work at all here**, whatever your IAM says. A bot that wants a
+  generated answer does `Retrieve` and then `Converse` with the chunks. The managed policy
+  deliberately does not grant `RetrieveAndGenerate`, so the failure is an IAM denial you can read
+  rather than a service error you can't.
 
 SSM rather than a CloudFormation `Export` on purpose: an export would couple the consumer's
 stack lifecycle to this one and block ever replacing the knowledge base.
@@ -231,4 +240,6 @@ See `docs/warnings.md`.
 - `docs/sharepoint-source.md` — the SharePoint half: Entra, the certificate, the grants, the order
 - `docs/assumptions.md` — what must already be true for this to deploy
 - `docs/warnings.md` — cost, silent-failure modes, immutable fields
+- `docs/sharepoint-runbook.md` — a validated end-to-end SharePoint procedure, for
+  whoever unpins it. Reference only; changes no template.
 - `skills/knowledgebase/SKILL.md` — how Claude Code reproduces this to standard

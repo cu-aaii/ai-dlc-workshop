@@ -134,12 +134,10 @@ Parameters:
     Description: 'When to re-sync the SharePoint source. An hour after SyncScheduleExpression because ingestion jobs conflict. Ignored unless EnableScheduledSync and EnableSharePointSource are both true.'
     Type: 'String'
 
-  # There are deliberately no chunking parameters. A managed embedding model owns chunking, and
-  # supplying a ChunkingConfiguration alongside it is rejected outright:
-  #   "A chunking strategy cannot be specified with a managed embedding model."
-  # An earlier version of this template exposed ChunkingMaxTokens and ChunkingOverlapPercentage,
-  # which lints clean and fails at CREATE. Tuning chunking requires EmbeddingModelType: CUSTOM,
-  # which means naming an embedding model and provisioning a vector store.
+  # No chunking parameters, deliberately: a managed embedding model owns chunking and rejects any
+  # ChunkingConfiguration at CREATE ("A chunking strategy cannot be specified with a managed
+  # embedding model") while linting clean. Tuning it means EmbeddingModelType: CUSTOM plus a vector
+  # store. docs/warnings.md.
 
   # Pipeline Provided Parameters
 
@@ -446,12 +444,9 @@ Resources:
         - Key: 'cornell:deployment-id'
           Value: !Sub '${Application}-${Environment}-knowledgebase'
 
-  # A zip function with inline code, which is a deliberate exception to the repo's "Lambda
-  # means container images" rule: no pipeline stage builds an image yet, and with no CLI access
-  # there is no way to upload a code bundle to S3 either, so inline is the only zip available.
-  #
-  # Inline Code.ZipFile is hard-capped at 4096 characters by CloudFormation, which is why the
-  # handler is terse and uncommented. Keep it under the cap or this template stops deploying.
+  # Inline code, a documented exception to the repo's "Lambda means container images" rule: no stage
+  # builds an image yet, and with no CLI there is nowhere to upload a bundle. Code.ZipFile is capped
+  # at 4096 characters, which is why the handler is terse and uncommented. docs/decisions.md.
   #
   # Four properties exist because a custom resource that never answers leaves the stack waiting,
   # and nobody here can cancel a stuck stack: imports and clients are built INSIDE the try; poll
@@ -619,18 +614,20 @@ Resources:
   # The retrieval seam. Downstream blueprints attach this policy instead of writing their own
   # Bedrock statements, so read access to this knowledge base stays one reviewable artifact.
 
+  # Retrieve only. RetrieveAndGenerate is not supported on a managed knowledge base (observed on a
+  # second tenant, docs/sharepoint-runbook.md), so granting it would advertise an affordance the
+  # service rejects and send a consumer debugging their own role. Generation is Retrieve + Converse.
+
   RetrievalPolicy:
     Type: 'AWS::IAM::ManagedPolicy'
     Properties:
       ManagedPolicyName: !Sub '${Application}-${Environment}-knowledgebase-retrieval'
-      Description: 'Read-only retrieval against the knowledgebase blueprint knowledge base. Attach this to a consuming role rather than granting bedrock:Retrieve directly.'
+      Description: 'Read-only retrieval against this knowledge base. Attach to a consuming role rather than granting bedrock:Retrieve directly. Retrieve only - RetrieveAndGenerate is unsupported on a managed KB.'
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: 'Allow'
-            Action:
-              - 'bedrock:Retrieve'
-              - 'bedrock:RetrieveAndGenerate'
+            Action: 'bedrock:Retrieve'
             Resource: !GetAtt 'KnowledgeBase.KnowledgeBaseArn'
 
   # Scheduled re-sync. Keeps the index fresh, asserts nothing - see the parameter comments above.
@@ -1001,7 +998,7 @@ Outputs:
     Value: !GetAtt 'SharePointIngestionVerifier.SmokeQueryResult'
 
   RetrievalPolicyArn:
-    Description: 'Managed policy granting bedrock:Retrieve and bedrock:RetrieveAndGenerate on this knowledge base'
+    Description: 'Managed policy granting bedrock:Retrieve on this knowledge base. Not RetrieveAndGenerate - unsupported on a managed KB.'
     Value: !Ref 'RetrievalPolicy'
 
   IngestionBucketName:

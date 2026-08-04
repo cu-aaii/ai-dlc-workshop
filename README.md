@@ -271,8 +271,13 @@ aws ssm get-parameter --name /aidlc/main/knowledgebase/retrieval-policy-arn  --q
 ```
 
 Attach that managed policy to your role instead of writing your own `bedrock:Retrieve` statement,
-then call `bedrock-agent-runtime`. Retrieval on a **managed** knowledge base takes
-`managedSearchConfiguration` — `vectorSearchConfiguration` is rejected outright.
+then call `bedrock-agent-runtime:Retrieve`. Two shapes to get right on a **managed** knowledge base,
+both observed rather than assumed:
+
+- retrieval takes `managedSearchConfiguration`; `vectorSearchConfiguration` is rejected outright;
+- **`retrieve-and-generate` is not supported**, whatever your IAM says. Retrieve, then `Converse`
+  with the chunks. The policy grants `Retrieve` only, so that limit shows up as a readable denial
+  instead of a puzzling service error.
 
 | | |
 |---|---|

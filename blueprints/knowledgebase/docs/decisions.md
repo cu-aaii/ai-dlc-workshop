@@ -211,8 +211,11 @@ runtime and carry no such lock.
 
 ### The managed policy
 
-`RetrievalPolicy` grants `bedrock:Retrieve` and `bedrock:RetrieveAndGenerate` scoped to this one
-knowledge base ARN. Consumers attach it rather than writing their own statements, so read access
+`RetrievalPolicy` grants `bedrock:Retrieve` — and, since `sharepoint-runbook.md` §11, **not**
+`bedrock:RetrieveAndGenerate`, which a managed knowledge base does not support at any IAM level.
+Granting it would hand a consumer an affordance the service rejects, which costs them an hour of
+debugging their own role. A bot that wants generation calls `Retrieve` then `Converse`. Scoped to
+this one knowledge base ARN. Consumers attach it rather than writing their own statements, so read access
 stays one reviewable artifact — and it is a concrete answer to Track D's isolation question
 instead of a paragraph about one.
 
@@ -262,6 +265,23 @@ the requirement to a `Sites` scope alone, which is a far smaller consent ask. He
 data source has been observed ingesting and answering in this account — `sharepoint-kb` /
 `KANPIZQSGD`, one job `COMPLETE`, one document scanned, one indexed, none failed. The template's
 `ConnectorParameters` body and its parameter defaults are that configuration, field for field.
+
+**Independently confirmed, on a different tenant.** `sharepoint-runbook.md` documents this path
+built end to end on a separate tenant and AWS account, and it settles the consent question this
+document used to leave open: that build ingested holding `Sites.Selected` and nothing else on both
+Microsoft Graph and the SharePoint REST API. No `GroupMember.Read.All`, no `User.Read.All`, no scope
+error. `aclEnabled: false` is sufficient on its own — `crawlIdentities` then defaults to `false`
+without being set, which the service confirms in its echo of `connectorParameters`.
+
+So the consent ask is two `Sites.Selected` grants plus one per-site grant, not the five tenant-wide
+permissions the quick-start failure implies. Two builds, two accounts, same answer — which is why
+`aclEnabled: false` is in the template rather than under discussion.
+
+That runbook also carries three findings this blueprint acts on: `aclEnabled` is **immutable after
+creation** (so getting it wrong is a data-source replacement, not an update), the SharePoint
+`connectorParameters` body is larger and therefore more exposed to the unlintable-Json hazard than
+the S3 one, and `RetrieveAndGenerate` is not supported on a managed knowledge base at all — see
+below.
 
 ### Off by default
 
@@ -422,5 +442,6 @@ Confirmed from AWS documentation rather than memory:
 - `numberOfDocumentsScanned` "includes new, updated, and unchanged documents," which is what makes
   the zero-scanned assertion safe on re-deploys. If it counted only *changed* documents, every
   no-op merge would fail the stack.
-- Retrieval actions are `bedrock:Retrieve` / `bedrock:RetrieveAndGenerate` on
-  `arn:aws:bedrock:us-east-1:<account>:knowledge-base/<id>`.
+- The retrieval action is `bedrock:Retrieve` on
+  `arn:aws:bedrock:us-east-1:<account>:knowledge-base/<id>`. `bedrock:RetrieveAndGenerate` exists as
+  an IAM action but the API behind it does not serve a managed knowledge base, so it is not granted.

@@ -75,3 +75,14 @@ The web crawler needs none of this: no Entra, no certificate, no Terraform. Anot
 `AWS::Bedrock::DataSource` with `type: WEB` in `ConnectorParameters`, plus a verifier instance
 copied from `SharePointIngestionVerifier`. If the goal is another source rather than *SharePoint*,
 that is the cheap version.
+
+## The generalized walkthrough
+
+`../../docs/sharepoint-runbook.md` is this path validated end to end on a **separate tenant and AWS
+account** — certificate generation, the two resource applications, the per-site grant, the Secrets
+Manager and IAM shapes, and a pre-flight script that separates an Entra fault from a Bedrock one
+before any Bedrock resource exists.
+
+Read it as the generalized reference and this directory as the Cornell-specific instance. It also
+settles the consent question these files used to leave open: `Sites.Selected` on two resource
+applications plus one per-site grant is sufficient, as long as `aclEnabled` is `false`.
