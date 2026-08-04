@@ -11,6 +11,41 @@ not drift), [`PROJECT-KNOWLEDGE.md`](../../docs/aidlc/builder-mcp/PROJECT-KNOWLE
 runbook). The AI-DLC artifacts that produced this package are a historical record at
 [`docs/aidlc/builder-mcp/`](../../docs/aidlc/builder-mcp/aidlc-state.md).
 
+## Surfaces onto this server
+
+One server, several ways in. They are siblings — each is a client of
+`builder_mcp.server`, none owns it, and none is a fork.
+
+| Surface | What it is | Start here |
+|---|---|---|
+| **Server** | MCP over streamable HTTP; deployed on AgentCore | [`SPEC.md`](SPEC.md), [`deploy/HANDOFF.md`](deploy/HANDOFF.md) |
+| **Devtools console** | Browser chat UI for live demos — tool schemas and a direct invoke box on the left, streaming chat on the right | [`devtools/README.md`](devtools/README.md) |
+| **Claude plugin** | Packaged for Claude Code and Claude Cowork; installs with no checkout and no credentials | [`plugin/README.md`](plugin/README.md), [`plugin/SPEC-PLUGIN.md`](plugin/SPEC-PLUGIN.md) |
+| **Terminal demo** | Scripted stdio walkthrough of the builder path | [`../../demo/`](../../demo/) |
+| **Quality control** | Reproducible metric battery for longitudinal comparison across versions | [`qc/README.md`](qc/README.md), [`qc/METHODOLOGY.md`](qc/METHODOLOGY.md) |
+
+Run the console:
+
+```sh
+tools/dev                          # from the repo root, in Git Bash
+```
+
+Install the plugin — needs only [`uv`](https://docs.astral.sh/uv/), no clone of this repo:
+
+```sh
+claude plugin marketplace add cu-aaii/ai-dlc-workshop --sparse packages/builder-mcp/plugin
+claude plugin install cornell-builder@cornell-builder
+```
+
+### Slide deck
+
+A leadership-facing walkthrough of the problem, the tools, three real user journeys, the
+governance model, and the honest gaps lives at
+[`plugin/docs/progress-slides.html`](plugin/docs/progress-slides.html). GitHub will not
+render HTML in-page, so view it through
+[raw.githack](https://raw.githack.com/cu-aaii/ai-dlc-workshop/team-ad/packages/builder-mcp/plugin/docs/progress-slides.html)
+or open the file locally — it is self-contained and needs no server.
+
 ## Tools
 
 Names follow noun_verb (SPEC C3): the resource first, then the operation.
