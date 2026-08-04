@@ -294,3 +294,13 @@
 **Context**: CONSTRUCTION — Functional Design for U-01 complete; three artifacts generated, 10 PBT properties identified. Awaiting explicit user approval before the U-02 Functional Design pass.
 
 ---
+
+## Functional Design U-01 — Approval
+**Timestamp**: 2026-08-03T00:00:00Z
+**Approval Prompt**: "# 🔧 Functional Design Complete - U-01 Domain Core … ✅ **Continue to Next Stage** — approve and proceed to **NFR Requirements**" — presented with the eight rules, the ten-property set and what the three new properties buy, **both of my own corrections** (the false FR-1.1 weakening claim, withdrawn after checking the approved text; and the ambiguous "preserved-or-ignored" wording in my own Q9 option, resolved to *ignore* on the no-read-modify-write argument with P1's scoping stated openly), the two cross-unit obligations flowing to U-02, and the warning that `_reference_group_by_tag` must be written independently or P5 becomes a tautology.
+**User Input**: "Continue to next stage"
+**Decision**: **APPROVED** — Functional Design for U-01 Domain Core closed. Accepted: BR-01..BR-08, the six domain entities with their identity/equality/immutability semantics, the algorithms and totality table, and the ten-property PBT set (PBT-01 satisfied for this unit).
+**Carried forward**: two cross-unit obligations to U-02 (`Freshness.INVALID` → 503 sixth row in C-03's state table; the three accounting counts must reach the UI). U-02's own Functional Design pass is still outstanding.
+**Context**: CONSTRUCTION — proceeding to NFR Requirements.
+
+---
