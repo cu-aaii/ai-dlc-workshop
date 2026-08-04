@@ -29,6 +29,7 @@ blueprints/                 THE DEPLOY SURFACE — one directory per blueprint
   knowledgebase/              Bedrock managed knowledge base; verifies its own ingestion
   entra-probe/                one Entra app registration; proves the Terraform path
   tiny-chatbot/               canned-response Lambda behind a Function URL; parked
+  aisei-site/                 an existing Angular + Hono app as a Lambda container; parked
   course-chatbot/             the workshop MVP — scaffold only, deploys nothing yet
 packages/                   components, one package each
   builder-mcp/                the Cornell Builder MCP server (track A)
@@ -42,18 +43,23 @@ pipeline/                   the deploy path
 bootstrap/                  account baseline — deployed BY HAND, once per account
   account-bootstrap.yml       deploy role, artifact bucket, GitHub connection
 observability/              seeing what's running (track E) — scaffold only
+demo/                       terminal walkthrough of the builder path; the no-Teams fallback
 docs/
   aidlc-rules/                the AI-DLC methodology — vendored from awslabs, do not edit
   aidlc/                      how things here were built — a record, not a backlog
   decisions/                  one file per decision made on purpose
-tools/check                 the checks that gate a merge; CI runs this exact script
+tools/
+  check                       the checks that gate a merge; CI runs this exact script
+  dev                         start builder-mcp and its local browser console together
 .github/workflows/
   pr-checks.yml               runs tools/check. No AWS calls, no credentials.
 .mcp.json                   GitHub MCP server for Claude Code — needs one env var, see below
+.env.example                template for the gitignored .env that tools/dev sources
 ```
 
-Every directory has its own README explaining what goes in it, except `docs/aidlc-rules/` — see
-below for why that one is left exactly as upstream ships it.
+Most directories have their own README explaining what goes in it. `docs/aidlc-rules/` is the
+deliberate exception — see below for why it is left exactly as upstream ships it. `packages/`,
+`docs/` and `tools/` have none; their conventions live in `CLAUDE.md`.
 
 **Two paths cannot move.** `pipeline/pipeline.yml`, because the running pipeline deploys itself
 from that literal path and a commit that relocates it breaks the stage that would have picked up
@@ -258,6 +264,39 @@ path goes there, self-contained with its own `pyproject.toml` and lockfile — i
 stage action names the component's directory as the context and its named target. Keep the two in
 step with where the component lives: a stale `CONTAINER_CONTEXT` fails the build on a missing path
 and says nothing about the move that caused it.
+
+## The knowledge base, for the teams consuming it
+
+`blueprints/knowledgebase` is deployed and queryable. Two identifiers are all a consumer needs, and
+both are in SSM rather than a CloudFormation `Export`, so nothing couples your stack's lifecycle
+to ours:
+
+```sh
+aws ssm get-parameter --name /aidlc/main/knowledgebase/knowledge-base-id     --query Parameter.Value --output text
+aws ssm get-parameter --name /aidlc/main/knowledgebase/retrieval-policy-arn  --query Parameter.Value --output text
+```
+
+Attach that managed policy to your role instead of writing your own `bedrock:Retrieve` statement,
+then call `bedrock-agent-runtime:Retrieve`. Two shapes to get right on a **managed** knowledge base,
+both observed rather than assumed:
+
+- retrieval takes `managedSearchConfiguration`; `vectorSearchConfiguration` is rejected outright;
+- **`retrieve-and-generate` is not supported**, whatever your IAM says. Retrieve, then `Converse`
+  with the chunks. The policy grants `Retrieve` only, so that limit shows up as a readable denial
+  instead of a puzzling service error.
+
+| | |
+|---|---|
+| Indexed today | One syllabus PDF from `aidlc-kb-ingestion-890349359349`. **One document is not a corpus** — expect mediocre relevance, and scores that don't track it. |
+| Freshness | A merge re-ingests and re-verifies. Nothing else does: `EnableScheduledSync` exists and is off, and a scheduled sync cannot report its own result anyway. |
+| SharePoint | Built and verified against a real site, **off by default** (`EnableSharePointSource`). On, it would make every team's merge depend on an Entra certificate nobody watches. |
+| Proof it works | A green `BlueprintDeploy` asserts the documents are indexed **and** answerable — the stack fails otherwise. `DocumentsIndexed` and `SmokeQueryResult` are stack outputs. |
+| Costs while idle | Per-GB stored plus per-retrieve. It does not stop when the workshop ends, and no OpenSearch collection exists to add an hourly floor. |
+
+Changing the corpus means `IngestionBucketName` plus a `SmokeQuery` the new corpus can answer, in
+`pipeline/pipeline.yml`, `blueprints/knowledgebase/blueprint.yaml` **and** the template. If that
+smoke query stops being answerable, every team's deploy goes red — the verifier is doing its job.
+Details in `blueprints/knowledgebase/README.md`.
 
 ## Not here yet
 

@@ -130,8 +130,12 @@ TEMPLATE_MARKER = 'AWSTemplateFormatVersion'
 # unregistered templates and fail the build. It is gitignored, but this scan walks the
 # filesystem rather than git, so ignoring it there is not enough -- without this entry,
 # running the preview tool breaks tools/check on that machine until the folder is deleted.
+# .claude is here for the same reason, one layer up: Claude Code puts git worktrees under
+# .claude/worktrees/, and a worktree is a full second checkout -- so every template appears twice
+# and the registry check fails against paths that are not repo content. CI never sees it (clean
+# checkout), which makes it a local-only false positive, and a confusing one.
 SKIP_DIRS = {
-    '.git', '.github', 'node_modules', '.venv', '__pycache__', 'outputs-preview',
+    '.git', '.github', '.claude', 'node_modules', '.venv', '__pycache__', 'outputs-preview',
 }
 
 VALID_DEPLOYED_BY = {'pipeline', 'manual'}

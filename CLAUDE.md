@@ -224,6 +224,12 @@ and CI gets it from `hashicorp/setup-terraform`. Never document or run the bare 
   pins the interpreter, so `uv run` fetches a 64-bit CPython. Without it, on a machine whose only
   Python is `x86`, `cryptography` has no wheel and the install disappears into a failing Rust
   build.
+- **An explicit resource name plus a replacing update is a self-collision.** `AWS::IAM::ManagedPolicy`
+  replaces on a `PolicyDocument` change, so a named policy's replacement fails with *"a policy called
+  X already exists"* and rolls the stack back — observed on `main`, red for every track, from a
+  one-line policy edit. Renaming in the same change is the fix, and IAM refuses to delete a policy
+  that is still attached, so check `list-entities-for-policy` first. Same trap for any named IAM
+  resource.
 - **`AWS::SSM::Parameter` takes `Tags` as a map**, not the usual list of `Key`/`Value` pairs.
   Every other resource here uses the list form.
 - **CodeConnections connections need a human browser handshake.** CloudFormation creates them
@@ -277,6 +283,15 @@ and CI gets it from `hashicorp/setup-terraform`. Never document or run the bare 
   with an entirely empty knowledge base, and Bedrock has no native scheduled sync. Something in
   the stack has to start the job, and on this repo's no-CLI deploy path it should also assert the
   result — see `blueprints/knowledgebase/docs/decisions.md`.
+- **`"secret has an invalid format or missing values"` usually is not about the secret.** Bedrock
+  emits it both for wrong secret key names *and* for attaching a SharePoint data source to a
+  customer-managed knowledge base — a path it cannot service at all. Check the knowledge base type
+  before rewriting a correct secret; that mistake costs hours.
+- **A SharePoint data source cannot be purged in place.** No document-level deletion
+  (*"Invalid data source type [SHAREPOINTV3] provided"*), and narrowing scope does not retroactively
+  delete what is already indexed — the connector can no longer see it to diff it. Delete and
+  recreate the data source, which only clears the index if its `DataDeletionPolicy` is `DELETE`.
+  That is why `blueprints/knowledgebase` sets `DELETE` there and `RETAIN` on its S3 source.
 
 ## Scaffolded but not built
 

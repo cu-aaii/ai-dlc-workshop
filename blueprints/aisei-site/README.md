@@ -10,9 +10,10 @@ It exists as a minimal demo of the other direction from tiny-chatbot: instead of
 handler for this repo's deploy path, it takes an app that already exists elsewhere and
 deploys it unchanged. No auth, no state, no LLM.
 
-**Status: parked.** Registered `deployed_by: manual` in `pipeline/stacks.yml` and not
-wired to a pipeline action, on purpose, until the hello-world deploy path is verified
-end to end.
+**Status: live.** Registered `deployed_by: pipeline` in `pipeline/stacks.yml`, with a
+`Build` stage action (`AiseiSiteContainer`) and a `BlueprintDeploy` action
+(`AiseiSiteCloudFormation`) in `pipeline/pipeline.yml` — see "Flipping it live" below for
+how it got there.
 
 ## What it deploys
 
@@ -49,25 +50,25 @@ the adapter at the route that was already there.
 
 ## Flipping it live
 
-Three steps, one PR, once hello-world has deployed green:
+Done, once hello-world had deployed green — three steps, one PR:
 
-1. Add a `Build` stage action in `pipeline/pipeline.yml` running
+1. Added a `Build` stage action (`AiseiSiteContainer`) in `pipeline/pipeline.yml` running
    **`ArmContainerBuildProject`** — not the x86 `ContainerBuildProject`; the Lambda below
    declares `Architectures: [arm64]`, and an x86 image would crash at invoke — with
    `CONTAINER_TARGET=aisei-site`, `CONTAINER_CONTEXT=blueprints/aisei-site` (the
    directory holding this blueprint's `Dockerfile`) and `DATE_TAG`, per "Adding a
    container image build" in `pipeline/README.md` and the `BuilderMcpContainer` action
    as the working example.
-2. Add a `BlueprintDeploy` CloudFormation action modelled on `HelloWorldCloudFormation`,
-   passing every parameter explicitly — including
+2. Added a `BlueprintDeploy` CloudFormation action (`AiseiSiteCloudFormation`) modelled on
+   `HelloWorldCloudFormation`, passing every parameter explicitly — including
    `ContainerImageUri: #{AiseiSiteContainer.CONTAINER_DIGEST}` (deploy by digest, not
    tag) and `DeploymentName`.
-3. Change this blueprint's entry in `pipeline/stacks.yml` to `deployed_by: 'pipeline'` —
+3. Changed this blueprint's entry in `pipeline/stacks.yml` to `deployed_by: 'pipeline'` —
    `validate_stacks.py` fails a `pipeline` entry with no action and a `manual` entry with
-   one, so steps 2 and 3 must land together.
+   one, so steps 2 and 3 landed together.
 
-Also pin both base images in `Dockerfile` by digest (SECURITY-10, like builder-mcp's
-Dockerfile) in that same PR.
+Both base images in `Dockerfile` are pinned by digest (SECURITY-10, like builder-mcp's
+Dockerfile), resolved with `crane digest --platform=linux/arm64 <image>`.
 
 ## Testing locally
 
