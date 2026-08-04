@@ -32,10 +32,22 @@ dry-run pattern works everywhere.)
 
 ## Run locally
 
+Server on its own — this is all you need to point an MCP client at it:
+
 ```sh
 cd packages/builder-mcp
 uv run builder-mcp                 # streamable HTTP on http://127.0.0.1:8000/mcp
 ```
+
+Server **and** the browser console together, one command from the repo root:
+
+```sh
+tools/dev                          # then open http://127.0.0.1:8765
+```
+
+`tools/dev` is a bash script and needs Git Bash on Windows — `bash` on the PowerShell PATH is
+the WSL launcher, not Git Bash. Per-platform instructions, the stop/cleanup rules, and the
+ports are in [devtools/README.md](devtools/README.md#run-it).
 
 Connect from Claude Code:
 

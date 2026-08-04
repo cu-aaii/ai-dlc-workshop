@@ -15,8 +15,9 @@ digest passed into `BuilderMcpCloudFormation`.
 
 ## Step 1 — add a Dockerfile target
 
-One named target per component in the **root** `Dockerfile`. Build context is the repo root,
-so `COPY` paths start from there. Keep targets self-contained.
+One named target per component in the **root** `Dockerfile` — that file holds *every* image in
+the repo. **Never add a per-package Dockerfile.** Build context is the repo root, so `COPY`
+paths start from there. Keep targets self-contained.
 
 ```dockerfile
 # --- <name>: <one line on what it is> ------------------------------------------------------
@@ -25,14 +26,17 @@ FROM <base> AS <name>
 WORKDIR /app
 
 # Dependency layer first so code edits don't re-resolve the environment.
-COPY <name>/pyproject.toml <name>/uv.lock ./
+COPY packages/<name>/pyproject.toml packages/<name>/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-COPY <name>/src ./src
+COPY packages/<name>/src ./src
 RUN uv sync --frozen --no-dev
 
 CMD ["uv", "run", "--no-sync", "<entrypoint>"]
 ```
+
+Paths depend on where the component lives: `packages/<name>/` for a component that isn't a
+blueprint and isn't the deploy path, `blueprints/<name>/src/` for a blueprint's own code.
 
 The target name is what `CONTAINER_TARGET` refers to in step 2 — they must match exactly.
 

@@ -6,6 +6,10 @@
       "headers": {
         "Authorization": "Bearer ${GITHUB_MCP_PAT}"
       }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
     }
   }
 }
