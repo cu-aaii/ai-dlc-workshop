@@ -227,7 +227,7 @@ inferred. The all-four-`cornell:*`-tags rule is therefore impossible on it.
 Rather than quietly skip it, `DataSourceIdParameter` gives tag-based inventory a join key that
 tags cannot reach. Deleting that parameter hides the data source from Track E entirely.
 
-## SharePoint: wired, verified, and off by default
+## SharePoint: wired, verified, and now on
 
 The operational detail lives in `sharepoint-source.md`. This section is the decisions and the
 retractions, because this is the part of the blueprint that has been wrong in public twice.
@@ -283,18 +283,26 @@ creation** (so getting it wrong is a data-source replacement, not an update), th
 the S3 one, and `RetrieveAndGenerate` is not supported on a managed knowledge base at all — see
 below.
 
-### Off by default
+### On, and what that costs
 
-`EnableSharePointSource` defaults to `false` and `pipeline/pipeline.yml` passes `false`, so the
-deployed `main` stack is S3-only. This is the decision most likely to read as timidity, so the
-reason is worth being explicit about: enabling it makes **every merge to `main`, by every track,**
-depend on an Entra app registration, an admin consent, a per-site grant and an unexpired
-certificate. None of those is in this repo, none is visible to `tools/check`, and the verifier
-correctly fails the stack when any of them lapses — so a lapsed certificate is a red
-`BlueprintDeploy` for everyone during a workshop.
+`EnableSharePointSource` is `true` in the template default, in `pipeline/pipeline.yml` and in
+`blueprint.yaml`, so the deployed `main` stack indexes the ECE 4960 handouts alongside the CS1112
+syllabus.
 
-An S3-only deploy is byte-for-byte what it was before SharePoint existed: everything
-SharePoint-shaped hangs off one `Condition`.
+It shipped off first and was turned on after a rehearsal, which is the order that matters: the
+`Environment=test` stack indexed **25 of 25 documents with zero failures**, re-synced them
+incrementally on the following update, and answered a smoke query returning only SharePoint chunks.
+Turning it on before that would have been a guess with everyone else's merges as collateral.
+
+The cost is real and worth restating plainly: **every merge, by every track, now depends on** the
+Entra app's consent on both Microsoft Graph and the SharePoint REST API, the per-site grant on that
+site, and an unexpired certificate. None of those lives in this repo, none is visible to
+`tools/check`, and the verifier correctly fails the stack when one lapses — so a lapsed certificate is
+a red `BlueprintDeploy` for everyone. The Entra side is managed by hand by the platform team, which is
+what makes that an accepted cost rather than an unowned risk.
+
+Setting the flag `false` renders byte-for-byte the S3-only stack that shipped before SharePoint
+existed: everything SharePoint-shaped hangs off one `Condition`. That is the rollback.
 
 ### Rejected: making the certificate or the secret value IaC
 
@@ -336,11 +344,15 @@ probably not have fit.
 `DependsOn` sequences the two, because Bedrock rejects concurrent ingestion jobs with a conflict
 and two instances racing would spend their 900-second budgets waiting on each other.
 
-The residual gap is stated in the template and in `sharepoint-source.md`: the ingestion statistics
-are per-data-source, so an empty SharePoint source cannot pass, but `bedrock:Retrieve` spans the
-whole knowledge base, so a smoke query the S3 corpus can also answer weakens assertion five to
-nothing. The default `SharePointSmokeQuery` is currently exactly that mistake and is labelled a
-placeholder.
+The residual gap is narrower than it was but still real: the ingestion statistics are per-data-source,
+so an empty SharePoint source cannot pass, while `bedrock:Retrieve` spans the whole knowledge base, so
+a smoke query both corpora answer would weaken assertion five to nothing.
+
+`SharePointSmokeQuery` is therefore chosen by measurement rather than judgement.
+`What do the ECE 4960 handouts cover?` returns 5/5 SharePoint chunks; `What is the late homework
+policy?` returns 5/5 S3 chunks. The corpora are cleanly separated — CS1112 syllabus in the bucket,
+ECE 4960 handouts in SharePoint — and that separation is what makes both assertions mean something.
+Changing either corpus means re-measuring, not re-guessing.
 
 ### Still rejected: the self-managed SharePoint connector
 

@@ -12,7 +12,7 @@ a chatbot can query*. Track A's Builder MCP asks for it; Track C's Teams bot con
 |---|---|
 | `AWS::Bedrock::KnowledgeBase` | `Type: MANAGED` — AWS owns the storage, index and embedding model. No vector store to provision. |
 | `AWS::Bedrock::DataSource` | The managed S3 connector, pointed at `IngestionBucketName`. |
-| `AWS::Bedrock::DataSource` | The managed SharePoint connector — **only when `EnableSharePointSource` is `true`, and it defaults to `false`.** |
+| `AWS::Bedrock::DataSource` | The managed SharePoint connector, over the ECE 4960 handouts in `sites/kb`. **On** (`EnableSharePointSource`). |
 | `AWS::IAM::Role` (×2) | One for Bedrock to read the bucket (and, when enabled, the certificate and secret), one for the verifier below. |
 | `AWS::Lambda::Function` + custom resource | Ingests **and verifies** at deploy time. See below — this is the interesting part. A second custom resource, same function, verifies SharePoint. |
 | `AWS::IAM::ManagedPolicy` | `bedrock:Retrieve` on this one knowledge base. The handoff seam. **Not** `RetrieveAndGenerate` — unsupported on a managed KB. |
@@ -21,9 +21,9 @@ a chatbot can query*. Track A's Builder MCP asks for it; Track C's Teams bot con
 
 Stack name: `aidlc-main-knowledgebase`. Region `us-east-1`.
 
-The deployed `main` stack is S3-only. With the flag off, nothing SharePoint-shaped exists in the
-stack at all — every SharePoint resource, role statement, verifier, SSM mirror and output hangs off
-one `Condition`.
+The deployed `main` stack indexes both sources. Every SharePoint resource, role statement, verifier,
+SSM mirror and output hangs off one `Condition`, so setting `EnableSharePointSource=false` renders
+exactly the S3-only stack that shipped before it existed.
 
 ## The bucket is referenced, never created
 
@@ -153,12 +153,12 @@ stack lifecycle to this one and block ever replacing the knowledge base.
 |---|---|---|
 | `IngestionBucketName` | `aidlc-kb-ingestion-890349359349` | Must exist, same account, **same region** (`us-east-1`), General Purpose. |
 | `SmokeQuery` | `What is the late homework policy?` | Must be answerable from the bucket's contents or **every deploy fails**. Change it in the same PR that changes the corpus. |
-| `EnableSharePointSource` | `false` | Adds the SharePoint source. Read `docs/sharepoint-source.md` first; flip it in its own PR. |
+| `EnableSharePointSource` | `true` | The SharePoint source. Setting it `false` renders the original S3-only stack. |
 | `SharePointSiteUrl` | `https://8chzbf.sharepoint.com/sites/kb` | One site — the site needs its own per-site Graph grant. Indexing a *second* site is a `ConnectorParameters` edit, not a parameter change. Ignored while the flag is off. |
 | `SharePointTenantId` | Entra directory id | Not a secret. |
 | `SharePointConnectorSecretArn` | `bedrock/sharepoint-cert-connector` | Must hold exactly `clientId` and `certificatePassword`. Referenced by ARN; the template never reads its value. |
 | `SharePointCertificateBucket` / `SharePointCertificateKey` | `bedrock-sharepoint-certs-890349359349` / `certs/certificate.p12` | The `.p12`, under a prefix — the role grants `GetObject` on the prefix because the connector probes for a sibling `.metadata.json`. |
-| `SharePointSmokeQuery` | `What does the syllabus say about attendance?` | **Placeholder.** Retrieval spans the whole knowledge base, so this one would pass on the S3 syllabus. Replace it with a SharePoint-only question. |
+| `SharePointSmokeQuery` | `What do the ECE 4960 handouts cover?` | Measured at 5/5 SharePoint chunks. Must stay answerable **only** from SharePoint — retrieval spans the whole knowledge base. |
 
 | `EnableScheduledSync` | `false` | Adds the re-sync schedules. Fire-and-forget — read the section above. |
 | `SyncScheduleExpression` / `SharePointSyncScheduleExpression` | `cron(0 7 ? * MON *)` / `cron(0 8 ? * MON *)` | **UTC**, so 07:00 here is 03:00 in Ithaca in summer. Offset by an hour because ingestion jobs conflict. |
@@ -172,20 +172,26 @@ model owns chunking outright — supplying a `ChunkingConfiguration` alongside i
 `EmbeddingModelType: CUSTOM`, which means naming an embedding model and provisioning a vector store,
 which is the whole cost this blueprint exists to avoid.
 
-## SharePoint: wired, verified, off by default
+## SharePoint: on, and rehearsed before it was
 
-`EnableSharePointSource=true` adds a second data source over a SharePoint site's document library,
-and a second verifier instance that holds it to the same five assertions. The configuration in the
-template is one that was observed ingesting and answering in this account — not a sketch.
+A second data source over `https://8chzbf.sharepoint.com/sites/kb` — the ECE 4960 handouts — plus a
+second verifier instance holding it to the same five assertions.
 
-It is off by default because turning it on makes **every track's merge to `main`** depend on things
-outside this repo and outside AWS: an Entra app registration, admin-consented `Sites.Selected`
-grants on both Microsoft Graph and the SharePoint REST API, a per-site permission grant, a `.p12` in
-S3, and a certificate that has not expired. When one of those lapses the verifier correctly fails
-the stack, and `BlueprintDeploy` is red for everyone.
+Rehearsed as `aidlc-test-knowledgebase` before the flag flipped, and the numbers are the reason it is
+on rather than pending: **25 of 25 documents indexed, zero failures** on the first ingestion, a clean
+incremental re-sync on the following stack update, and a smoke query returning 5/5 chunks from
+SharePoint.
 
-Read `docs/sharepoint-source.md` before flipping it — in particular the order of operations, and the
-fact that the default `SharePointSmokeQuery` is a placeholder that would pass on S3 content.
+`SharePointSmokeQuery` is `What do the ECE 4960 handouts cover?` — chosen by measurement, not
+guesswork. The two corpora are cleanly separated: that question returns only SharePoint chunks, and
+`What is the late homework policy?` returns only CS1112 chunks from S3. A smoke query both corpora can
+answer would prove nothing, because retrieval spans the whole knowledge base.
+
+**What this costs.** Every merge — any track's — now depends on the Entra app's consent on both
+Microsoft Graph and the SharePoint REST API, the per-site grant on that site, and an unexpired
+certificate. When one lapses, the verifier correctly fails the stack and `BlueprintDeploy` is red for
+everyone. The Entra side is managed by hand by the platform team, so the certificate expiry lives
+with them; nothing in this repo watches that date. See `docs/sharepoint-source.md`.
 
 What is still by hand, and why: the certificate (CloudFormation cannot generate a `.p12`), the
 secret's value (never in a public repo), and the per-site Graph grant. The Entra app registration

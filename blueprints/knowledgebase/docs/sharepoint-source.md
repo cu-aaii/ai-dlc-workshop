@@ -4,8 +4,9 @@ How the SharePoint half of this blueprint works, what has to be true before it c
 and what has to be done by hand. Written after building it once and watching it ingest, so
 everything marked **verified** was observed rather than reasoned about.
 
-`EnableSharePointSource` defaults to `false`. The deployed `main` stack is S3-only. Everything
-below describes what flipping that flag commits the shared pipeline to.
+`EnableSharePointSource` is `true`. The deployed `main` stack indexes the ECE 4960 handouts in
+`sites/kb` alongside the CS1112 syllabus in S3 — 25 of 25 documents on the rehearsal, zero failures.
+Everything below is what that commits the shared pipeline to, and what has to stay true.
 
 ## The decision that governs everything else
 
