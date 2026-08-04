@@ -404,3 +404,12 @@
 **Context**: CONSTRUCTION — Code Generation complete for U-01. Awaiting approval before Build and Test.
 
 ---
+
+## Code Generation U-01 — Approval
+**Timestamp**: 2026-08-03T00:00:00Z
+**Approval Prompt**: "# 🚀 Code Generation Complete - U-01 Domain Core … ✅ **Continue to Next Stage** — approve and proceed to **Build and Test**" — presented with the generated files, the ~45 assertions actually executed, the one real bug found and fixed, the three plan deviations (notably that Step 11 was wrong and that `tools/check` was already failing on this branch beforehand), and an explicit list of what did not run.
+**User Input**: "Continue to next stage"
+**Decision**: **APPROVED** — Code Generation for U-01 closed, including the three recorded deviations.
+**Context**: CONSTRUCTION — proceeding to Build and Test, the stage whose entire purpose is executing what Code Generation could only write.
+
+---
