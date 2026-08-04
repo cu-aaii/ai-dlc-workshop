@@ -26,7 +26,13 @@ tfplan
 # up by `git add -A`.
 SCRATCHPAD.md
 PARTICIPANT_BRIEF.md
-aidlc-docs/
+
+# `aidlc-docs/` was ignored here. Removed deliberately: the pattern is unanchored, so it matched
+# at every depth and silently ignored each track's AI-DLC artifacts, which are this workshop's
+# primary deliverable. Track A's survive only because they were committed before the rule landed;
+# already-tracked files are unaffected by .gitignore. Any track that had not yet committed was
+# blocked without a signal, since the files never appear in `git status` and `git add -A` skips
+# them. Local-only scratch belongs in `.git/info/exclude`, which is per-machine and needs no PR.
 
 .DS_Store
 .idea/
