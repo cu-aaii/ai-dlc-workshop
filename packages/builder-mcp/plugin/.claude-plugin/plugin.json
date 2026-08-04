@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "cornell-builder",
+  "displayName": "Cornell Builder (AI-DLC)",
+  "description": "Deploy Cornell AWS infrastructure from plain language. Wraps the builder-mcp server: search the blueprint catalog, open a registration PR, and watch the deploy chain — with governance invariants that never merge, push, or call CloudFormation directly.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Cornell AI-DLC workshop team",
+    "url": "https://github.com/cu-aaii/ai-dlc-workshop"
+  },
+  "homepage": "https://github.com/cu-aaii/ai-dlc-workshop/tree/main/packages/builder-mcp",
+  "repository": "https://github.com/cu-aaii/ai-dlc-workshop",
+  "license": "MIT",
+  "keywords": ["aws", "cloudformation", "infrastructure", "deployment", "cornell", "mcp"],
+  "userConfig": {
+    "github_token": {
+      "type": "string",
+      "title": "GitHub token (optional)",
+      "description": "OPTIONAL. Leave blank to install and demo — the blueprint catalog is read anonymously from the public repo. Supply a fine-grained PAT with repo scope for two things only: (1) headroom, since anonymous GitHub API access allows roughly six catalog searches per hour per IP, and (2) real pull requests — without a token every write tool returns a dry-run plan instead of opening a PR.",
+      "sensitive": true,
+      "required": false
+    },
+    "github_org": {
+      "type": "string",
+      "title": "GitHub organization",
+      "description": "Org that owns the workshop repo the catalog is read from and pull requests are opened against. Change this to your own username to rehearse against a fork.",
+      "default": "cu-aaii",
+      "required": false
+    },
+    "workshop_repo": {
+      "type": "string",
+      "title": "Workshop repository name",
+      "description": "Repository the pipeline tracks. Paired with the organization above.",
+      "default": "ai-dlc-workshop",
+      "required": false
+    },
+    "aws_region": {
+      "type": "string",
+      "title": "AWS region",
+      "description": "Region used when reading stack status and pipeline health. Read-only AWS access is enough; the server never creates, updates, or deletes a stack.",
+      "default": "us-east-1",
+      "required": false
+    }
+  }
+}

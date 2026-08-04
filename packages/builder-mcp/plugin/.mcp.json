@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "cornell-builder": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "${BUILDER_MCP_SOURCE:-git+https://github.com/cu-aaii/ai-dlc-workshop@main#subdirectory=packages/builder-mcp}",
+        "builder-mcp"
+      ],
+      "env": {
+        "BUILDER_MCP_TRANSPORT": "stdio",
+        "GITHUB_TOKEN": "${user_config.github_token}",
+        "BUILDER_MCP_GITHUB_ORG": "${user_config.github_org}",
+        "BUILDER_MCP_WORKSHOP_REPO": "${user_config.workshop_repo}",
+        "AWS_REGION": "${user_config.aws_region}"
+      }
+    }
+  }
+}
