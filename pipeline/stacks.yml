@@ -33,3 +33,18 @@ templates:
     template: 'blueprints/hello-world/infra/hello-world.yml'
     deployed_by: 'pipeline'
     description: 'Trivial tagged stack that proves the deploy path end to end.'
+
+  - name: 'tiny-chatbot'
+    template: 'blueprints/tiny-chatbot/infra/tiny-chatbot.yml'
+    deployed_by: 'manual'
+    description: 'Experimental canned-response chatbot behind a public Lambda Function URL. Parked until the hello-world deploy path is verified end to end; flipped to pipeline in the PR that wires its Build stage action (blueprints/tiny-chatbot/Dockerfile, target tiny-chatbot).'
+
+  - name: 'builder-mcp'
+    template: 'builder-mcp/infra/builder-mcp.yml'
+    deployed_by: 'pipeline'
+    description: 'Cornell Builder MCP server on Bedrock AgentCore. Image built by the Build stage (arm64, root Dockerfile target builder-mcp), deployed by digest.'
+
+  - name: 'knowledgebase'
+    template: 'blueprints/knowledgebase/infra/knowledgebase.yml'
+    deployed_by: 'pipeline'
+    description: 'Bedrock managed knowledge base over the existing document bucket. Verifies at deploy time that the documents are indexed and answerable, so a green deploy is the acceptance test.'

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "cornell-builder": {
+      "command": "uv",
+      "args": ["run", "--directory", "builder-mcp", "builder-mcp"],
+      "env": {
+        "BUILDER_MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}

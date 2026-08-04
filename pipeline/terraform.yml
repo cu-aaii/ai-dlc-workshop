@@ -1,0 +1,84 @@
+version: 0.2
+
+# Buildspec for TerraformProject in pipeline/pipeline.yml. Runs one Terraform module per
+# invocation against non-AWS (Azure/Entra) resources.
+#
+# The invoking Terraform stage action must set:
+#   TF_WORKING_DIR  repo-relative directory holding the module, e.g.
+#                   blueprints/entra-probe/infra/azure
+#   TF_STATE_KEY    state object key within TF_STATE_BUCKET, e.g.
+#                   aidlc/main/entra-probe.tfstate
+#
+# TF_STATE_BUCKET, TF_VERSION and the three ARM_* credentials come from the project itself.
+# The ARM_* values are CodeBuild SECRETS_MANAGER variables resolved at build start; the
+# azuread and azurerm providers read them natively, so no credential is written to disk, to a
+# .tfvars file, or into Terraform state.
+#
+# Nothing below echoes an ARM_* value, and no phase enables shell tracing. CodeBuild does not
+# redact environment variables in build logs -- keeping them out is this file's job. Note that
+# `terraform init` prints the resolved backend config, which is why the credentials are
+# environment variables rather than -backend-config or -var arguments.
+
+env:
+  variables:
+    TF_INSTALL_DIR: '/usr/local/bin'
+
+phases:
+
+  # The CodeBuild standard images ship no Terraform, so it is fetched here and pinned by
+  # TF_VERSION. The checksum check is not ceremony: this is an unauthenticated download that
+  # is about to be handed tenant credentials.
+  install:
+    on-failure: 'ABORT'
+    commands:
+      - 'set -euo pipefail'
+      - 'cd /tmp'
+      - 'curl -fsSL -O "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"'
+      - 'curl -fsSL -O "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_SHA256SUMS"'
+      - 'grep " terraform_${TF_VERSION}_linux_amd64.zip$" "terraform_${TF_VERSION}_SHA256SUMS" | sha256sum -c -'
+      - 'unzip -o -q "terraform_${TF_VERSION}_linux_amd64.zip" -d "$TF_INSTALL_DIR"'
+      - 'terraform version'
+
+  pre_build:
+    on-failure: 'ABORT'
+    commands:
+      - 'set -euo pipefail'
+      - ': "${TF_WORKING_DIR:?the Terraform stage action must set TF_WORKING_DIR}"'
+      - ': "${TF_STATE_KEY:?the Terraform stage action must set TF_STATE_KEY}"'
+      - 'cd "$CODEBUILD_SRC_DIR/$TF_WORKING_DIR"'
+      # The module declares `backend "s3" {}` with no values, so one module works unchanged in
+      # any environment. use_lockfile is S3-native state locking -- no DynamoDB table to
+      # create, tag or pay for.
+      - >-
+        terraform init
+        -input=false
+        -no-color
+        -backend-config="bucket=$TF_STATE_BUCKET"
+        -backend-config="key=$TF_STATE_KEY"
+        -backend-config="region=$AWS_DEFAULT_REGION"
+        -backend-config="use_lockfile=true"
+
+  build:
+    on-failure: 'ABORT'
+    commands:
+      - 'set -euo pipefail'
+      - 'cd "$CODEBUILD_SRC_DIR/$TF_WORKING_DIR"'
+      # Plan to a file, then apply that file. Applying a saved plan is what guarantees the
+      # apply does exactly what the plan printed, rather than re-planning against state that
+      # may have moved in between.
+      - >-
+        terraform plan
+        -input=false
+        -no-color
+        -lock-timeout=5m
+        -var="application=$APPLICATION"
+        -var="environment=$ENVIRONMENT"
+        -var="owner=$OWNER"
+        -out=tfplan
+      - 'terraform apply -input=false -no-color -lock-timeout=5m tfplan'
+
+  post_build:
+    commands:
+      # Runs even on failure. The plan file can contain resource attributes; the build
+      # artifact is not uploaded anywhere, but leaving it in the workspace is needless.
+      - 'rm -f "$CODEBUILD_SRC_DIR/$TF_WORKING_DIR/tfplan"'

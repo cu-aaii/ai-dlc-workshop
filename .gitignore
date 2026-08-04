@@ -7,18 +7,28 @@ venv/
 .env.*
 !.env.example
 
-# Terraform (Azure stage, not yet added)
+# Terraform. State lives in S3 (see pipeline/pipeline.yml), never on disk here.
+#
+# .terraform.lock.hcl is deliberately NOT ignored -- it is the provider version lock, and
+# committing it is what makes a laptop, PR checks and CodeBuild resolve identical provider
+# versions. Ignoring it lets them drift silently.
 .terraform/
 *.tfstate
 *.tfstate.*
 *.tfplan
-.terraform.lock.hcl
+tfplan
 
 # Claude Code personal settings and MCP server config. Never commit: this repo is public, and
 # these files hold machine-specific paths, per-user permission grants, and — in .mcp.json —
 # the access tokens MCP servers are configured with.
 .claude/settings.local.json
 .mcp.json
+
+# Local working notes and workshop handouts. Untracked but not ignored is how these get swept
+# up by `git add -A`.
+SCRATCHPAD.md
+PARTICIPANT_BRIEF.md
+aidlc-docs/
 
 .DS_Store
 .idea/
