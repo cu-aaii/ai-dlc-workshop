@@ -3,7 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - U-02 NFR Design
+- **Current Stage**: **CONSTRUCTION** - U-02 Infrastructure Design
+- **NFR Design U-02 Complete (awaiting approval)**: 2026-08-03 — "choose defaults and proceed" (Q1–Q6 all A)
 - **NFR Requirements U-02 Approved**: 2026-08-03 — "Continue to next stage"
 - **Functional Design U-02 Approved**: 2026-08-03 — "Continue to next stage"
 - **Build and Test U-01 Approved**: 2026-08-03 — "Approve". **U-01 COMPLETE END TO END.**
@@ -524,6 +525,45 @@ relocated to `docs/aidlc/builder-mcp/`. By that convention this blueprint's reco
 relocating puts the repo convention in direct conflict with the methodology. ~30 files. A decision, not a
 cleanup — deliberately not done.
 
+## NFR Design U-02 — outputs
+`construction/u-02-dashboard-platform/nfr-design/` — `nfr-design-patterns.md`, `logical-components.md`.
+Q1-Q6 all **A** ("choose defaults and proceed").
+
+Declarative `botocore.Config` retry/timeout → `UPSTREAM_THROTTLED` · **deadline derived from
+`get_remaining_time_in_millis()`** (knowledgebase.yml precedent) · stdlib `logging`+JSON, **no powertools** ·
+metrics via **EMF** (a log line, no API call) · API totality via **one outer error boundary** → generic 503 ·
+scheduled collector **`MaximumRetryAttempts: 0`, no DLQ**.
+
+**The mirror image of U-01's NFR Design.** U-01 recorded 8 pattern families N/A and zero infrastructure
+components; U-02 has a real 12-component inventory and every mandated category live. `logical-components.md`
+draws `notify-topic` and U-01's `dashboard.core` as **dependencies (inbound arrows), not owned boxes**, and
+has an explicit *no queue/cache/circuit-breaker* section with reasons.
+
+### ⚠️ TSD-8 REFINED (not reopened, not rewritten)
+Q2 = A refines TSD-8's internal-deadline **mechanism** from a guessed "≈100 s" constant to a value derived
+from `get_remaining_time_in_millis()` less a fixed margin — the 120 s timeout (P-1) becomes the single source
+of truth. **Numeric intent unchanged** at the default timeout. TSD-8's original wording is preserved in
+`tech-stack-decisions.md` with a ⚠️ REFINED pointer; this is an annotation, per the amendment discipline, not
+an in-place rewrite of an approved artifact.
+
+### RESILIENCY-04/-14/-15 were NOT re-deferred here
+U-01's NFR Design plan (Q6) routed -04/-15 to "U-02's NFR Design" as a 2nd deferral — but they were then
+**discharged one stage earlier, at U-02 NFR Requirements** (R-9 revert-to-rollback/deploy-by-digest, R-10
+runbook), so the deferral count stopped at 2. This stage confirmed they are closed and did **not** reopen
+them. -14 remains satisfied at U-01's NFR Design (the property suite).
+
+### Four findings (interactions), none reopening a prior decision
+1. **Q2 refines an approved artifact** — annotated above.
+2. **Q3 + Q4 compose into one stdout channel** — why EMF needs no extra IAM and cannot throttle; CR-04's
+   "never a tag value" rule extends to EMF **dimensions** (no NetID as a dimension).
+3. **Three named collector bounds** (page limit / deadline / retry exhaustion), ordered so the platform 120 s
+   timeout — the only *unnamed* bound — never wins. Every failure is attributable before the runtime kills it.
+4. **Q5 + Q6 are one discipline on two functions** — a failure must be named and visible, never papered over.
+
+**Carried to Infrastructure Design (unchanged):** §6.4 site-sync ordering · WAF IPv6 (2 IPSets or documented
+scope) · notify-topic ARN mechanism · API reserved-concurrency number (S-2) · exact CSP string · two-template
+split shape.
+
 ## Stage Progress
 ### 🔵 INCEPTION PHASE
 - [x] Workspace Detection
@@ -549,7 +589,10 @@ cleanup — deliberately not done.
 - [ ] NFR Design — **U-01 complete (awaiting approval)**; U-02 pass follows
       - [x] U-01 — **APPROVED 2026-08-03** — 9 patterns, zero infrastructure components. **RESILIENCY-14 SATISFIED**;
             **RESILIENCY-04/-15 ASSIGNED to U-02's NFR Design (2nd deferral)**
-      - [ ] U-02 — inherits RESILIENCY-04/-15 as a named obligation
+      - [x] U-02 — **COMPLETE 2026-08-03 (awaiting approval)**. Q1–Q6 all A. Two artifacts:
+            `nfr-design-patterns.md` (9 sections), `logical-components.md` (12-component inventory + 2
+            dependencies). **Note: RESILIENCY-04/-15 were NOT re-deferred to here** — they were already
+            discharged at U-02 NFR Requirements (R-9/R-10); deferral count stopped at 2. See below.
 - [ ] Infrastructure Design — **applicability to U-01 QUESTIONED, not assumed** (see
       `construction/plans/u-01-infrastructure-design-applicability.md`). U-01 has **zero** infrastructure
       components; the plan's own justification for this stage (SECURITY-01, -06, -14 SRI, RESILIENCY-08,
