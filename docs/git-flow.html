@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ai-dlc-workshop — commit flow, Aug 3–4 2026</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --muted:          #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6;
+    --series-1-wash:  rgba(42,120,214,0.10);
+    --hover:          rgba(11,11,11,0.035);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted:          #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --series-1:       #3987e5;
+      --series-1-wash:  rgba(57,135,229,0.14);
+      --hover:          rgba(255,255,255,0.05);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted:          #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --series-1:       #3987e5;
+    --series-1-wash:  rgba(57,135,229,0.14);
+    --hover:          rgba(255,255,255,0.05);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+  }
+  .viz-root { background: var(--page); color: var(--text-primary); min-height: 100vh; padding: 32px 24px 64px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--text-secondary); font-size: 13px; margin: 0; }
+  button.theme {
+    font: inherit; font-size: 12px; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 10px; cursor: pointer; white-space: nowrap;
+  }
+  button.theme:hover { color: var(--text-primary); }
+
+  .hero { margin-bottom: 24px; }
+  .hero .label { color: var(--text-secondary); font-size: 13px; }
+  .hero .value { font-size: 56px; font-weight: 600; line-height: 1.05; letter-spacing: -0.03em; margin: 2px 0 2px; }
+  .hero .note { color: var(--text-secondary); font-size: 13px; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .tile .label { color: var(--text-secondary); font-size: 12px; }
+  .tile .value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px; }
+  .tile .foot { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px 20px; margin-bottom: 20px; }
+  .card > h2 { font-size: 14px; font-weight: 600; margin: 0 0 2px; }
+  .card > .cardsub { color: var(--text-secondary); font-size: 12px; margin: 0 0 14px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 0 0 12px; font-size: 12px; color: var(--text-secondary); }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .legend svg { display: block; overflow: visible; }
+
+  /* ---- commit flow graph ---- */
+  .graphhead, .row {
+    display: grid;
+    grid-template-columns: var(--gutter) 64px minmax(0,1fr) 132px 118px;
+    gap: 0 12px;
+    align-items: center;
+  }
+  .graphhead {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--grid);
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    padding-bottom: 6px; margin-bottom: 0;
+  }
+  .scroller { max-height: 620px; overflow: auto; position: relative; margin: 0 -4px; padding: 0 4px; }
+  .rowsbox { position: relative; }
+  .rails { position: absolute; left: 0; top: 0; pointer-events: none; }
+  .row { height: 26px; font-size: 12.5px; position: relative; }
+  .row:hover { background: var(--hover); }
+  .row .sha { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .row .subj { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
+  .row.off .subj { color: var(--text-secondary); }
+  .row .who { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .row .when { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; text-align: right; }
+  .chip {
+    display: inline-block; font-size: 10.5px; line-height: 1.5;
+    padding: 0 5px; margin-right: 5px; border-radius: 4px;
+    border: 1px solid var(--border); color: var(--text-secondary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    vertical-align: 1px;
+  }
+  .chip.main { border-color: var(--series-1); color: var(--text-primary); background: var(--series-1-wash); }
+  .pr { color: var(--text-secondary); }
+
+  /* ---- tooltip ---- */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; opacity: 0;
+    transition: opacity .08s linear;
+    background: var(--surface-1); border: 1px solid var(--baseline);
+    border-radius: 8px; padding: 9px 11px; width: max-content; max-width: 380px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.18); font-size: 12px; line-height: 1.55;
+    color: var(--text-primary);
+  }
+  #tip .t-sha { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--muted); font-size: 11px; }
+  #tip .t-sub { font-weight: 600; margin: 2px 0 4px; }
+  #tip .t-meta { color: var(--text-secondary); }
+  #tip .t-key { color: var(--muted); }
+
+  /* ---- bars ---- */
+  .barrow { display: grid; grid-template-columns: 148px minmax(0,1fr) 44px; gap: 12px; align-items: center; height: 22px; font-size: 12.5px; }
+  .barrow:hover { background: var(--hover); }
+  .barrow .nm { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barrow .track { position: relative; height: 14px; }
+  .barrow .fill { position: absolute; left: 0; top: 0; height: 14px; background: var(--series-1); border-radius: 0 4px 4px 0; }
+  .barrow .val { text-align: right; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+  /* ---- tables ---- */
+  details { margin-top: 14px; border-top: 1px solid var(--grid); padding-top: 10px; }
+  summary { cursor: pointer; font-size: 12px; color: var(--text-secondary); }
+  summary:hover { color: var(--text-primary); }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; color: var(--muted); }
+  .tablewrap { max-height: 340px; overflow: auto; }
+
+  .foot { color: var(--muted); font-size: 12px; margin-top: 24px; line-height: 1.6; }
+  .foot code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
+</style>
+</head>
+<body>
+<div class="viz-root" data-palette="#2a78d6">
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>cu-aaii/ai-dlc-workshop — commit flow</h1>
+      <p class="sub">Every commit on every branch, <strong id="rangeLabel">—</strong> (author local time). The repository's entire history to date.</p>
+    </div>
+    <button class="theme" id="themeBtn" type="button">Dark mode</button>
+  </header>
+
+  <section class="hero">
+    <div class="label">Commits, all branches</div>
+    <div class="value" id="heroVal">—</div>
+    <div class="note" id="heroNote">—</div>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="card">
+    <h2>Commit flow</h2>
+    <p class="cardsub">Topological order, newest first. Rails are branch lanes; a rail bending left is a merge landing on the lane it bends into.</p>
+    <div class="legend">
+      <span class="item"><svg width="14" height="14"><circle cx="7" cy="7" r="4" fill="var(--series-1)"/></svg> On the <code>main</code> spine (first-parent)</span>
+      <span class="item"><svg width="14" height="14"><circle cx="7" cy="7" r="4" fill="var(--muted)"/></svg> Branch work</span>
+      <span class="item"><svg width="14" height="14"><circle cx="7" cy="7" r="4" fill="var(--surface-1)" stroke="var(--series-1)" stroke-width="2"/></svg> Merge commit (2+ parents)</span>
+    </div>
+    <div class="graphhead" id="ghead">
+      <div>Graph</div><div>Commit</div><div>Subject</div><div>Author</div><div style="text-align:right">Local time</div>
+    </div>
+    <div class="scroller" id="scroller">
+      <div class="rowsbox" id="rowsbox">
+        <svg class="rails" id="rails" aria-hidden="true"></svg>
+      </div>
+    </div>
+    <details>
+      <summary>Table view — all commits</summary>
+      <div class="tablewrap">
+        <table id="allTable">
+          <thead><tr><th>Commit</th><th>Subject</th><th>Author</th><th>Local time</th><th>Parents</th><th>On main spine</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>What landed on <code>main</code></h2>
+    <p class="cardsub">The first-parent spine of <code>origin/main</code>, newest first — each row is one deploy to the shared AWS account.</p>
+    <div class="tablewrap">
+      <table id="mainTable">
+        <thead><tr><th>#</th><th>PR</th><th>Subject</th><th>Author</th><th>Local time</th><th>How</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Commits by author identity</h2>
+    <p class="cardsub">As git records them. Some people committed under more than one identity, so these are identities, not headcount.</p>
+    <div id="authorChart"></div>
+    <details>
+      <summary>Table view — commits by author identity</summary>
+      <table id="authorTable">
+        <thead><tr><th>Author identity</th><th class="num">Commits</th><th class="num">Share</th><th>First commit</th><th>Last commit</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Commits per hour</h2>
+    <p class="cardsub">Author local time, every branch. Two working days.</p>
+    <div id="hourChart"></div>
+    <details>
+      <summary>Table view — commits per hour</summary>
+      <div class="tablewrap">
+        <table id="hourTable">
+          <thead><tr><th>Hour</th><th class="num">Commits</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <p class="foot">
+    Generated from <code>git log --all --topo-order --since=2026-08-02</code>. Stash entries excluded.
+    Diff totals measured as <code>git diff f1dc83b origin/main --shortstat</code>.
+    Branch and tag chips show the refs pointing at a commit at the time of generation.
+  </p>
+
+  <div id="tip" role="tooltip"></div>
+
+</div>
+</div>
+
+<script>
+// ---------------------------------------------------------------- data
+const RAW = `4626ccec2888301e245c57bd6c8346598b0280a4|77f4f611d81b0b202db13092fceedca1d0f0987c|4esv|2026-08-04T14:12:01-0400|origin/b-track-b-stakeholder-deck|docs(track-b): add stakeholder deck for the knowledge base
+77f4f611d81b0b202db13092fceedca1d0f0987c|86c671878a254de3a3ce52a78d0e4f66e642d7f6 a42665de3c3e201f0d89e33f6693de818c67040e|Axel Stevens|2026-08-04T14:02:26-0400|origin/main, origin/HEAD|Merge pull request #31 from cu-aaii/b-kb-enable-sharepoint
+a42665de3c3e201f0d89e33f6693de818c67040e|84957657f2302e07a62be22e731203e3f9f21fe1|4esv|2026-08-04T14:01:07-0400||feat(knowledgebase): turn the SharePoint source on
+86c671878a254de3a3ce52a78d0e4f66e642d7f6|84957657f2302e07a62be22e731203e3f9f21fe1 6fc74a1e23e6557a1512cf223d71c4b1210f4c37|phil|2026-08-04T13:28:07-0400||Merge pull request #30 from ferminromeroiii/teams-bot-followups
+6fc74a1e23e6557a1512cf223d71c4b1210f4c37|84957657f2302e07a62be22e731203e3f9f21fe1|Fermin Romero|2026-08-04T13:06:07-0400||teams-bot: bound the model call, parse MAX_TOKENS lazily, never reply blank
+84957657f2302e07a62be22e731203e3f9f21fe1|6202aa8f06be54db7b4d118fa58649dbbc941105 d928b640eab2a493342010e1a870c220603793f8|phil|2026-08-04T12:48:59-0400|HEAD -> team-ad, origin/team-ad|Merge pull request #29 from ferminromeroiii/team-c-wip
+d928b640eab2a493342010e1a870c220603793f8|d198a0abd74a2c198ae4a49770d79f1a097a44b5 6202aa8f06be54db7b4d118fa58649dbbc941105|Fermin Romero|2026-08-04T12:38:59-0400||Merge upstream/main; keep both new Build actions
+6202aa8f06be54db7b4d118fa58649dbbc941105|60491400ff8b9e088684463a51f2184fd2184db1 df012356f9568a799d2adf677d53e519ed8fa886|Axel Stevens|2026-08-04T12:36:44-0400||Merge pull request #27 from cu-aaii/b-kb-fix-policy-desc
+df012356f9568a799d2adf677d53e519ed8fa886|60491400ff8b9e088684463a51f2184fd2184db1|4esv|2026-08-04T12:34:58-0400||fix(knowledgebase): restore RetrievalPolicy byte-for-byte; Description replaces too
+60491400ff8b9e088684463a51f2184fd2184db1|f009a8d43c3fea8f1c96adc023e8cf0032bed392 7e1963e606124cf1819ed4353e3383660139a5f9|Axel Stevens|2026-08-04T12:25:07-0400||Merge pull request #26 from cu-aaii/b-kb-fix-policy
+7e1963e606124cf1819ed4353e3383660139a5f9|f009a8d43c3fea8f1c96adc023e8cf0032bed392|4esv|2026-08-04T12:24:08-0400||fix(knowledgebase): restore the RetrieveAndGenerate grant to unblock main
+f009a8d43c3fea8f1c96adc023e8cf0032bed392|2f3513e1b0e39d13848bf5023132699e283df64c 11c29acd4a535141cc47de4979b1ab3e032cd4db|phil|2026-08-04T12:14:12-0400||Merge pull request #25 from cu-aaii/team-ad
+11c29acd4a535141cc47de4979b1ab3e032cd4db|b4a003a48818b080a5c7d9bc52235bebac920017|philwilliammee|2026-08-04T12:10:31-0400||feat(aisei-site): wire the Build/Deploy pipeline actions and un-park
+b4a003a48818b080a5c7d9bc52235bebac920017|91430b4b3c9e5890aa6f725707b2c08359378591|Ernest Francis|2026-08-04T11:33:17-0400||screenshot
+91430b4b3c9e5890aa6f725707b2c08359378591|c8f4d63a1e096384bd5bf891405dd5d39b3c1293|Ernest Francis|2026-08-04T11:32:08-0400||feat(builder-mcp): let the requestor choose whether to preview a deploy
+c8f4d63a1e096384bd5bf891405dd5d39b3c1293|e3a37422e57ba5dcda2cc4709544338c74ee479d|Ernest Francis|2026-08-04T11:22:52-0400|blackfneix2|feat(builder-mcp): mark Builder-generated PR titles for reviewers
+e3a37422e57ba5dcda2cc4709544338c74ee479d|3d54f34c496feee27a9845ebd29a76b2135b33f0|Ernest Francis|2026-08-04T10:55:56-0400||docs(readme): bring the Layout tree back in line with the repo
+2f3513e1b0e39d13848bf5023132699e283df64c|3d54f34c496feee27a9845ebd29a76b2135b33f0 01dc90e626f76c8241231fc13e5ede53b7e5beaa|Axel Stevens|2026-08-04T12:12:50-0400||Merge pull request #18 from cu-aaii/b-kb-retract-sharepoint
+01dc90e626f76c8241231fc13e5ede53b7e5beaa|581a14ee9514a6c692e629fecb511ae2fe716982 aac465d92b1b22a3a136d479ce503b2e1643e11a|4esv|2026-08-04T12:10:27-0400||Merge the SharePoint runbook; act on three of its findings
+aac465d92b1b22a3a136d479ce503b2e1643e11a|f5471466f283a7e92767c690d0924cfa6560d544|stevemandl|2026-08-04T11:43:02-0400||docs(knowledgebase): add a validated SharePoint runbook; confirm the consent ask
+581a14ee9514a6c692e629fecb511ae2fe716982|d3f1227ca0550c1c19255396e06553549e8a575d 3d54f34c496feee27a9845ebd29a76b2135b33f0|4esv|2026-08-04T12:06:15-0400||Merge origin/main; reconcile with the monorepo layout and the manifest rule
+d3f1227ca0550c1c19255396e06553549e8a575d|f5471466f283a7e92767c690d0924cfa6560d544|4esv|2026-08-04T12:00:01-0400||feat(knowledgebase): SharePoint source and scheduled re-sync, both gated off
+f5471466f283a7e92767c690d0924cfa6560d544|37e0f480dec1ffd50c735bfbee189f931591d204|4esv|2026-08-04T08:58:25-0400|origin/b-kb-retract-sharepoint|docs(knowledgebase): retract the claim that SharePoint works here
+d198a0abd74a2c198ae4a49770d79f1a097a44b5|adab9c23616de5d307176a919995a96f47cbc2f3|Fermin Romero|2026-08-04T12:36:02-0400||Finish CONSTRUCTION: Code Generation and Build and Test; gate the tests
+adab9c23616de5d307176a919995a96f47cbc2f3|080665637b35a0df49a7400e31cbdb419e178567|Fermin Romero|2026-08-04T12:28:17-0400||Move Track C's blueprint to blueprints/teams-bot/; make retrieval optional
+080665637b35a0df49a7400e31cbdb419e178567|e8779e3dabfd66c486595e56feaa8b8281400736|Fermin Romero|2026-08-04T11:38:25-0400||Ground course-chatbot in the knowledge base; merge upstream
+e8779e3dabfd66c486595e56feaa8b8281400736|9c77a60eb14325b8da2953d69ee98b7cfbc58417 3d54f34c496feee27a9845ebd29a76b2135b33f0|Fermin Romero|2026-08-04T11:33:41-0400||Merge remote-tracking branch 'upstream/main' into team-c-wip
+9c77a60eb14325b8da2953d69ee98b7cfbc58417|5726794734a78ca89c37a9ef01eabcb1d0d3cb7b|Fermin Romero|2026-08-04T11:28:35-0400||Wire course-chatbot into the pipeline: this now deploys on merge
+5726794734a78ca89c37a9ef01eabcb1d0d3cb7b|fe7d336e66ba604913e2b6c56c9ac9974ca9d493|Fermin Romero|2026-08-04T11:22:07-0400||Track C: Bot Framework front door for course-chatbot (not yet deployable)
+fe7d336e66ba604913e2b6c56c9ac9974ca9d493|fff795ee6fc7f814342af2b5d6c65306beb6f699|Fermin Romero|2026-08-04T09:49:48-0400||Re-track Track C's AI-DLC artifacts under blueprints/course-chatbot/
+fff795ee6fc7f814342af2b5d6c65306beb6f699|00fdf71c85de2ed95303fb3e10d897b5a78f3f36 e03ee473b2cb6fe42b9f4a468aa712678fcd59bc|Fermin Romero|2026-08-04T09:47:56-0400||Merge remote-tracking branch 'upstream/main' into team-c-wip
+00fdf71c85de2ed95303fb3e10d897b5a78f3f36|98b1694498209db2759851620c184fff4d32e5a8|Fermin Romero|2026-08-04T09:36:00-0400||Ignore the participant brief under the name it actually has
+98b1694498209db2759851620c184fff4d32e5a8|667d7c0d60610efd129491e8f7f396fa58cf4cdd|Fermin Romero|2026-08-04T09:35:05-0400||Keep aidlc-docs and the participant brief out of the shared repo
+667d7c0d60610efd129491e8f7f396fa58cf4cdd|318e92f0a24e8303a631cc26c0d2b5415a8af442|Fermin Romero|2026-08-04T09:33:26-0400||Reconcile the teams-bot INCEPTION artifacts with upstream
+318e92f0a24e8303a631cc26c0d2b5415a8af442|f73dddff4e7de7bbca4f51d32d12405a5074578a 37e0f480dec1ffd50c735bfbee189f931591d204|Fermin Romero|2026-08-04T09:23:22-0400||Merge remote-tracking branch 'upstream/main' into team-c-wip
+f73dddff4e7de7bbca4f51d32d12405a5074578a|41105921b7e69d863b64298148f845ac53a31c2d|Fermin Romero|2026-08-04T09:23:13-0400||Fold in the second round of Microsoft-side CLI research
+41105921b7e69d863b64298148f845ac53a31c2d|45c1ae67b8fc105e83dcc92b50430f1438835fd2|Fermin Romero|2026-08-03T17:37:25-0400||Add the workshop docs, writing guides, and Teams bot research
+45c1ae67b8fc105e83dcc92b50430f1438835fd2|4d5fcfd79433352880024be560e46e456dbd4fde|Fermin Romero|2026-08-03T17:37:06-0400||Add the AI-DLC inception artifacts for the teams-bot blueprint
+4d5fcfd79433352880024be560e46e456dbd4fde|b148dd26195311011b24ac2dbf256751a2ce03a2|Fermin Romero|2026-08-03T17:36:59-0400||Ignore .mcp.json and Windows Zone.Identifier artifacts
+b148dd26195311011b24ac2dbf256751a2ce03a2|416891be8760c55ae1e50a812e22361476dffa9a|Fermin Romero|2026-08-03T17:16:48-0400||Record research on CLI automation of the Microsoft side of teams-bot
+231aeb2c59d8fa2b72f0f7001b91e0830b043bb3|ca4130eac8e793a69fd87ec3a9b6cab24b2617da|Jasdev Imani|2026-08-04T14:04:09-0400|origin/dashboard|AI-DLC: U-02 Dashboard Platform built and tested (Construction complete)
+ca4130eac8e793a69fd87ec3a9b6cab24b2617da|a8f07ac3094151244904db0204360679f43186b6|chrisjcameron|2026-08-04T13:34:53-0400||docs(dashboard): capture fork's Bedrock/CloudWatch telemetry as an integration spec
+a8f07ac3094151244904db0204360679f43186b6|54b4f6de2c9eca485b50d4293a72494f2019afb8|Jasdev Imani|2026-08-04T12:54:49-0400||AI-DLC: NFR Design complete for U-02 Dashboard Platform
+54b4f6de2c9eca485b50d4293a72494f2019afb8|d8b90e4c08fcd4cf7f3f21a1f1f5d22fce727892|Jasdev Imani|2026-08-04T12:32:01-0400||AI-DLC: U-02 NFR Requirements approved
+d8b90e4c08fcd4cf7f3f21a1f1f5d22fce727892|ba59fdd574a0af3f6b1f34d5f9b7604489dc23e6|Jasdev Imani|2026-08-04T12:30:37-0400||AI-DLC: NFR Requirements complete for U-02 Dashboard Platform
+ba59fdd574a0af3f6b1f34d5f9b7604489dc23e6|ae929a8c157de0fc3514e60ddeb9e33ed5747371|Jasdev Imani|2026-08-04T12:21:29-0400||AI-DLC: open U-02 NFR Requirements
+ae929a8c157de0fc3514e60ddeb9e33ed5747371|f93521caa2796a79ec3ea49ca7fe10cab2ac8d28|Jasdev Imani|2026-08-04T12:18:41-0400||AI-DLC: U-02 Functional Design approved
+f93521caa2796a79ec3ea49ca7fe10cab2ac8d28|4788cc6c660a43f470c2d722e7ab6b915ac706bd|Jasdev Imani|2026-08-04T12:16:36-0400||AI-DLC: Functional Design complete for U-02 Dashboard Platform
+4788cc6c660a43f470c2d722e7ab6b915ac706bd|01a90150505b4d7e04199ccc6ad9f7bd3233158f|Jasdev Imani|2026-08-04T12:05:50-0400||AI-DLC: open U-02 Functional Design (one pass, as approved)
+01a90150505b4d7e04199ccc6ad9f7bd3233158f|76bae6fbadf65d9d61018eb6cb499057c089483b|Jasdev Imani|2026-08-04T12:03:10-0400||chore: install uv + terraform, commit uv.lock, tools/check passes
+76bae6fbadf65d9d61018eb6cb499057c089483b|f19d8470d38eb628e8f804b14eb29b86c89c7817|Jasdev Imani|2026-08-04T11:59:14-0400||AI-DLC: U-01 Build and Test approved — U-01 complete end to end
+f19d8470d38eb628e8f804b14eb29b86c89c7817|bf89c44296e109dadf6c1c9abc024b05929b8db6|Jasdev Imani|2026-08-04T11:57:54-0400||test(dashboard): run U-01 suite for real — 60 pass, 9/9 mutants killed
+bf89c44296e109dadf6c1c9abc024b05929b8db6|51b35e11badaf26e04715a8048344308c61b8419|Jasdev Imani|2026-08-04T11:42:27-0400||AI-DLC: U-01 Code Generation approved
+51b35e11badaf26e04715a8048344308c61b8419|a4842ab2fd47d1fa3f101ff93ed9299c569b52f0|Jasdev Imani|2026-08-04T11:39:22-0400||feat(dashboard): U-01 Domain Core — pure tag-inventory logic + tests
+a4842ab2fd47d1fa3f101ff93ed9299c569b52f0|b41ec728b4bd12d6e3f12f3c40ba49b0ae2b7310|Jasdev Imani|2026-08-04T11:24:57-0400||AI-DLC: Code Generation Part 1 plan for U-01 Domain Core
+b41ec728b4bd12d6e3f12f3c40ba49b0ae2b7310|07c7ae88e864a8f6c705452fa3b6f13e474862e2|Jasdev Imani|2026-08-04T11:22:59-0400||AI-DLC: skip Infrastructure Design for U-01; depth-first confirmed
+07c7ae88e864a8f6c705452fa3b6f13e474862e2|84608c80d55499136dfde3365e8e919658b12691|Jasdev Imani|2026-08-04T11:20:39-0400||AI-DLC: raise Infrastructure Design applicability for U-01
+84608c80d55499136dfde3365e8e919658b12691|3eac2fe6eee32bb4d9a6f65b32e5da1cb0422d53|Jasdev Imani|2026-08-04T11:19:01-0400||AI-DLC: U-01 NFR Design approved
+3eac2fe6eee32bb4d9a6f65b32e5da1cb0422d53|3680c768c8d0c3bdb76cb159b3605759e799c3dc|Jasdev Imani|2026-08-04T11:16:48-0400||AI-DLC: NFR Design complete for U-01 Domain Core
+3680c768c8d0c3bdb76cb159b3605759e799c3dc|3c919db6abfac4d17805424600f409352092220d|Jasdev Imani|2026-08-04T11:11:18-0400||AI-DLC: open NFR Design for U-01 Domain Core
+3c919db6abfac4d17805424600f409352092220d|208d7b529c077b84ca7f10e4270f05f906b90216|Jasdev Imani|2026-08-04T11:09:08-0400||AI-DLC: U-01 NFR Requirements approved
+208d7b529c077b84ca7f10e4270f05f906b90216|eeb301b221e5d353ee360fbf0b987b075116709d|Jasdev Imani|2026-08-04T11:07:15-0400||AI-DLC: record inbound UI design language contract as U-02 context
+eeb301b221e5d353ee360fbf0b987b075116709d|19c43923b4e1d967b0de2389ee6044d651cb1726 b1ffb84c9aa2cd016572c8bf7b52a7e58926a697|Jasdev Imani|2026-08-04T11:05:44-0400||Merge remote-tracking branch 'origin/dashboard' into dashboard
+b1ffb84c9aa2cd016572c8bf7b52a7e58926a697|7ac70feb99ea5dd34d524c4bc40023031f598ec7 b0d3c7ba39c4688fc18dc9c678bd542d94f8dd14|Sean Gnau|2026-08-04T11:00:18-0400||Merge origin/dashboard: U-01 NFR Requirements opened
+7ac70feb99ea5dd34d524c4bc40023031f598ec7|adfebd2e3e83286d8b9b1b1f38336c7fc0e0852f 592c1f0e38bcb22c84927ed9ea7a24d1cae1f2b1|Sean Gnau|2026-08-04T10:58:54-0400||Merge origin/dashboard: AI-DLC inception trail into the UI contract work
+adfebd2e3e83286d8b9b1b1f38336c7fc0e0852f|e03ee473b2cb6fe42b9f4a468aa712678fcd59bc|Sean Gnau|2026-08-04T10:58:43-0400||Add the UI design language contract, with logo and a11y non-waivable
+19c43923b4e1d967b0de2389ee6044d651cb1726|b0d3c7ba39c4688fc18dc9c678bd542d94f8dd14|Jasdev Imani|2026-08-04T11:05:15-0400||AI-DLC: NFR Requirements complete for U-01 Domain Core
+b0d3c7ba39c4688fc18dc9c678bd542d94f8dd14|36003ac87866484bb2d40038115954c1889237a4|Jasdev Imani|2026-08-04T10:58:20-0400||AI-DLC: open NFR Requirements for U-01 Domain Core
+36003ac87866484bb2d40038115954c1889237a4|592c1f0e38bcb22c84927ed9ea7a24d1cae1f2b1|Jasdev Imani|2026-08-04T10:53:54-0400||AI-DLC: U-01 Functional Design approved
+592c1f0e38bcb22c84927ed9ea7a24d1cae1f2b1|ba1c4a85421fc5d270eb7e1a7e5f872e65c7d2f5|Jasdev Imani|2026-08-04T10:51:59-0400||AI-DLC: Functional Design complete for U-01 Domain Core
+ba1c4a85421fc5d270eb7e1a7e5f872e65c7d2f5|78ae484daa4a8a3641c878a094741cd8b5d0c2bf|Jasdev Imani|2026-08-04T10:38:35-0400||AI-DLC: open Functional Design for U-01 Domain Core
+78ae484daa4a8a3641c878a094741cd8b5d0c2bf|05605f009804e09a575dda2baaeb8f8818ca364b|Jasdev Imani|2026-08-04T10:35:40-0400||AI-DLC: units approved — INCEPTION complete
+05605f009804e09a575dda2baaeb8f8818ca364b|ae02dc86b1342432efb28f1b948b5ee3bc726041|Jasdev Imani|2026-08-04T10:34:06-0400||AI-DLC: amend units artifacts for monorepo reorganization (A2)
+ae02dc86b1342432efb28f1b948b5ee3bc726041|37d4db92a84b9b204a924fa0d0ea60571e562f02 4e153b9f3bee847ba87782cd64601042f9b392f1|Jasdev Imani|2026-08-04T10:31:08-0400||Merge remote-tracking branch 'origin/dashboard' into dashboard
+4e153b9f3bee847ba87782cd64601042f9b392f1|b91cf3b2d39556e30848ebadab41e6a37662c925|chrisjcameron|2026-08-04T10:25:58-0400||docs(dashboard): add source-catalog design; relocate design docs to docs/aidlc/dashboard
+b91cf3b2d39556e30848ebadab41e6a37662c925|6fae2c7b7cd19dbfa917a74e8ef678d9c002f325 e03ee473b2cb6fe42b9f4a468aa712678fcd59bc|chrisjcameron|2026-08-04T10:16:55-0400||Merge remote-tracking branch 'origin/main' into dashboard
+37d4db92a84b9b204a924fa0d0ea60571e562f02|6fae2c7b7cd19dbfa917a74e8ef678d9c002f325|Jasdev Imani|2026-08-04T10:31:08-0400||AI-DLC: Units Generation complete — two units, three artifacts
+6fae2c7b7cd19dbfa917a74e8ef678d9c002f325|9723168d7dff1988836ce04b393ead15b7489fd7|Jasdev Imani|2026-08-04T09:15:14-0400||AI-DLC: amend for post-rebase repo baseline change
+9723168d7dff1988836ce04b393ead15b7489fd7|ffd24e3d9e54931fa9d191e5fb4b9944cd686420|chrisjcameron|2026-08-03T17:27:50-0400|origin/dashboard-obs-temp|summarize other team braches
+ffd24e3d9e54931fa9d191e5fb4b9944cd686420|af033f379825c0fedaf830dd41cf52f0e8f6c884|chrisjcameron|2026-08-03T17:05:01-0400||current dashboard abstract work
+af033f379825c0fedaf830dd41cf52f0e8f6c884|41e77fb576061015eebabdee98739a4b2d37481b|Jasdev Imani|2026-08-03T16:47:30-0400||AI-DLC: Application Design approved; Units Generation plan issued
+41e77fb576061015eebabdee98739a4b2d37481b|f75fc272e9360a73b75a17dbbfca02e16c186b29|Jasdev Imani|2026-08-03T16:42:33-0400||AI-DLC: Application Design complete — five artifacts generated
+f75fc272e9360a73b75a17dbbfca02e16c186b29|75ae107cd21c379e3628843d096ff6e6d06a9499|Jasdev Imani|2026-08-03T16:28:47-0400||Analyse Application Design answers; raise Step 9 follow-ups
+75ae107cd21c379e3628843d096ff6e6d06a9499|fcdc442ca37134f104c0ec07b762a77f39f3381b|Jasdev Imani|2026-08-03T16:16:33-0400||Approve execution plan; issue Application Design plan and questions
+fcdc442ca37134f104c0ec07b762a77f39f3381b|148926d90ad7107ec64ef84ec71ae00310ca7581|Jasdev Imani|2026-08-03T16:10:10-0400||Approve user stories; complete Workflow Planning
+148926d90ad7107ec64ef84ec71ae00310ca7581|f67c1f906f58252e2b3e89241271f2fc001434be|Jasdev Imani|2026-08-03T16:05:42-0400||Resolve telemetry amendment decisions; route to a second pass
+f67c1f906f58252e2b3e89241271f2fc001434be|65f464f22c01d3ac1134e88353c093ea565a3e6e|Jasdev Imani|2026-08-03T15:45:40-0400||Raise telemetry requirement questions; hold User Stories gate
+65f464f22c01d3ac1134e88353c093ea565a3e6e|61a6546e4248d2b580fd224695a5ca590ff733e1|Jasdev Imani|2026-08-03T15:28:26-0400||Generate personas and user stories for the dashboard blueprint
+61a6546e4248d2b580fd224695a5ca590ff733e1|a362813cf0d24e76101dd234ba907170a9efd7c7|Jasdev Imani|2026-08-03T15:16:44-0400||Resolve the story plan and consolidate all ten answers
+a362813cf0d24e76101dd234ba907170a9efd7c7|8e2b361e010d6c8f9590e352b65721493a487ed7|Jasdev Imani|2026-08-03T14:41:19-0400||Analyze story-plan answers and raise the one gap they leave
+8e2b361e010d6c8f9590e352b65721493a487ed7|a6bc8e7e12bf03e73d92e4910e46423d92036115|Jasdev Imani|2026-08-03T14:17:28-0400||Open the User Stories stage for the dashboard blueprint
+a6bc8e7e12bf03e73d92e4910e46423d92036115|984eac36e5efac950114a9399dd93f852529e4c6|Jasdev Imani|2026-08-03T14:04:49-0400||Complete AI-DLC Requirements Analysis for the dashboard blueprint
+984eac36e5efac950114a9399dd93f852529e4c6|ce2b28e9466bb122d8e96c6262a71ced2b49855e|Sean Gnau|2026-08-03T13:13:56-0400||Add an empty file to verify push access
+ce2b28e9466bb122d8e96c6262a71ced2b49855e|8da03f0c7fff064d949f50c363e8bd8abaa7f973|Jasdev Imani|2026-08-03T13:09:13-0400||Start AI-DLC workflow for the dashboard blueprint
+8da03f0c7fff064d949f50c363e8bd8abaa7f973|f3b9b2dada5d2b1aa36ee0c0bbd8509c19c06f03|Sean Gnau|2026-08-03T12:53:48-0400||feat: initial commit
+9b9d27e57fcf4fc3f6030d9306cfc86834caa976|185cde31841e0d7faceb3fcdfcebe575b0b6492e 3d54f34c496feee27a9845ebd29a76b2135b33f0|4esv|2026-08-04T11:03:16-0400|origin/fix-demo-retrieve|Merge remote-tracking branch 'origin/main' into fix-demo-retrieve
+3d54f34c496feee27a9845ebd29a76b2135b33f0|e03ee473b2cb6fe42b9f4a468aa712678fcd59bc 307f3931c39e2173a50317f23c734d65bc33b316|Axel Stevens|2026-08-04T10:44:55-0400||Merge pull request #22 from cu-aaii/worktree-blueprint-manifests
+185cde31841e0d7faceb3fcdfcebe575b0b6492e|307f3931c39e2173a50317f23c734d65bc33b316|4esv|2026-08-04T11:02:08-0400|origin/worktree-blueprint-manifests|fix(demo): scene 5 used an operation managed knowledge bases reject
+307f3931c39e2173a50317f23c734d65bc33b316|cfe466340032f7626d8f314f4a510050543b3370 e03ee473b2cb6fe42b9f4a468aa712678fcd59bc|4esv|2026-08-04T10:41:13-0400||Merge origin/main; reconcile the manifest check with the one that landed in #15
+e03ee473b2cb6fe42b9f4a468aa712678fcd59bc|9acb06b2383914e780eb40f10397117b54dd1bd8 0a7a6f31c8ac28986c8e0924a959a9557f8696f0|Ernie Francis|2026-08-04T09:29:51-0400|origin/blackfneix2, main|Merge pull request #15 from cu-aaii/trust-me-bruh
+0a7a6f31c8ac28986c8e0924a959a9557f8696f0|376122e83015166bd22b5c21fc8ea3ba4b21abb6|Ernest Francis|2026-08-04T00:52:04-0400|origin/trust-me-bruh, trust-me-bruh|Add a deploy preview tool, and document three silent Builder defects
+376122e83015166bd22b5c21fc8ea3ba4b21abb6|9b67be2129287e66f034573362e8ab2f108c9e98 37e0f480dec1ffd50c735bfbee189f931591d204|Ernest Francis|2026-08-03T23:38:01-0400||Merge origin/main into trust-me-bruh; add the knowledgebase manifest
+9b67be2129287e66f034573362e8ab2f108c9e98|adfd31bbf4c98482f55eb2c1d9a83636b2803c2d|Ernest Francis|2026-08-03T23:21:25-0400||WIP: notify-topic blueprint, devtools console, diagnose-deploy skill
+adfd31bbf4c98482f55eb2c1d9a83636b2803c2d|6b1059e2c8b3ca1c160bae09073fbe5440bb2aa6|Ernest Francis|2026-08-03T19:52:39-0400||trust me bruh
+9acb06b2383914e780eb40f10397117b54dd1bd8|37e0f480dec1ffd50c735bfbee189f931591d204 b18afe6d77d9048a95e834fb8c0a78c967f4afbc|phil|2026-08-04T09:29:01-0400||Merge pull request #17 from cu-aaii/aisei-site-blueprint
+b18afe6d77d9048a95e834fb8c0a78c967f4afbc|31c244ba7dcc72de33b85448adf3f7b4aa60f402|philwilliammee|2026-08-04T08:14:06-0400|origin/aisei-site-blueprint|Re-vendor aisei-site: tighten hero/cards spacing, remove nav-to-hero gap
+31c244ba7dcc72de33b85448adf3f7b4aa60f402|2b6e919e54387dfb7f09747c9d7abfd5a4becfed|philwilliammee|2026-08-04T08:05:38-0400||Re-vendor aisei-site: masthead containment, hero full-bleed, card overlay
+2b6e919e54387dfb7f09747c9d7abfd5a4becfed|3aea5fc7bf080eb105a7b895b24992540310e9d4|philwilliammee|2026-08-04T07:56:50-0400||Re-vendor aisei-site: masthead/hero rework matching live site
+3aea5fc7bf080eb105a7b895b24992540310e9d4|8b92dd83e4007759c4da7b4d6f04319f7643eb53|philwilliammee|2026-08-04T07:35:17-0400||Re-vendor aisei-site: public landing demo replaces admin interface
+8b92dd83e4007759c4da7b4d6f04319f7643eb53|8bf43a05ac460399af8083edac83f74e7d82cde8|philwilliammee|2026-08-04T06:57:22-0400||Fix Lambda Web Adapter image reference in aisei-site Dockerfile
+8bf43a05ac460399af8083edac83f74e7d82cde8|37e0f480dec1ffd50c735bfbee189f931591d204|philwilliammee|2026-08-04T06:51:46-0400||Add aisei-site blueprint (parked)
+cfe466340032f7626d8f314f4a510050543b3370|a88b96b6dacb85e417fe7e74cc3d5079f85bafcd|4esv|2026-08-04T10:30:15-0400||feat(demo): terminal demo of the builder path, for when the Teams bot isn't ready
+a88b96b6dacb85e417fe7e74cc3d5079f85bafcd|37e0f480dec1ffd50c735bfbee189f931591d204|4esv|2026-08-04T10:30:05-0400||fix(blueprints): make knowledgebase visible to blueprint_search
+ae5fcdd0bd14e65be4c491b8053eb8c8c19db148|37e0f480dec1ffd50c735bfbee189f931591d204|Pete Stergion|2026-08-04T09:32:40-0400|origin/c/inception-requirements-answers|Answer the ten course-chatbot requirements questions (Track C)
+2a80442b15c661c27063790f86868e2a51f0f299|37e0f480dec1ffd50c735bfbee189f931591d204|Pete Stergion|2026-08-04T09:32:14-0400|origin/c/unignore-aidlc-docs|Stop ignoring every track's AI-DLC artifacts
+37e0f480dec1ffd50c735bfbee189f931591d204|baedac948ce456920e101394e73b63f874f7f5ab 1b52fa726880b3d81b4d6f132f6f5382e6de2bea|zain1629|2026-08-03T20:27:44-0400||Merge pull request #11 from timothyfraser/builder
+1b52fa726880b3d81b4d6f132f6f5382e6de2bea|062257f52dc47db8e2552a6476e0865ee694b9ca baedac948ce456920e101394e73b63f874f7f5ab|zain1629|2026-08-03T20:26:47-0400||Merge branch 'main' into builder
+baedac948ce456920e101394e73b63f874f7f5ab|f3b9b2dada5d2b1aa36ee0c0bbd8509c19c06f03|Axel Stevens|2026-08-03T17:37:34-0400||feat(knowledgebase): Bedrock managed knowledge base blueprint (Track B) (#13)
+f3b9b2dada5d2b1aa36ee0c0bbd8509c19c06f03|9eba0b75b5ed45560e2e4f5816db0357f0bce60f|Marty Sullivan|2026-08-03T17:24:11-0400||Document the SSO gotcha in the entra-probe manual deploy path (#14)
+9eba0b75b5ed45560e2e4f5816db0357f0bce60f|ad289a8b964bf7c164d9420051297775072af516|Marty Sullivan|2026-08-03T17:15:38-0400||Add the Terraform stage for Azure/Entra resources (#12)
+062257f52dc47db8e2552a6476e0865ee694b9ca|0f4927878b5a39d8ef25f3a88d8ed386fa2fb988|timothyfraser|2026-08-03T17:17:07-0400||Testing phase: mask Entra auth and deploy shells into outputs/ folders
+0f4927878b5a39d8ef25f3a88d8ed386fa2fb988|452e02fe8b13d874cc4d683cec7828436b8bd89e|timothyfraser|2026-08-03T16:37:31-0400||Make the server usable by hand: .mcp.json plus a local testing guide
+452e02fe8b13d874cc4d683cec7828436b8bd89e|5f137d73ae0e19bc69f7bf93a018f241c2c194b7|timothyfraser|2026-08-03T16:28:36-0400||Relocate Dockerfiles into their components; buildspec gains CONTAINER_CONTEXT
+5f137d73ae0e19bc69f7bf93a018f241c2c194b7|46e508529da05e5a49ad7d1db33f070d77eabc0d|timothyfraser|2026-08-03T16:16:21-0400||Close Gate 3: five verified units of work + ownership contract (SPEC C8)
+46e508529da05e5a49ad7d1db33f070d77eabc0d|02ab7a85bdf122d67b8c0df5706a694a9dea4cfb|timothyfraser|2026-08-03T16:04:12-0400||Draft the tiny-chatbot blueprint, registered but parked
+02ab7a85bdf122d67b8c0df5706a694a9dea4cfb|365a435c2c493cfce6ab9efd97bc981edff9ab8d|timothyfraser|2026-08-03T16:01:33-0400||Add the endpoint validation harness; fix a latent auth bug in verify.py
+365a435c2c493cfce6ab9efd97bc981edff9ab8d|52709f4650e36340e9e8cd8f3b479e398e7a379d|timothyfraser|2026-08-03T15:59:11-0400||Add the deployment watch runbook and apply the mob's story updates
+52709f4650e36340e9e8cd8f3b479e398e7a379d|4b9934625ad096a69a1cf5836cd2dfa2ad20e676 ad289a8b964bf7c164d9420051297775072af516|timothyfraser|2026-08-03T15:53:39-0400||Merge origin/main (PRs 9 and 10) back into builder
+ad289a8b964bf7c164d9420051297775072af516|416891be8760c55ae1e50a812e22361476dffa9a 6b1059e2c8b3ca1c160bae09073fbe5440bb2aa6|Jai C|2026-08-03T15:39:32-0400||Merge pull request #10 from cu-aaii/builder-mcp
+6b1059e2c8b3ca1c160bae09073fbe5440bb2aa6|416891be8760c55ae1e50a812e22361476dffa9a daa7d85cc77aaf5f6d0bcf62d287d619bd89438d|Jai C|2026-08-03T15:29:30-0400|builder-mcp|Merge pull request #9 from timothyfraser/builder
+4b9934625ad096a69a1cf5836cd2dfa2ad20e676|7fafc7dc166a6e2b4960638a2e0c407a3e72f9ee|timothyfraser|2026-08-03T15:46:15-0400||Remediate the blocking security findings from the Gate 1.1 compliance pass
+7fafc7dc166a6e2b4960638a2e0c407a3e72f9ee|daa7d85cc77aaf5f6d0bcf62d287d619bd89438d|timothyfraser|2026-08-03T15:42:39-0400||Swap inbound auth from Cognito to Microsoft Entra ID
+daa7d85cc77aaf5f6d0bcf62d287d619bd89438d|592782dab67923a1892ec12cd0207671fb15bd1b|timothyfraser|2026-08-03T15:27:20-0400||Rename tools to noun_verb, add deployment_delete, add property-based tests
+592782dab67923a1892ec12cd0207671fb15bd1b|9e8cb3b743bd3003d17a5c4ed86ad4256fc674cd|timothyfraser|2026-08-03T15:21:37-0400||Close Gates 1-2, generate user stories, land resiliency + Strands findings
+9e8cb3b743bd3003d17a5c4ed86ad4256fc674cd|c848de64b400f757174630951334a93083493095|timothyfraser|2026-08-03T15:04:08-0400||Reopen the skipped AI-DLC stages and put the gates to the mob
+c848de64b400f757174630951334a93083493095|18881cda7faafe3fec7c5472537238ba7014af38|timothyfraser|2026-08-03T14:55:11-0400||Log five new backlog items from the mob
+18881cda7faafe3fec7c5472537238ba7014af38|f19f555fac11c18b07e4826c62dbd759397eb8e5|timothyfraser|2026-08-03T14:25:16-0400||Reconstruct the skipped Workflow Planning stage
+f19f555fac11c18b07e4826c62dbd759397eb8e5|d6db00df89a822694674c8ab25098230d8ddfe07|timothyfraser|2026-08-03T14:17:35-0400||Fix showcase doc layout: stop grid blowout, restore the ask column
+d6db00df89a822694674c8ab25098230d8ddfe07|eeaafc19509a4a49952173b4c52985e43315c384|timothyfraser|2026-08-03T14:09:00-0400||Add tool-verification showcase doc and task backlog
+eeaafc19509a4a49952173b4c52985e43315c384|8b27d6402b40c577498209a9011815bbe68fcccd|timothyfraser|2026-08-03T14:07:20-0400||Rewire builder-mcp to the pipeline-native container path
+8b27d6402b40c577498209a9011815bbe68fcccd|ece4df7cf78f72cb1c61fb77372f7f1a04a66483|timothyfraser|2026-08-03T14:00:53-0400||Make builder-mcp deploy-ready and encode session knowledge spec-driven
+ece4df7cf78f72cb1c61fb77372f7f1a04a66483|bb4cb868092bba47e454c41c9b5cb75b707548c9|timothyfraser|2026-08-03T13:51:30-0400||Build the Cornell Builder MCP server: seven tools, local HTTP verified
+bb4cb868092bba47e454c41c9b5cb75b707548c9|416891be8760c55ae1e50a812e22361476dffa9a|timothyfraser|2026-08-03T13:08:10-0400||Start builder-mcp inception: AI-DLC state, audit log, and requirement questions
+e7edca0410ec53bb33efbc8b970ede780bdb484b|6f751a566e9306b6dd50fe0dddabf9bb1ea28e18|Ernest Francis|2026-08-03T13:53:25-0400|origin/team-d, team-d|added
+6f751a566e9306b6dd50fe0dddabf9bb1ea28e18|302574a61d192ed1b3bfb09055df85340d9da928 416891be8760c55ae1e50a812e22361476dffa9a|Ernest Francis|2026-08-03T12:46:09-0400||Merge remote-tracking branch 'origin/main' into BlackFenix2
+416891be8760c55ae1e50a812e22361476dffa9a|d8bbf12f505e677d0305569b1dc92e05c2534c35|Marty Sullivan|2026-08-03T12:40:18-0400||Vendor the AI-DLC rules from awslabs/aidlc-workflows (#6)
+d8bbf12f505e677d0305569b1dc92e05c2534c35|73396cf08d371687206654e08c1799d0b05855ba|Marty Sullivan|2026-08-03T10:44:50-0400||Fail PR checks on a blueprint that is registered but never deployed (#4)
+302574a61d192ed1b3bfb09055df85340d9da928|5d19bf9e2bcb45388620fb7a7e3f3147beccb1f6|Ernest Francis|2026-08-03T12:43:33-0400||test
+5d19bf9e2bcb45388620fb7a7e3f3147beccb1f6|27100a16e911adcbc554e1b1b6395491fd03a449|Ernest Francis|2026-08-03T11:50:49-0400||added proposal example.
+27100a16e911adcbc554e1b1b6395491fd03a449|a5c1c9480980bf85b81857b293cf6263780a0ac0|Ernest Francis|2026-08-03T11:41:31-0400||added UV install instructions.
+a5c1c9480980bf85b81857b293cf6263780a0ac0|73396cf08d371687206654e08c1799d0b05855ba|Ernest Francis|2026-08-03T11:32:02-0400||Adopt AI-DLC as the documented rule set for this repo
+73396cf08d371687206654e08c1799d0b05855ba|942eed3f17afe0db0db8da8c5d6d1c13c4df5fa5|Marty Sullivan|2026-08-03T09:56:43-0400||Make local checks runnable on a clean machine, and add CLAUDE.md (#3)
+942eed3f17afe0db0db8da8c5d6d1c13c4df5fa5|f1dc83b81382b6039e1df6c7354a60eb0d0058a1|Marty Sullivan|2026-08-03T09:01:31-0400||Correct the README's secret-scanning claim (#1)
+f1dc83b81382b6039e1df6c7354a60eb0d0058a1||Marty Sullivan|2026-08-03T08:46:48-0400||Add AWS deploy path adapted from the AI Innovation Lab reference pipeline`;
+
+const DIFF_FILES = 326;
+const DIFF_INSERTIONS = 69862;
+const DIFF_DELETIONS = 68;
+
+const commits = RAW.trim().split("\n").map((line, i) => {
+  const [hash, parentStr, author, date, refStr, ...rest] = line.split("|");
+  return {
+    hash,
+    short: hash.slice(0, 7),
+    parents: parentStr ? parentStr.trim().split(/\s+/) : [],
+    author,
+    dateRaw: date,
+    wall: date.slice(0, 19),               // author-local wall clock
+    refs: (refStr || "").split(",").map(s => s.trim()).filter(Boolean),
+    subject: rest.join("|"),
+    row: i,
+  };
+});
+const byHash = new Map(commits.map(c => [c.hash, c]));
+
+// ---------------------------------------------------------------- main spine
+const mainTip = commits.find(c => c.refs.some(r => r === "origin/main" || r === "main"));
+const spine = [];
+for (let c = mainTip; c; c = byHash.get(c.parents[0])) {
+  c.onMain = true;
+  spine.push(c);
+}
+
+// ---------------------------------------------------------------- lane assignment
+let lanes = [];
+const firstFree = () => { const i = lanes.indexOf(null); return i === -1 ? (lanes.push(null) - 1) : i; };
+
+for (const c of commits) {
+  let col = lanes.indexOf(c.hash);
+  if (col === -1) col = firstFree();
+  c.col = col;
+  for (let i = 0; i < lanes.length; i++) if (i !== col && lanes[i] === c.hash) lanes[i] = null;
+
+  const ps = c.parents.filter(p => byHash.has(p));
+  lanes[col] = ps.length ? ps[0] : null;
+  for (let k = 1; k < ps.length; k++) {
+    if (lanes.indexOf(ps[k]) === -1) lanes[firstFree()] = ps[k];
+  }
+}
+const laneCount = Math.max(...commits.map(c => c.col)) + 1;
+
+// ---------------------------------------------------------------- geometry
+const ROW_H = 26, LANE_W = 16, PAD_L = 10, R = 4;
+const gutter = PAD_L * 2 + (laneCount - 1) * LANE_W + R * 2;
+const cx = c => PAD_L + R + c.col * LANE_W;
+const cy = c => c.row * ROW_H + ROW_H / 2;
+
+document.documentElement.style.setProperty("--gutter", gutter + "px");
+document.getElementById("ghead").style.setProperty("--gutter", gutter + "px");
+
+// ---------------------------------------------------------------- render graph
+const rowsbox = document.getElementById("rowsbox");
+const rails = document.getElementById("rails");
+const SVG = "http://www.w3.org/2000/svg";
+
+rails.setAttribute("width", gutter);
+rails.setAttribute("height", commits.length * ROW_H);
+
+function edgePath(x1, y1, x2, y2, bendTop) {
+  if (x1 === x2) return `M${x1} ${y1} L${x2} ${y2}`;
+  if (bendTop) {
+    const yb = Math.min(y1 + ROW_H, y2);
+    return `M${x1} ${y1} C ${x1} ${y1 + (yb - y1) / 2}, ${x2} ${yb - (yb - y1) / 2}, ${x2} ${yb} L ${x2} ${y2}`;
+  }
+  const yb = Math.max(y2 - ROW_H, y1);
+  return `M${x1} ${y1} L ${x1} ${yb} C ${x1} ${yb + (y2 - yb) / 2}, ${x2} ${y2 - (y2 - yb) / 2}, ${x2} ${y2}`;
+}
+
+// edges first, so nodes sit on top
+for (const c of commits) {
+  c.parents.forEach((ph, k) => {
+    const p = byHash.get(ph);
+    if (!p) return;
+    const path = document.createElementNS(SVG, "path");
+    path.setAttribute("d", edgePath(cx(c), cy(c), cx(p), cy(p), k > 0));
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", c.onMain ? "var(--series-1)" : "var(--muted)");
+    path.setAttribute("stroke-width", "2");
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("opacity", c.onMain ? "1" : "0.55");
+    rails.appendChild(path);
+  });
+}
+for (const c of commits) {
+  const isMerge = c.parents.length > 1;
+  const dot = document.createElementNS(SVG, "circle");
+  dot.setAttribute("cx", cx(c));
+  dot.setAttribute("cy", cy(c));
+  dot.setAttribute("r", R);
+  const col = c.onMain ? "var(--series-1)" : "var(--muted)";
+  if (isMerge) {
+    dot.setAttribute("fill", "var(--surface-1)");
+    dot.setAttribute("stroke", col);
+    dot.setAttribute("stroke-width", "2");
+  } else {
+    dot.setAttribute("fill", col);
+    dot.setAttribute("stroke", "var(--surface-1)");   // 2px surface ring
+    dot.setAttribute("stroke-width", "2");
+  }
+  rails.appendChild(dot);
+}
+
+// rows
+const cleanRefs = c => c.refs
+  .map(r => r.replace(/^HEAD -> /, ""))
+  .filter(r => r !== "origin/HEAD" && r !== "HEAD");
+
+const prNum = s => { const m = s.match(/#(\d+)/); return m ? m[1] : ""; };
+
+for (const c of commits) {
+  const row = document.createElement("div");
+  row.className = "row" + (c.onMain ? "" : " off");
+  row.style.setProperty("--gutter", gutter + "px");
+
+  const chips = cleanRefs(c).map(r =>
+    `<span class="chip${r === "origin/main" || r === "main" ? " main" : ""}">${r}</span>`).join("");
+
+  row.innerHTML =
+    `<div></div>` +
+    `<div class="sha">${c.short}</div>` +
+    `<div class="subj">${chips}${esc(c.subject)}</div>` +
+    `<div class="who">${esc(c.author)}</div>` +
+    `<div class="when">${fmtShort(c.wall)}</div>`;
+
+  row.addEventListener("mousemove", e => showTip(e, c));
+  row.addEventListener("mouseleave", hideTip);
+  rowsbox.appendChild(row);
+}
+
+function esc(s) { return s.replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch])); }
+function fmtShort(w) { return w.slice(5, 10).replace("-", "/") + " " + w.slice(11, 16); }
+function fmtFull(w) { return w.slice(0, 10) + " " + w.slice(11, 19); }
+
+// ---------------------------------------------------------------- tooltip
+const tip = document.getElementById("tip");
+function showTip(e, c) {
+  const refs = cleanRefs(c);
+  tip.innerHTML =
+    `<div class="t-sha">${c.hash.slice(0, 12)}</div>` +
+    `<div class="t-sub">${esc(c.subject)}</div>` +
+    `<div class="t-meta"><span class="t-key">author</span> ${esc(c.author)}<br>` +
+    `<span class="t-key">when</span> ${fmtFull(c.wall)}<br>` +
+    `<span class="t-key">parents</span> ${c.parents.length ? c.parents.map(p => p.slice(0, 7)).join(", ") : "none (root)"}<br>` +
+    `<span class="t-key">lane</span> ${c.col + 1} of ${laneCount}` +
+    (c.onMain ? `<br><span class="t-key">spine</span> on main's first-parent chain` : "") +
+    (refs.length ? `<br><span class="t-key">refs</span> ${refs.join(", ")}` : "") +
+    `</div>`;
+  tip.style.opacity = "1";
+  const pad = 14, w = 380, h = tip.offsetHeight;
+  let x = e.clientX + pad, y = e.clientY + pad;
+  if (x + w > innerWidth) x = e.clientX - w - pad;
+  if (y + h > innerHeight) y = e.clientY - h - pad;
+  tip.style.left = Math.max(4, x) + "px";
+  tip.style.top = Math.max(4, y) + "px";
+}
+function hideTip() { tip.style.opacity = "0"; }
+
+// ---------------------------------------------------------------- stats
+const mergeCommits = commits.filter(c => c.parents.length > 1).length;
+const authors = [...new Set(commits.map(c => c.author))];
+const branchRefs = [...new Set(commits.flatMap(cleanRefs))];
+const prsOnMain = spine.filter(c => prNum(c.subject));
+
+const walls = commits.map(c => c.wall).sort();
+const firstWall = walls[0], lastWall = walls[walls.length - 1];
+const elapsedMin = Math.round((new Date(lastWall + "Z") - new Date(firstWall + "Z")) / 60000);
+const elapsed = `${Math.floor(elapsedMin / 60)}h ${elapsedMin % 60}m`;
+
+document.getElementById("rangeLabel").textContent =
+  `${fmtFull(firstWall).slice(0, 16)} → ${fmtFull(lastWall).slice(0, 16)}`;
+
+document.getElementById("heroVal").textContent = commits.length.toLocaleString();
+document.getElementById("heroNote").textContent =
+  `${spine.length} on the main spine · ${commits.length - spine.length} on branch work · ${mergeCommits} merge commits`;
+
+const kpis = [
+  { label: "Pull requests landed on main", value: prsOnMain.length, foot: "each one a deploy" },
+  { label: "Author identities", value: authors.length, foot: "identities, not headcount" },
+  { label: "Branch refs in play", value: branchRefs.length, foot: "local + origin, HEAD excluded" },
+  { label: "Files changed on main", value: DIFF_FILES.toLocaleString(), foot: `+${(DIFF_INSERTIONS / 1000).toFixed(1)}K / −${DIFF_DELETIONS} lines` },
+  { label: "Elapsed", value: elapsed, foot: "first commit to last" },
+];
+document.getElementById("kpis").innerHTML = kpis.map(k =>
+  `<div class="tile"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="foot">${k.foot}</div></div>`).join("");
+
+// ---------------------------------------------------------------- main table
+document.querySelector("#mainTable tbody").innerHTML = spine.map((c, i) => {
+  const n = prNum(c.subject);
+  const how = c.parents.length > 1 ? "merge commit" : (n ? "squash" : "direct (pre-protection)");
+  return `<tr><td class="num">${spine.length - i}</td>` +
+    `<td class="pr">${n ? "#" + n : "—"}</td>` +
+    `<td>${esc(c.subject)}</td>` +
+    `<td>${esc(c.author)}</td>` +
+    `<td class="mono">${fmtFull(c.wall)}</td>` +
+    `<td>${how}</td></tr>`;
+}).join("");
+
+// ---------------------------------------------------------------- all-commits table
+document.querySelector("#allTable tbody").innerHTML = commits.map(c =>
+  `<tr><td class="mono">${c.short}</td><td>${esc(c.subject)}</td><td>${esc(c.author)}</td>` +
+  `<td class="mono">${fmtFull(c.wall)}</td><td class="mono">${c.parents.map(p => p.slice(0, 7)).join(" ") || "—"}</td>` +
+  `<td>${c.onMain ? "yes" : "no"}</td></tr>`).join("");
+
+// ---------------------------------------------------------------- authors chart
+const aStats = new Map();
+for (const c of commits) {
+  const a = aStats.get(c.author) || { n: 0, first: c.wall, last: c.wall };
+  a.n++;
+  if (c.wall < a.first) a.first = c.wall;
+  if (c.wall > a.last) a.last = c.wall;
+  aStats.set(c.author, a);
+}
+const aRows = [...aStats].sort((x, y) => y[1].n - x[1].n);
+const aMax = aRows[0][1].n;
+
+document.getElementById("authorChart").innerHTML = aRows.map(([name, s]) =>
+  `<div class="barrow" title="${esc(name)} — ${s.n} commits">` +
+  `<div class="nm">${esc(name)}</div>` +
+  `<div class="track"><div class="fill" style="width:${(s.n / aMax * 100).toFixed(2)}%"></div></div>` +
+  `<div class="val">${s.n}</div></div>`).join("");
+
+document.querySelector("#authorTable tbody").innerHTML = aRows.map(([name, s]) =>
+  `<tr><td>${esc(name)}</td><td class="num">${s.n}</td>` +
+  `<td class="num">${(s.n / commits.length * 100).toFixed(1)}%</td>` +
+  `<td class="mono">${fmtFull(s.first)}</td><td class="mono">${fmtFull(s.last)}</td></tr>`).join("");
+
+// ---------------------------------------------------------------- hour chart
+const buckets = new Map();
+for (const c of commits) {
+  const key = c.wall.slice(0, 13);                     // YYYY-MM-DDTHH
+  buckets.set(key, (buckets.get(key) || 0) + 1);
+}
+const keys = [...buckets.keys()].sort();
+const lo = keys[0], hi = keys[keys.length - 1];
+const hours = [];
+for (let d = new Date(lo + ":00:00Z"); ; d = new Date(d.getTime() + 3600e3)) {
+  const k = d.toISOString().slice(0, 13);
+  hours.push({ key: k, n: buckets.get(k) || 0 });
+  if (k === hi) break;
+}
+const hMax = Math.max(...hours.map(h => h.n));
+const yTop = Math.ceil(hMax / 5) * 5;
+
+(function drawHours() {
+  const W = 1100, PH = 170, AXIS = 34, TOP = 20, L = 34, GAP = 2;
+  const band = (W - L) / hours.length;
+  const bw = Math.min(24, band - GAP);
+  const svg = document.createElementNS(SVG, "svg");
+  svg.setAttribute("viewBox", `0 ${-TOP} ${W} ${PH + AXIS + TOP}`);
+  svg.setAttribute("width", "100%");
+  svg.setAttribute("height", PH + AXIS + TOP);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `Commits per hour, ${lo.slice(0,10)} to ${hi.slice(0,10)}. Peak ${hMax} commits.`);
+
+  for (let t = 0; t <= yTop; t += 5) {
+    const y = PH - (t / yTop) * PH;
+    const ln = document.createElementNS(SVG, "line");
+    ln.setAttribute("x1", L); ln.setAttribute("x2", W);
+    ln.setAttribute("y1", y); ln.setAttribute("y2", y);
+    ln.setAttribute("stroke", t === 0 ? "var(--baseline)" : "var(--grid)");
+    ln.setAttribute("stroke-width", "1");
+    svg.appendChild(ln);
+    const tx = document.createElementNS(SVG, "text");
+    tx.setAttribute("x", L - 8); tx.setAttribute("y", y + 3.5);
+    tx.setAttribute("text-anchor", "end");
+    tx.setAttribute("fill", "var(--muted)");
+    tx.setAttribute("style", "font:11px system-ui,sans-serif;font-variant-numeric:tabular-nums");
+    tx.textContent = t;
+    svg.appendChild(tx);
+  }
+
+  hours.forEach((h, i) => {
+    const x = L + i * band + (band - bw) / 2;
+    const hh = h.n / yTop * PH;
+    if (h.n > 0) {
+      const p = document.createElementNS(SVG, "path");
+      const y0 = PH, y1 = PH - hh, r = Math.min(4, bw / 2, hh);
+      p.setAttribute("d", `M${x} ${y0} L${x} ${y1 + r} Q${x} ${y1} ${x + r} ${y1} L${x + bw - r} ${y1} Q${x + bw} ${y1} ${x + bw} ${y1 + r} L${x + bw} ${y0} Z`);
+      p.setAttribute("fill", "var(--series-1)");
+      svg.appendChild(p);
+    }
+    const hit = document.createElementNS(SVG, "rect");
+    hit.setAttribute("x", L + i * band); hit.setAttribute("y", -TOP);
+    hit.setAttribute("width", band); hit.setAttribute("height", PH + TOP);
+    hit.setAttribute("fill", "transparent");
+    hit.style.cursor = "default";
+    hit.addEventListener("mousemove", e => {
+      tip.innerHTML = `<div class="t-sub">${h.n} commit${h.n === 1 ? "" : "s"}</div>` +
+        `<div class="t-meta">${h.key.slice(5, 10).replace("-", "/")} ${h.key.slice(11, 13)}:00–${h.key.slice(11, 13)}:59</div>`;
+      tip.style.opacity = "1";
+      tip.style.left = Math.min(e.clientX + 14, innerWidth - 200) + "px";
+      tip.style.top = (e.clientY + 14) + "px";
+    });
+    hit.addEventListener("mouseleave", hideTip);
+    svg.appendChild(hit);
+
+    const hourNum = +h.key.slice(11, 13);
+    if (hourNum % 3 === 0) {
+      const tx = document.createElementNS(SVG, "text");
+      tx.setAttribute("x", L + i * band + band / 2);
+      tx.setAttribute("y", PH + 15);
+      tx.setAttribute("text-anchor", "middle");
+      tx.setAttribute("fill", "var(--muted)");
+      tx.setAttribute("style", "font:11px system-ui,sans-serif;font-variant-numeric:tabular-nums");
+      tx.textContent = String(hourNum).padStart(2, "0");
+      svg.appendChild(tx);
+    }
+    if (hourNum === 0 || i === 0) {
+      const tx = document.createElementNS(SVG, "text");
+      tx.setAttribute("x", L + i * band);
+      tx.setAttribute("y", PH + 30);
+      tx.setAttribute("fill", "var(--text-secondary)");
+      tx.setAttribute("style", "font:11px system-ui,sans-serif;font-weight:600");
+      tx.textContent = h.key.slice(0, 10);
+      svg.appendChild(tx);
+      if (i > 0) {
+        const ln = document.createElementNS(SVG, "line");
+        ln.setAttribute("x1", L + i * band); ln.setAttribute("x2", L + i * band);
+        ln.setAttribute("y1", 0); ln.setAttribute("y2", PH + 20);
+        ln.setAttribute("stroke", "var(--baseline)"); ln.setAttribute("stroke-width", "1");
+        svg.appendChild(ln);
+      }
+    }
+  });
+
+  // peak label — one selective direct label
+  const peak = hours.reduce((a, b) => (b.n > a.n ? b : a));
+  const pi = hours.indexOf(peak);
+  const lab = document.createElementNS(SVG, "text");
+  lab.setAttribute("x", L + pi * band + band / 2);
+  lab.setAttribute("y", PH - peak.n / yTop * PH - 6);
+  lab.setAttribute("text-anchor", "middle");
+  lab.setAttribute("fill", "var(--text-primary)");
+  lab.setAttribute("style", "font:11px system-ui,sans-serif;font-weight:600");
+  lab.textContent = peak.n;
+  svg.appendChild(lab);
+
+  document.getElementById("hourChart").appendChild(svg);
+})();
+
+document.querySelector("#hourTable tbody").innerHTML = hours.map(h =>
+  `<tr><td class="mono">${h.key.replace("T", " ")}:00</td><td class="num">${h.n}</td></tr>`).join("");
+
+// ---------------------------------------------------------------- theme toggle
+const btn = document.getElementById("themeBtn");
+const root = document.documentElement;
+function isDark() {
+  const t = root.getAttribute("data-theme");
+  if (t) return t === "dark";
+  return matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function syncBtn() { btn.textContent = isDark() ? "Light mode" : "Dark mode"; }
+btn.addEventListener("click", () => { root.setAttribute("data-theme", isDark() ? "light" : "dark"); syncBtn(); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncBtn);
+syncBtn();
+</script>
+</body>
+</html>
