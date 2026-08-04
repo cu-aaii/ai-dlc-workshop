@@ -471,3 +471,12 @@
 **Context**: CONSTRUCTION — U-02 NFR Requirements complete. Awaiting approval before U-02 NFR Design.
 
 ---
+
+## NFR Requirements U-02 — Approval
+**Timestamp**: 2026-08-03T00:00:00Z
+**Approval Prompt**: "# 📊 NFR Requirements Complete - U-02 Dashboard Platform … ✅ **Continue to Next Stage**" — presented with the 49 requirements and the new `deployed` verification category, the explicit statement that U-02 cannot match U-01's 60-executed-tests standard without a shared-account deploy, and the three findings (new requirement P-3, the site-bucket gap in my own Q6, and Q7 = A unblocking `blueprint.yaml`).
+**User Input**: "Continue to next stage"
+**Decision**: **APPROVED** — U-02 NFR Requirements closed. Accepted: the 49 requirements with their four-way verification classification, TSD-8..TSD-15, the new P-3 internal-deadline requirement, D-3/D-4 on the site bucket, and `Condition: HasImage` with its stated partial-state cost.
+**Context**: CONSTRUCTION — proceeding to U-02 NFR Design. Unlike U-01's pass (which recorded eight pattern families as inapplicable and zero infrastructure components), U-02 has real components and real failure modes, so this stage is substantive.
+
+---
