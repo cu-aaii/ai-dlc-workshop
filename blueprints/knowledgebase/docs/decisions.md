@@ -148,18 +148,42 @@ the managed connector offers `ENTRA_ID_APP_ONLY` (certificate mandatory) or `OAU
 resource-owner password grant needing an MFA-exempt account), and the workshop's Entra app uses a
 client secret, which fits neither.
 
-The account disproves that. There is a **working** managed SharePoint data source in it —
-`knowledge-base-quick-start-9as4d` / `GBHYGKPMYL` — using `authType: ENTRA_ID_APP_ONLY` with
-`certificateS3Path` pointing at `public.cer` in `config-bucket-890349359349`, against
-`https://8chzbf.sharepoint.com/sites/kb`, and reading the very secret this document said was
-unusable. Someone generated a certificate and uploaded it to the Entra app. The blocker was a
-missing artifact, not an incompatibility.
+There is a managed SharePoint data source in the account — `knowledge-base-quick-start-9as4d` /
+`GBHYGKPMYL` — configured with `authType: ENTRA_ID_APP_ONLY`, a `certificateS3Path` pointing at
+`public.cer` in `config-bucket-890349359349`, `https://8chzbf.sharepoint.com/sites/kb`, and the very
+secret the retracted paragraph called unusable. So `ENTRA_ID_APP_ONLY` is at least *reachable* here:
+someone generated a certificate for the Entra app. That much is configuration anyone can read.
 
-So SharePoint stays pinned on **scope**, not impossibility: one data source proves the pattern, and
-adding a second means extending the verifier, which asserts on a single ingestion job and would
-otherwise let an empty second source pass green. `infra/azure/sharepoint-entra.tf.sample` records
-the shape. Anyone unpinning it should read `GBHYGKPMYL`'s live `connectorParameters` first — it is a
-known-good example, which is more than the docs offer.
+**Second retraction, and this one was mine.** An earlier version of this section called that data
+source **working** and a "known-good example." It is neither. It has never ingested a document. Its
+last five ingestion jobs all `FAILED` with zero documents scanned, every one of them:
+
+```
+SharePoint app is missing required scopes: Missing required permissions:
+[GroupMember.Read.All, User.Read.All,
+ one of [Sites.FullControl.All, Sites.Selected, Sites.Read.All]]
+```
+
+I concluded "working" from `status: AVAILABLE` plus a complete-looking `connectorParameters`, and
+never listed its ingestion jobs. **`AVAILABLE` describes the connector's validity, not whether it
+ever ingested anything** — the same mistake as reading a stack status instead of an outcome, which
+is the lesson at the top of `warnings.md`. Nothing in this repo had evidence for the claim when it
+was written.
+
+What is *not* established: whether `siteUrls` is correct. Bedrock validates the app's granted Graph
+permissions before it reaches the site, so a wrong site URL would fail at scopes first regardless.
+The scope error is the current blocker; it is not proof that anything behind it is right.
+
+Two things follow for anyone unpinning SharePoint. The consent is an Entra admin task, not a code
+task — `Sites.*` plus, because this config sets `aclEnabled: true` and `crawlIdentities: true`,
+`GroupMember.Read.All` and `User.Read.All` for identity crawling. Turning ACL and identity crawling
+off should drop the requirement to a Sites scope alone, which is a much smaller consent ask. And
+`GBHYGKPMYL` is a **shape** reference only — copy its structure if you like, but do not treat it as
+proof the shape ingests.
+
+Independently of all that, SharePoint stays pinned on **scope**: adding a second data source means
+extending the verifier, which asserts on a single ingestion job and would otherwise let an empty
+second source pass green. `infra/azure/sharepoint-entra.tf.sample` records the shape.
 
 The self-managed connector remains rejected: preview, and its docs state only OpenSearch Serverless
 is available with it — the continuous OCU floor, on a shared account, for a demo.
