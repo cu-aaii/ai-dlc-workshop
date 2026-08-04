@@ -1,4 +1,61 @@
-# devtools — local console for the Builder MCP server
+# devtools — local harnesses for the Builder MCP server
+
+Two tools, neither on the deploy path:
+
+| | |
+|---|---|
+| [`console.py`](#run-it) | Drive the server by hand in a browser — every tool, its schema, and a live call log. |
+| [`preview_deploy.py`](#preview_deploypy--what-a-deployment_create-pr-would-deploy) | Render what a `deployment_create` PR *would* deploy, into a gitignored folder, before opening it. |
+
+## `preview_deploy.py` — what a `deployment_create` PR would deploy
+
+`deployment_create` returns a plan in prose. This renders the artifacts that plan describes,
+so you can read the template CloudFormation receives, the parameter values it receives with
+it, and the diff the registration PR would apply to `pipeline/pipeline.yml`.
+
+```sh
+cd packages/builder-mcp
+uv run python devtools/preview_deploy.py tiny-chatbot --owner <netid>
+uv run python devtools/preview_deploy.py tiny-chatbot --owner <netid> --name my-bot
+```
+
+Writes `outputs-preview/<name>/` at the repo root — gitignored, regenerated wholesale each
+run. No AWS call, no GitHub call, nothing deployed.
+
+| Path | What it is |
+|---|---|
+| `aws/template.yml` | The template CloudFormation receives, byte-identical to the blueprint's. Copied, not rendered: a CFN template is passed verbatim alongside its parameter values. |
+| `aws/parameters.json` | Those values, split into `resolved`, `runtime_resolved` (CodePipeline `#{Ns.VAR}` variables, unknowable from a checkout) and `template_defaults_used`. |
+| `pipeline/action.yml` | The exact `BlueprintDeploy` action the PR appends. |
+| `pipeline/pipeline.yml.diff` | That insertion as a unified diff — the reviewable half of the PR. |
+| `shell/` | The two files the Builder writes to `outputs/<name>/`. A record of intent; **nothing reads them at deploy time.** |
+| `PREFLIGHT.md` | What would go wrong, and why. |
+
+### Preflight
+
+Exit status is `1` when a `BLOCKER` is found, `0` otherwise, so it works in a script. The
+checks are the failure modes this repo has actually hit — each one produces a *green plan*
+and then either a red PR check or a wrong stack:
+
+- an override referencing a CodePipeline namespace no action declares (the component's Build
+  stage was never wired)
+- a blueprint registered `deployed_by: manual` that this PR would have the pipeline deploy —
+  `validate_stacks.py` rejects the combination, so the PR cannot merge
+- an advertised input that never reaches the template, and so is silently ignored
+- a generated action landing outside the `BlueprintDeploy` stage
+- overrides naming parameters the template does not declare, parameters with neither an
+  override nor a default, and values violating their `AllowedPattern`
+
+It calls the server's own `render_pipeline_action`, `deployment_repo_files`,
+`insert_blueprint_action` and `Blueprint.from_manifest` rather than reimplementing them. A
+preview that reimplemented the transforms would drift from the server and start lying, which
+is worse than having no preview.
+
+> `outputs-preview/` holds verbatim copies of blueprint templates, so it is in
+> `validate_stacks.py`'s `SKIP_DIRS` as well as `.gitignore` — that scan walks the filesystem,
+> not git, and would otherwise report every copy as an unregistered template.
+
+## console.py — local console for the Builder MCP server
 
 A browser harness for driving [`builder-mcp`](../README.md) by hand: a chat window on the
 right, and on the left every tool the server advertises, its schema, and a live log of

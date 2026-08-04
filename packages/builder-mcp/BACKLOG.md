@@ -18,6 +18,44 @@ them.
   Claude Cowork. Live Cowork use depends on the deployed AgentCore endpoint plus an OAuth
   token (SPEC C5); if that is not ready by demo time, the recording is what gets shown.
 
+## Deploy-path correctness
+
+Found 2026-08-04 by an end-to-end Builder test against `tiny-chatbot`, and reproducible with
+`uv run python devtools/preview_deploy.py <blueprint> --owner <netid>`. All three are
+**silent** — they produce a green plan and then a red PR check or a wrong stack, never an
+error the builder sees. Ordered plan and estimates in
+`blueprints/tiny-chatbot/docs/completion-plan.md`.
+
+- **Generated actions land in the wrong stage.** `patching._insertion_point` anchors on the
+  `Outputs:` block after the last stage, which was `BlueprintDeploy` when it was written;
+  `pipeline.yml` has since grown a `Terraform` stage after it, so every action
+  `deployment_create` writes is appended to `Terraform` while the returned plan still says
+  `BlueprintDeploy`. CodePipeline allows mixed action types in a stage, so it misplaces
+  rather than fails. `patching.py`'s module docstring predicted this. Fix the anchor *and*
+  `test_insert_places_action_inside_blueprint_deploy_stage`, which asserts only
+  "before `Outputs:`" — a window containing every later stage — so it passes while the
+  property it is named for is false. (SPEC C2)
+
+- **Declared inputs never reach the template.** Overrides are `Application`/`Environment`/
+  `Owner` + `pipeline_parameters` only, so any other manifest input is collected, validated,
+  written to `deployment.yaml` and dropped. `tiny-chatbot`'s `deployment_name` never reaches
+  `DeploymentName`, so a second deployment collides with the first on resource names and
+  `singleton: false` does not work; `notify-topic`'s `notification_email` never reaches the
+  template, so the subscription its pipeline comment promises is never created. Breaks
+  CLAUDE.md's "pass every parameter explicitly from the pipeline". Needs a decision on
+  input → parameter mapping (explicit `parameter_map` preferred over deriving by
+  `pascal_case`, whose failure mode is another silent drop). (SPEC C1)
+
+- **`deployment_create` plans a single-edit registration for every blueprint.** It adds a
+  `BlueprintDeploy` action and nothing else, so for a blueprint needing a container image it
+  opens a PR that cannot merge: `pipeline/stacks.yml` still says `deployed_by: manual` (which
+  `validate_stacks.py` rejects alongside a pipeline action) and the `#{Ns.CONTAINER_DIGEST}`
+  it passes references a namespace no Build action declares. Either have the tool read
+  `stacks.yml` and decline to plan a parked blueprint, or — cheaper and more durable — add a
+  third cross-check to `validate_stacks.py`, which already validates CloudFormation and
+  Terraform actions in both directions, so an unbacked manifest fails PR checks instead of
+  reaching a builder as a plan. (SPEC C1, C2)
+
 ## Catalog & search
 
 - Blueprints move to a **private** repo: the target-state platform generates private
