@@ -72,12 +72,35 @@ Moderate-to-Complex.
   at least one blocking requirement that would otherwise have no home — a consequence of opting into
   all three extensions.
 
-### Finding raised at Workflow Planning
-`pipeline/pipeline.yml` defines `ContainerRepository` and `ContainerBuildProject` but has only three
-stages (Source, PipelineDeploy, BlueprintDeploy); **no stage invokes the container build**. Lambda
-means container images, so this blueprint is the first to need one. US-15 does not cover adding the
-Build stage action or the Dockerfiles — recorded as a known story-coverage gap, carried by
-Infrastructure Design and Code Generation rather than by a story amendment.
+### Finding raised at Workflow Planning — SUPERSEDED 2026-08-03
+~~`pipeline/pipeline.yml` defines `ContainerRepository` and `ContainerBuildProject` but has only three
+stages (Source, PipelineDeploy, BlueprintDeploy); **no stage invokes the container build**.~~
+**No longer true** — see `inception/amendments/repo-baseline-2026-08-03.md` §A1.2. A branch rebase onto
+`main` landed a `Build` stage invoking `ArmContainerBuildProject`, and `builder-mcp` proves
+build → digest → deploy-by-digest end to end on arm64. The **x86** `ContainerBuildProject` is still
+uninvoked, which is why Lambda architecture became a new open question (Q8).
+
+Still true: US-15 does not cover adding the Build stage action or the Dockerfiles — a known
+story-coverage gap carried by Infrastructure Design and Code Generation rather than a story amendment.
+It is now cheaper to close, since the stage exists and the root `Dockerfile` target pattern is set.
+
+## ⚠️ Repo baseline amendment — 2026-08-03
+`origin/dashboard` was force-pushed (rebased onto `main`), pulling in 15 commits merged elsewhere. All
+inception artifacts survived byte-identical; pre-rebase tip `f9d4d57`. Four facts underpinning approved
+artifacts changed. Full record: **`inception/amendments/repo-baseline-2026-08-03.md`**.
+
+| § | What changed | Approved artifacts annotated |
+|---|---|---|
+| A1.1 | **No-self-approval rule removed.** Zero approving reviews required; `validate` is the only automated gate before a shared-account deploy | `requirements.md` §4.3 RESILIENCY-03 + §5 constraint 4; `execution-plan.md` success criteria |
+| A1.2 | **Container build now runs** (arm64, via `builder-mcp`). x86 still uninvoked | `application-design.md` §6.1; `services.md` deployment table; `execution-plan.md` risk reason 4 |
+| A1.3 | **New decision**: arm64 vs x86 Lambda architecture | none — asked as Q8 in `unit-of-work-plan.md` |
+| A1.4 | **`blueprint.yaml` is a parsed contract** (`builder_mcp/catalog.py`); needs `DeploymentName`, `state`, `data_classification`, `cost` values | none — asked as Q3/Q9 |
+| A1.5 | Risk stays **Medium** on a partly different reason set — container unknown shrank, change-control gate weakened | `execution-plan.md` |
+| A1.6 | `tools/check` now needs `terraform` **and** `uv`; neither installed here | — |
+
+Approved conclusions were **not** rewritten — each affected passage keeps its original wording and
+gains a pointer. No user decision was reopened. `CLAUDE.md`'s own closing paragraph still contradicts
+its `pipeline.yml` on the container build; flagged for its owner, not edited here.
 
 ## Stage Progress
 ### 🔵 INCEPTION PHASE
@@ -135,8 +158,9 @@ See `inception/plans/application-design-plan.md` Part A2 (Q1–Q8) and Part A3 (
   (`components.md`, `component-methods.md`, `services.md`, `component-dependency.md`,
   `application-design.md`)
 - **Next Stage**: Units Generation Part 2 (Generation), after the plan is approved
-- **Status**: Awaiting answers to the 7 `[Answer]:` tags in
-  `inception/plans/unit-of-work-plan.md`
+- **Status**: Awaiting answers in `inception/plans/unit-of-work-plan.md` — **9 questions, 22
+  `[Answer]:` tags** (Q9 has four sub-tags). Amended 2026-08-03: Q6 rewritten (false premise), Q3
+  corrected (omitted `blueprint.yaml`), Q8 and Q9 added. Q1, Q2, Q4, Q5, Q7 unaffected.
 
 ### What Units Generation actually decides here
 This blueprint deploys as one CloudFormation stack behind one CloudFront distribution, so the

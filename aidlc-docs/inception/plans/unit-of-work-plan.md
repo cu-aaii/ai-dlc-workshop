@@ -24,8 +24,15 @@ than the most architecturally satisfying one.
 There is exactly one boundary in this design that changes *how work is verified* rather than merely
 how it is organised: C-04 and C-05 have empty dependency rows, use no AWS SDK, and can be built and
 fully property-tested on a laptop with no pipeline, no account, and no deployed stack. Everything else
-needs the never-yet-run container build. That asymmetry is the strongest argument for any split at
+needs a deployed stack and a built image. That asymmetry is the strongest argument for any split at
 all, and it is why the recommended answer separates the pure core and nothing else.
+
+> **Amended 2026-08-03.** This plan originally said "everything else needs the never-yet-run container
+> build." A branch rebase onto `main` landed a working `Build` stage, so that is no longer true — see
+> `inception/amendments/repo-baseline-2026-08-03.md`. Three things changed here as a result: **Q6** was
+> rewritten because its premise (no self-approval) is now false, **Q3** was corrected because it
+> omitted the now-mandatory `blueprint.yaml`, and **Q8** and **Q9** were added for decisions that did
+> not exist when the plan was written. Q1, Q2, Q4, Q5 and Q7 are unaffected.
 
 ---
 
@@ -61,14 +68,15 @@ This is the consequential question; the rest mostly follow from it. Component ID
    - **U-03 Platform Wiring**: the `pipeline.yml` Build stage action, the Dockerfiles, the
      `stacks.yml` entry, C-08 Deployment Marker, C-09 Observability Set
 
-   *Why*: U-03 isolates the two riskiest and least-covered pieces of work in the whole plan — the
-   container build that `CLAUDE.md` confirms **no stage has ever invoked**, and the story-coverage gap
-   where US-15 does not mention the Build stage action or the Dockerfiles. A unit whose whole purpose
-   is "the machinery nobody has run yet" gets its own Infrastructure Design pass and its own Build and
-   Test, instead of being the last third of a large unit's checklist.
+   *Why*: U-03 isolates the deployment wiring — the Build stage action, the `Dockerfile` targets, the
+   `stacks.yml` entry, and the `blueprint.yaml` manifest — which is the work US-15 does not cover. It
+   gets its own Infrastructure Design pass instead of being the last third of a large unit's checklist.
 
-   *Cost*: three CONSTRUCTION passes. And U-03 cannot be verified without U-02 existing to build, so
-   the isolation is organisational rather than genuinely independent.
+   *Cost*: three CONSTRUCTION passes. U-03 cannot be verified without U-02 existing to build, so the
+   isolation is organisational rather than genuinely independent. **This option was weakened by the
+   2026-08-03 amendment**: its original justification was that U-03 held "the machinery nobody has run
+   yet," and that machinery has now run. What remains is the story-coverage gap, which is a smaller
+   reason for a whole unit than an unproven pipeline was.
 
 **C) Four units — Domain Core, Collection, Presentation, Platform Wiring**
    - **U-01 Domain Core**: C-04, C-05
@@ -141,13 +149,21 @@ X) Other (describe after the `[Answer]:` tag)
 application code at all, so this blueprint sets the precedent that later blueprints will copy. That
 is the reason to ask rather than pick.
 
+**Updated 2026-08-03**: all three options originally omitted **`blueprint.yaml`**, which now exists at
+`blueprints/hello-world/blueprint.yaml` and is parsed by `builder_mcp/catalog.py`. A blueprint without
+one is invisible to the Cornell Builder MCP. It is not optional and it sits at the blueprint root in
+every option below. Also note the container **Dockerfile is at the repo root** with one named target
+per component — not per-directory — so the layouts below no longer place Dockerfiles inside the
+blueprint. See `inception/amendments/repo-baseline-2026-08-03.md` §A1.2 and §A1.4.
+
 **A) Group by kind, with the pure core as its own top-level package** ← *recommended*
 ```
 blueprints/dashboard/
+  blueprint.yaml    the manifest the Cornell Builder MCP reads — required
   infra/            dashboard.yml, and the repurposed marker template
   core/             the pure, AWS-free package — no boto3 import anywhere beneath here
-  collector/        Dockerfile + handler for C-01
-  api/              Dockerfile + handler for C-03
+  collector/        handler for C-01 (image built from the root Dockerfile target)
+  api/              handler for C-03 (image built from the root Dockerfile target)
   ui/               package.json, package-lock.json, vite config, src/
   tests/            property tests and unit tests
 ```
@@ -231,21 +247,35 @@ X) Other (describe after the `[Answer]:` tag)
 
 ### Question 6 — Ownership and team alignment
 
-`CLAUDE.md`: **nobody can approve their own PR, so every change needs a second person**, and every
-merge to `main` deploys to a shared account during the workshop. Unit boundaries are the natural
-ownership boundaries, so this affects whether they need to be independently reviewable.
+**This question was rewritten on 2026-08-03.** Its original premise — "nobody can approve their own
+PR, so every change needs a second person" — was true when the plan was written and is now false. Per
+`CLAUDE.md` and `inception/amendments/repo-baseline-2026-08-03.md` §A1.1: a PR is required and direct
+pushes are rejected, but **zero approving reviews** are needed and a team member merges their own PR.
+The `validate` check is the only automated gate between a branch and a shared-account deploy.
 
-**A) Single builder, second person reviews only** ← *recommended*
-   Units are sequencing devices, not ownership boundaries. One PR per unit keeps each review small
-   enough for a reviewer with no prior context.
+That inverts what this question is for. It is no longer "how do we satisfy a mandatory second
+reviewer" — it is "**do we want a human reviewer at all, given nothing now requires one**," while
+every merge to `main` still deploys to the shared account mid-workshop.
 
-**B) Units owned by different people, working in parallel**
-   *Why*: parallel throughput, and reviewers are naturally available for each other's work.
+**A) One PR per unit, and ask for a human review even though none is required** ← *recommended*
+   Units are sequencing devices; the PR boundary is a review boundary by choice, not by rule. One PR
+   per unit keeps each review small enough for someone with no prior context.
+
+   *Why*: `validate` lints templates and checks the registry. It cannot see a WAF allowlist that locks
+   everyone out, a cache policy inverted so `/api/*` is cached, or an IAM policy scoped to `*` — the
+   three failures this design spent the most effort guarding against. None of them fails a lint.
+
+**B) One PR per unit, self-merged on a green `validate`**
+   *Why*: fastest, and it is what the branch protection now expects.
+   *Cost*: the only gate is a lint. Accepting this means accepting that a deny-by-default lockout or a
+   bad cache policy reaches the shared account without a second pair of eyes.
+
+**C) Units owned by different people, working in parallel**
    *Cost*: U-01 must be complete and stable before anyone can meaningfully work on U-02, since both
-   other units call into it. Parallelism is limited by the dependency graph regardless of people.
+   other units call into it. Parallelism is bounded by the dependency graph regardless of headcount.
 
-**C) Ownership is not being decided here** — record units as work groupings only and leave assignment
-   out of the artifacts.
+**D) Ownership is not being decided here** — record units as work groupings only and leave both
+   assignment and review policy out of the artifacts.
 
 X) Other (describe after the `[Answer]:` tag)
 
@@ -278,6 +308,87 @@ X) Other (describe after the `[Answer]:` tag)
 
 ---
 
+### Question 8 — arm64 or x86 for the two Lambdas? *(added 2026-08-03)*
+
+**This question did not exist when the plan was written.** The approved Application Design says only
+"container images," because at that time there was one container path and it had never been invoked.
+The rebase changed that: there are now two paths with asymmetric evidence. See
+`inception/amendments/repo-baseline-2026-08-03.md` §A1.2 and §A1.3.
+
+- **arm64** — `ArmContainerBuildProject`, invoked by the `Build` stage for `builder-mcp`. Build →
+  digest → deploy-by-digest is **proven end to end**.
+- **x86** — `ContainerBuildProject`, known-good by inspection, **still never invoked**. It was added
+  alongside the ARM project deliberately so its definition stays untouched "for future x86 Lambda
+  images" — meaning the repo anticipates exactly this decision.
+
+**A) arm64 for both Lambdas** ← *recommended*
+   *Why*: it is the only container path with evidence behind it, and Lambda on arm64 (Graviton) is
+   cheaper per GB-second — which matters for a blueprint whose own purpose is cost visibility. Reuses
+   the proven `ArmContainerBuildProject` and the root `Dockerfile` target pattern.
+   *Cost*: any Python wheel without an aarch64 build must compile from source in the image. For this
+   design's dependencies (boto3 and the standard library — the pure core has none) that is unlikely to
+   bite, but it is the real risk.
+
+**B) x86 for both Lambdas**
+   *Why*: the widest wheel compatibility, and `ContainerBuildProject` was the original reference
+   project.
+   *Cost*: this blueprint becomes the first thing ever to invoke it, which is the exact risk the
+   amendment just retired. It reintroduces a resolved unknown for no stated benefit.
+
+**C) You choose** — I pick and record the reasoning. (That would land on A.)
+
+X) Other (describe after the `[Answer]:` tag)
+
+[Answer]:
+
+---
+
+### Question 9 — The `blueprint.yaml` manifest values *(added 2026-08-03)*
+
+`blueprint.yaml` is a real parsed contract now (§A1.4), and four of its fields need deliberate values
+rather than copied ones. Answer whichever you have opinions on; where you skip, I will use the
+recommendation and record that I did.
+
+**9a — `data_classification`.** hello-world declares `[public]`. This dashboard exposes account
+inventory: resource ARNs, owner NetIDs, deployment ids, and eventually cost figures.
+   A) `[internal]` ← *recommended* — Cornell-internal; consistent with a WAF allowlist restricted to
+      Cornell IP ranges, which is already the only access control
+   B) `[public]` — matches hello-world; hard to justify given ARNs and NetIDs
+   C) Something stricter (`[confidential]`, or a Cornell-specific term you use)
+
+   [Answer]:
+
+**9b — `singleton`.** hello-world sets `singleton: true` and its own comment says "**Real blueprints
+should take a `DeploymentName` parameter instead**." The approved design has **no `DeploymentName`
+parameter** — resources are named per app/environment, so exactly one dashboard can exist per
+environment.
+   A) Take a `DeploymentName` parameter, `singleton: false` ← *recommended* — follows the repo's own
+      stated guidance for real blueprints. *Cost*: changes resource naming across every dashboard
+      template, and the stack name must still fit `aidlc-<env>-*` for `BuildPipelineRole`
+   B) `singleton: true`, keep the design as approved — one dashboard per environment is arguably
+      correct for a dashboard *of* that environment. *Cost*: knowingly diverges from the guidance
+   C) You choose
+
+   [Answer]:
+
+**9c — `state`.** Vocabulary is `stateless | derived | authoritative`.
+   A) `derived` for the snapshot, nothing authoritative ← *recommended* — the snapshot is fully
+      rebuildable by re-running the collector, which is already the stated basis for RESILIENCY-02's
+      RTO/RPO N/A. Declaring it `derived` makes that consistent rather than merely compatible
+   B) Something else (describe)
+
+   [Answer]:
+
+**9d — `cost`.** `baseline_monthly_usd` and `scales_with`.
+   A) Estimate now from the resource set, and record it as an estimate ← *recommended*
+   B) Leave `0` like hello-world until FR-8 lands. *Cost*: a cost dashboard misreporting its own cost
+      is a bad look, and `0` is definitely wrong — CloudFront, WAF, and two Lambdas are not free
+   C) You choose
+
+   [Answer]:
+
+---
+
 ## Part A1 — Categories evaluated and deliberately not asked about
 
 Recorded so their absence reads as a decision rather than an omission.
@@ -306,7 +417,7 @@ Recorded so their absence reads as a decision rather than an omission.
 ## Part B — Execution checklist (runs after you approve)
 
 ### B1. Preconditions
-- [ ] Confirm every `[Answer]:` tag in Part A is filled
+- [ ] Confirm every `[Answer]:` tag in Part A is filled — **Q1-Q9, including the four Q9 sub-tags**
 - [ ] Run the mandatory Step 7 analysis over all answers — vagueness, undefined terms, contradiction,
       missing detail, option-merging — and raise follow-ups rather than proceeding if any is found
 - [ ] Record resolved decisions and any interactions between answers in a `Part A2` section
@@ -318,8 +429,11 @@ Recorded so their absence reads as a decision rather than an omission.
       account and which cannot, since that is the asymmetry the decomposition turns on
 - [ ] Document the code organization strategy per Q3, including the enforceable no-`boto3` boundary if
       option A is chosen
-- [ ] Record which units carry the known story-coverage gap (Build stage action, Dockerfiles) and the
-      never-run container build
+- [ ] Record which units carry the known story-coverage gap (Build stage action, Dockerfiles) — now
+      cheaper to close, since the `Build` stage exists and the root `Dockerfile` target pattern is
+      established (amendment §A1.2)
+- [ ] Record the chosen Lambda architecture (Q8) and, if x86, that it reintroduces an uninvoked path
+- [ ] Include `blueprint.yaml` in the code-organization strategy with the Q9 values recorded
 - [ ] Carry forward `application-design.md` §6.4 and note whether Q4's answer resolves it
 
 ### B3. `unit-of-work-dependency.md` (mandatory artifact)

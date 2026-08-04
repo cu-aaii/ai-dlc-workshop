@@ -110,6 +110,13 @@ Recorded here because each is silent when wrong.
 
 ### 6.1 The container build has never run — corroborated, not just inferred
 
+> **⚠️ SUPERSEDED 2026-08-03 — see `inception/amendments/repo-baseline-2026-08-03.md` §A1.2.**
+> A branch rebase onto `main` brought in a `Build` stage that invokes `ArmContainerBuildProject`, and
+> `builder-mcp` now proves build → digest → deploy-by-digest end to end. This finding no longer holds
+> in general. It **does** still hold for the x86 `ContainerBuildProject`, which remains uninvoked —
+> which is why Lambda architecture (arm64 vs x86) became a new open question, asked as Q8 in
+> `unit-of-work-plan.md`. The original text is preserved below as approved.
+
 `pipeline/pipeline.yml` defines `ContainerRepository` (line 103) and `ContainerBuildProject`
 (line 191), and has three stages — `Source`, `PipelineDeploy`, `BlueprintDeploy` — none of which
 invokes the build. `CLAUDE.md` states the same thing directly: *"`ContainerBuildProject`,

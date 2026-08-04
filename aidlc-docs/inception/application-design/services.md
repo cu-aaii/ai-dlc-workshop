@@ -101,7 +101,7 @@ Not services of the blueprint, but the blueprint does not exist without them.
 
 | Concern | Where it lives | Note |
 |---|---|---|
-| Container image build | New Build stage action in `pipeline/pipeline.yml` | `ContainerBuildProject` and `ContainerRepository` are defined and known-good but **no stage invokes them** — `CLAUDE.md` states this outright, so the finding raised at Workflow Planning is corroborated by the repo's own documentation, not just by my reading of the template. Wiring is a Build stage action plus a Dockerfile. |
+| Container image build | New Build stage action in `pipeline/pipeline.yml` | `ContainerBuildProject` and `ContainerRepository` are defined and known-good but **no stage invokes them** — `CLAUDE.md` states this outright, so the finding raised at Workflow Planning is corroborated by the repo's own documentation, not just by my reading of the template. Wiring is a Build stage action plus a Dockerfile. **⚠️ SUPERSEDED — see `inception/amendments/repo-baseline-2026-08-03.md` §A1.2.** A `Build` stage now exists and invokes `ArmContainerBuildProject`; the dashboard adds an **action to an existing stage**, not a new stage. A root `Dockerfile` with one named target per component is the established pattern. |
 | Site build + upload | The **same** Build stage action | Q10 = A. Vite build, then `aws s3 sync` to the site bucket. One `pipeline.yml` edit for both, per the execution plan's coordination point. |
 | Stack deployment | New BlueprintDeploy action + `pipeline/stacks.yml` entry | FR-7. A registry entry without a matching action deploys nothing while reporting success. |
 | Pre-push validation | `tools/check` | Stays `uv`-only. Node is **not** added to it, so template-only contributors are unaffected. |

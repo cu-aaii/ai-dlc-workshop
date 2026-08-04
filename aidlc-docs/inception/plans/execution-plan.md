@@ -79,7 +79,12 @@ the deploy path (`pipeline/pipeline.yml`).
      workshop, that is a plausible way for the dashboard to look broken while working exactly as
      specified. US-11's requirement that blocks be visible in logs is the mitigation.
   4. **This blueprint is the first to need a container image** (see below), so it must wire a
-     pipeline stage that has never run.
+     pipeline stage that has never run. **⚠️ LARGELY RESOLVED — see
+     `inception/amendments/repo-baseline-2026-08-03.md` §A1.2 and §A1.5.** A `Build` stage now exists
+     and `builder-mcp` proves build → digest → deploy-by-digest end to end on **arm64**. The x86
+     `ContainerBuildProject` is still uninvoked, so the residual risk depends on the architecture
+     chosen (Q8 of the unit-of-work plan). Risk remains **Medium** overall, on a partly different
+     reason set: this reason shrank while the change-control gate in §A1.1 weakened.
 - **Rollback complexity**: **Easy-to-Moderate.** The blueprint is a self-contained stack — deleting
   it removes it. The pipeline change is additive and revertable. The one asymmetry: the Build stage
   action and the ECR repository are shared infrastructure once introduced, so reverting them later
@@ -312,6 +317,9 @@ from `cornell:*` tags, reachable by a Cornell viewer with no AWS account and no 
 - Stack name conforms to `<application>-<environment>-<name>`; every parameter passed explicitly
 - No credential, key, or secret in any file — the repo is public and secret scanning is disabled
 - `main` reaches deployment only via PR with one human approval, by someone other than the author
+  — **⚠️ SUPERSEDED, see `inception/amendments/repo-baseline-2026-08-03.md` §A1.1.** Zero approving
+  reviews are now required. This criterion is no longer satisfiable as written; what remains
+  enforceable is "reaches deployment only via PR, with `validate` passing."
 - No story's acceptance criteria left unverified, and any that cannot be verified at story level
   named with the stage that carries it
 

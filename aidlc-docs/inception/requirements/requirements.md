@@ -200,7 +200,7 @@ silently dropped, and the supersession chain is logged in `aidlc-docs/audit.md`.
 |---|---|
 | RESILIENCY-01 Criticality | **Medium/Low**. This is an observability aid for a two-day workshop, not a revenue or safety path. Unavailability means organizers temporarily can't see tag/cost inventory; there is no data loss of record, because every input is re-derivable from the live AWS account. Dependencies: Resource Groups Tagging API (upstream), snapshot store, CloudFront/WAF (downstream of the UI). Nothing depends on this blueprint. |
 | RESILIENCY-02 Availability & recovery targets | **RTO/RPO: N/A per user answer (R5-Q1 = E)** — no cross-region DR. Justification: the snapshot is fully rebuildable by re-running the collector against the live account, so RPO is effectively bounded by the refresh interval and no data is irreplaceable. Availability target: best-effort in-region; not SLA-bound. Explicitly **not** over-engineered — matching the rule's requirement that over-engineering is itself a finding. |
-| RESILIENCY-03 Change management | **Exempt per user answer (R5-Q2 = C).** Rationale: this is workshop teaching infrastructure with no external customers. In practice changes are still gated — `main` is PR-only with one mandatory human approval and no self-approval (branch protection) — but no formal change-record process (CAB/ServiceNow) applies. This exemption is recorded here as the rule requires. |
+| RESILIENCY-03 Change management | **Exempt per user answer (R5-Q2 = C).** Rationale: this is workshop teaching infrastructure with no external customers. In practice changes are still gated — `main` is PR-only with one mandatory human approval and no self-approval (branch protection) — but no formal change-record process (CAB/ServiceNow) applies. This exemption is recorded here as the rule requires. **⚠️ SUPERSEDED IN PART — see `inception/amendments/repo-baseline-2026-08-03.md` §A1.1.** `CLAUDE.md` now requires **zero approving reviews**; a team member merges their own PR. The exemption (a recorded user decision) stands, but the compensating control cited in this rationale no longer exists. |
 | RESILIENCY-04 Automated deploy & rollback | Deployment is already automated (CodePipeline → CodeBuild → CloudFormation). Rollback mechanism and deployment style are **user decisions deferred to NFR/Application Design** per the extension's own scoping. |
 | RESILIENCY-05 Monitoring & alerting | Metrics, structured logs, and a health dashboard required. Distributed tracing: **N/A** (not a multi-service distributed system). |
 | RESILIENCY-06 Health checks | The API MUST expose a health endpoint. A deep check verifying the snapshot store is readable is required for the API. Synthetic canary monitoring: documented as not applicable (the endpoint is not publicly reachable — WAF-allowlisted only). |
@@ -251,7 +251,11 @@ These bind regardless of the vendored AI-DLC rules, per `CLAUDE.md`:
 2. Serverless-first, `us-east-1`. **Lambda means container images**, not zip.
 3. Secrets live only in AWS Secrets Manager. **The repo is public with secret scanning disabled
    — never commit a credential.**
-4. `main` is PR-only, one human approval, no self-approval.
+4. `main` is PR-only, one human approval, no self-approval. **⚠️ SUPERSEDED — see
+   `inception/amendments/repo-baseline-2026-08-03.md` §A1.1.** Now: PR required and direct pushes
+   rejected, the `validate` check must pass, `ai-dlc-workshop` team members only — but **zero
+   approving reviews**, so a team member merges their own PR and `validate` is the only automated
+   gate between a branch and a shared-account deploy.
 5. All four `cornell:*` tags on every resource. `cornell:owner` and `cornell:deployment-id`
    arrive as stack parameters; `cornell:blueprint` is hardcoded to `dashboard` and
    `cornell:blueprint-version` is a template default bumped in the PR that changes the blueprint.
