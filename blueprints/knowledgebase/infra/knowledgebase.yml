@@ -612,17 +612,19 @@ Resources:
   # The retrieval seam. Downstream blueprints attach this policy instead of writing their own
   # Bedrock statements, so read access to this knowledge base stays one reviewable artifact.
 
-  # Use Retrieve. RetrieveAndGenerate is not supported on a managed knowledge base
-  # (docs/sharepoint-runbook.md), so a consumer calling it fails whatever this grants - the grant
-  # stays only because removing it needs its own PR: ManagedPolicy REPLACES on a PolicyDocument
-  # change and the replacement collides with its own explicit name, which rolled main back once.
-  # See docs/warnings.md. An unusable grant is a documentation problem, not a security one.
+  # IMMUTABLE IN PLACE. Name, Description and PolicyDocument all replace the resource, and the
+  # replacement collides with the explicit name the original holds. Editing any of them means
+  # renaming the policy in the same change - a document edit and then a description edit each rolled
+  # main back. docs/warnings.md.
+  #
+  # Use Retrieve; RetrieveAndGenerate is unsupported on a managed KB (docs/sharepoint-runbook.md) and
+  # is still granted only because removing it is that rename. Unusable grant, not a security issue.
 
   RetrievalPolicy:
     Type: 'AWS::IAM::ManagedPolicy'
     Properties:
       ManagedPolicyName: !Sub '${Application}-${Environment}-knowledgebase-retrieval'
-      Description: 'Read-only retrieval against this knowledge base. Attach to a consuming role rather than granting bedrock:Retrieve directly. Use Retrieve - RetrieveAndGenerate is unsupported on a managed KB.'
+      Description: 'Read-only retrieval against the knowledgebase blueprint knowledge base. Attach this to a consuming role rather than granting bedrock:Retrieve directly.'
       PolicyDocument:
         Version: '2012-10-17'
         Statement:

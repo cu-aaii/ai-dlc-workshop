@@ -235,6 +235,11 @@ This happened on `main`: a one-line edit dropping `bedrock:RetrieveAndGenerate` 
 knowledge base does not support — failed `BlueprintDeploy` and left `UPDATE_ROLLBACK_COMPLETE`. Red
 for every track, and the change did not land.
 
+**`Description` counts.** The first fix restored the policy document but reworded the description,
+which replaces the resource just as surely — so it failed again, identically, and cost a second red
+`BlueprintDeploy` on a shared pipeline. `ManagedPolicyName`, `Description` and `PolicyDocument` are
+all replacement-triggering: treat the whole resource as immutable-in-place.
+
 Editing that policy therefore takes a PR that also **renames** it, and the rename has a second
 precondition: IAM refuses to delete a managed policy that is attached to anything, so the delete half
 of the replacement fails and rolls back again. Check first:
