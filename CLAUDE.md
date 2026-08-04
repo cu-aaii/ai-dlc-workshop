@@ -228,6 +228,15 @@ and CI gets it from `hashicorp/setup-terraform`. Never document or run the bare 
   with an entirely empty knowledge base, and Bedrock has no native scheduled sync. Something in
   the stack has to start the job, and on this repo's no-CLI deploy path it should also assert the
   result — see `blueprints/knowledgebase/docs/decisions.md`.
+- **`"secret has an invalid format or missing values"` usually is not about the secret.** Bedrock
+  emits it both for wrong secret key names *and* for attaching a SharePoint data source to a
+  customer-managed knowledge base — a path it cannot service at all. Check the knowledge base type
+  before rewriting a correct secret; that mistake costs hours.
+- **A SharePoint data source cannot be purged in place.** No document-level deletion
+  (*"Invalid data source type [SHAREPOINTV3] provided"*), and narrowing scope does not retroactively
+  delete what is already indexed — the connector can no longer see it to diff it. Delete and
+  recreate the data source, which only clears the index if its `DataDeletionPolicy` is `DELETE`.
+  That is why `blueprints/knowledgebase` sets `DELETE` there and `RETAIN` on its S3 source.
 
 ## Deliberately not built
 

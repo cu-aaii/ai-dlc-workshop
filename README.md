@@ -32,6 +32,8 @@ pipeline/                   the deploy path
 blueprints/
   hello-world/                trivial tagged stack; proves the pipeline, and the demo floor
   entra-probe/                one Entra app registration; proves the Terraform path
+  knowledgebase/              Bedrock managed KB over S3 (+ optional SharePoint); Track C reads it
+  tiny-chatbot/               canned-response Lambda behind a Function URL; parked, deploys by hand
 aidlc-rules/                the AI-DLC methodology — vendored from awslabs, do not edit
 .github/workflows/
   pr-checks.yml               cfn-lint + registry check. No AWS calls, no credentials.
@@ -190,10 +192,37 @@ deploys, which would otherwise deploy nothing while reporting success.
 **Pass every parameter explicitly** from the pipeline. Template defaults exist so a stack can
 be deployed by hand for debugging, not to be the real values.
 
+## The knowledge base, for the teams consuming it
+
+`blueprints/knowledgebase` is deployed and queryable. Two identifiers are all a consumer needs, and
+both are in SSM — not a CloudFormation `Export`, so nothing couples your stack's lifecycle to ours:
+
+```sh
+aws ssm get-parameter --name /aidlc/main/knowledgebase/knowledge-base-id     --query Parameter.Value --output text
+aws ssm get-parameter --name /aidlc/main/knowledgebase/retrieval-policy-arn  --query Parameter.Value --output text
+```
+
+Attach that managed policy to your role rather than writing your own `bedrock:Retrieve` statement,
+then call `bedrock-agent-runtime`. Retrieval on a managed knowledge base takes
+`managedSearchConfiguration`; `vectorSearchConfiguration` is rejected.
+
+| | |
+|---|---|
+| Indexed today | One syllabus PDF from `aidlc-kb-ingestion-890349359349`. **One document is not a corpus** — expect mediocre relevance, and scores that don't track it. |
+| Freshness | A merge re-ingests and re-verifies. Between merges nothing does unless `EnableScheduledSync` is on, and it is off. |
+| SharePoint | Built and verified, **off by default** (`EnableSharePointSource`). Turning it on makes every team's merge depend on an Entra certificate nobody watches. |
+| Proof it works | A green `BlueprintDeploy` asserts the documents are indexed *and* answerable — the stack fails otherwise. `DocumentsIndexed` and `SmokeQueryResult` are stack outputs. |
+| Costs money idle | Managed KB billing is per-GB-stored plus per-retrieve. It does not stop when the workshop ends. |
+
+If you need a different corpus, that is `IngestionBucketName` plus a `SmokeQuery` the new corpus can
+answer, in `pipeline/pipeline.yml` **and** the template — and if the smoke query stops being
+answerable, every team's deploy goes red. Details in `blueprints/knowledgebase/README.md`.
+
 ## Not here yet
 
-Still to come, per the workshop spec: the `course-chatbot` blueprint (managed Bedrock Knowledge
-Base, Teams bot, Strands agent), the `builder-mcp` keystone, and `observability/`.
+Still to come, per the workshop spec: the Teams bot and Strands agent half of `course-chatbot`
+(the knowledge base it was to sit on now exists as `blueprints/knowledgebase`), the `builder-mcp`
+keystone, and `observability/`.
 
 The Terraform stage exists but only reaches **Entra**. Managing Azure *resources* with `azurerm`
 additionally needs an Azure subscription in the tenant and an Azure RBAC role assignment for the

@@ -1,6 +1,6 @@
 ---
 name: knowledgebase
-description: Deploy or modify the Cornell AI-DLC knowledge base blueprint - a Bedrock managed knowledge base over an S3 document bucket that verifies its own ingestion at deploy time. Use when a builder asks for document search, RAG, "make these documents searchable/queryable", a knowledge base for a chatbot, or when changing what a knowledge base indexes.
+description: Deploy or modify the Cornell AI-DLC knowledge base blueprint - a Bedrock managed knowledge base over an S3 document bucket, plus an optional SharePoint site library, that verifies its own ingestion at deploy time. Use when a builder asks for document search, RAG, "make these documents searchable/queryable", indexing a SharePoint site, a knowledge base for a chatbot, or when changing what a knowledge base indexes.
 ---
 
 # knowledgebase blueprint
@@ -13,6 +13,7 @@ chatbot needs to query it. Template lives at `blueprints/knowledgebase/infra/kno
 - `blueprints/knowledgebase/docs/warnings.md` — before any edit
 - `blueprints/knowledgebase/docs/decisions.md` — before proposing an alternative that was rejected
 - `blueprints/knowledgebase/README.md` — what deploys and how to consume it
+- `blueprints/knowledgebase/docs/sharepoint-source.md` — before touching anything SharePoint
 
 ## The two constraints that break naive changes
 
@@ -31,6 +32,11 @@ plainly rather than implying a change was tested. For anyone who *does* have acc
 by-hand `Environment=test` deploy is the rehearsal and is worth doing before any change to the
 data source configuration or the verifier — see `docs/warnings.md` for the command.
 
+**Watch the template's size.** CloudFormation caps a request-body template at 51,200 bytes; this one
+hit 55,411 when SharePoint and the schedules landed, which broke that command. It is back to 50,143
+and `tools/check` gates it. When the gate warns, move comment prose into `docs/` and leave a pointer —
+do not delete reasoning, and do not reach for `--s3-bucket` as the first answer.
+
 ## Do not do these
 
 | Don't | Why |
@@ -38,11 +44,17 @@ data source configuration or the verifier — see `docs/warnings.md` for the com
 | Turn the verifier into a fire-and-forget trigger | It is the only thing distinguishing a green pipeline from an empty knowledge base. See the section below. |
 | Add a vector store — S3 Vectors, OpenSearch Serverless, Aurora | `Type: MANAGED` needs none. OpenSearch Serverless bills ~$350/mo continuously. |
 | Add `StorageConfiguration` | Absent on purpose for a managed knowledge base, and create-only. |
-| Broaden `KnowledgeBaseRole`'s Bedrock statements to `bedrock:*` or `Resource: '*'` | The four embedding-model statements are deliberate and deliberately narrow — the managed service-role docs require them and don't say whether `MANAGED` embedding actually uses them. Keep them scoped. |
+| Broaden `KnowledgeBaseRole`'s Bedrock statements to `bedrock:*` or `Resource: '*'` | The four embedding-model statements are deliberate and deliberately narrow. Managed embedding has been observed not to use them at all, so they are kept only because four read-scoped statements are cheaper than a failed deploy — which is an argument for leaving them alone, not for widening them. |
 | Create the ingestion bucket | Seeding objects needs write access nobody here has, so it would be empty forever and every deploy would fail. |
 | Add a `Tags` block to `AWS::Bedrock::DataSource` | The resource has no `Tags` property. cfn-lint will reject it. Use the SSM mirror. |
 | Copy a `Key`/`Value` tag list onto `AWS::Bedrock::KnowledgeBase` | Its `Tags` is a **map**, like `AWS::SSM::Parameter`. |
-| Wire SharePoint with the existing client secret | Auth-type mismatch, not an oversight. `infra/azure/README.md`. |
+| Enable `EnableSharePointSource` as part of another change | It makes every track's merge depend on Entra consent, a per-site grant and an unexpired certificate. Own PR, after an `Environment=test` rehearsal. |
+| Wire SharePoint with `dev/workshop/entra/sharepoint` | That is the old client-secret credential; `ENTRA_ID_APP_ONLY` needs a certificate. The connector's secret is `bedrock/sharepoint-cert-connector`, holding exactly `clientId` and `certificatePassword`. |
+| Set `aclEnabled: true` | Bedrock then demands `GroupMember.Read.All` and `User.Read.All` — tenant-wide profile reads. It is why the account's earlier SharePoint data source failed every job it ran. |
+| Change SharePoint's `DataDeletionPolicy` to `RETAIN` for consistency with S3 | SharePoint has no document-level deletion, so deleting the data source is the only purge that exists. `RETAIN` makes stale chunks permanent. |
+| Put a certificate, a `.p12`, a PEM or a secret value in the repo | Public repo, **no secret scanning**. Reference by ARN and S3 key only. |
+| Describe a scheduled sync as verified, or point at `last-ingestion-result` as proof one worked | Scheduler cannot call `get*`, `list*` or `retrieve`, so nothing ever learns a scheduled sync's outcome. Those parameters describe the last **deploy**. |
+| Add a `Tags` block to `AWS::Scheduler::Schedule` | No `Tags` property — cfn-lint rejects it. `AWS::Scheduler::ScheduleGroup` carries the tags instead. |
 | Edit anything under `aidlc-rules/` | Vendored verbatim from upstream. |
 
 ## Changing what gets indexed
@@ -55,10 +67,33 @@ Then change `SmokeQuery` to something the new corpus can answer, in the same two
 don't, **every** deploy fails — the verifier asserts the query returns results, and a red
 `BlueprintDeploy` stage blocks other blueprints too.
 
-Add a second source (web crawler is the cheap one) → another `AWS::Bedrock::DataSource` with
-`type: WEB` in `ConnectorParameters`, **and extend the verifier**. The handler asserts on one
-ingestion job, so a second data source can be completely empty while the stack goes green. This
-is the step that gets forgotten.
+Add a source → another `AWS::Bedrock::DataSource` (web crawler is the cheap one: `type: WEB` in
+`ConnectorParameters`) **and another verifier instance**. Copy `SharePointIngestionVerifier`: it is a
+second `AWS::CloudFormation::CustomResource` pointed at the same Lambda, with `DependsOn` chaining it
+after the previous one, because the handler already takes `KnowledgeBaseId`, `DataSourceId` and
+`SmokeQuery` as properties. **Do not edit the handler for this** — the inline code has ~280
+characters of headroom, and it does not need to change.
+
+Without that second instance the new source can be completely empty while the stack goes green. This
+is the step that gets forgotten. Note the residual limit even with it: ingestion statistics are
+per-data-source, but `bedrock:Retrieve` spans the whole knowledge base, so each source's smoke query
+has to be one only that source can answer.
+
+Keep the index fresh between merges → `EnableScheduledSync=true`, plus the two cron expressions, in
+all three places (template default, `pipeline/pipeline.yml`, and the docs claim). Bedrock has no
+native scheduled sync; EventBridge Scheduler's universal target
+(`arn:aws:scheduler:::aws-sdk:bedrockagent:startIngestionJob`) is the no-code way to trigger one.
+
+**Never describe it as verified re-sync.** Scheduler refuses read-only-prefixed actions — `get`,
+`list`, `retrieve` — so a schedule can start an ingestion job and can never discover the outcome. If
+a builder asks for *verified* scheduled ingestion, the answer is Scheduler → Step Functions
+(`startExecution` is allowed, and SFN's SDK integrations can call the read APIs), which is written up
+in `docs/decisions.md` as evaluated and deferred. Do not improvise it into the inline Lambda.
+
+Turn SharePoint on → read `docs/sharepoint-source.md`. It is a checklist in dependency order, and
+step 3 (verify the Entra half standalone, before Bedrock is involved) is the one that saves the day.
+The Entra app, its certificate and the per-site grant are prerequisites that live outside this repo;
+nothing in `tools/check` can see any of them.
 
 Change chunking → **you can't, and adding a `ChunkingConfiguration` back will fail the deploy.** A
 managed embedding model owns chunking; the API rejects any chunking strategy specified alongside it.
@@ -124,8 +159,10 @@ check reports success — `validate_stacks.py` catches this, but only if the reg
 be deployed by hand for debugging; they are not the real values.
 
 **No secrets in the repo, ever.** This repo is public and has **no secret scanning** — an enforced
-org security configuration disables it. Reference Secrets Manager by name or ARN only. The Entra
-credentials at `dev/workshop/entra/sharepoint` are referenced nowhere in the deployed template.
+org security configuration disables it. Reference Secrets Manager by name or ARN only — which is
+what `SharePointConnectorSecretArn` does; the template never reads that secret's value, and the
+certificate it protects lives in S3. The old client-secret credentials at
+`dev/workshop/entra/sharepoint` are referenced nowhere at all.
 
 ## Verifying a change
 
@@ -148,10 +185,14 @@ never reaches `AVAILABLE`. Any edit inside `ConnectorParameters` needs a by-hand
 rehearsal, and the status has to be read from `aws bedrock-agent list-data-sources`, not from the
 stack.
 
-**`connectionConfiguration.bucketOwnerAccountId` is required, always.** The AWS connector reference
-calls it conditional and cross-account-only; that is wrong. Omitting it fails validation with
-*"Member must not be null"* for a same-account bucket — via the hang above. It is
+**`connectionConfiguration.bucketOwnerAccountId` is required, always — in the S3 connector.** The
+AWS connector reference calls it conditional and cross-account-only; that is wrong. Omitting it fails
+validation with *"Member must not be null"* for a same-account bucket — via the hang above. It is
 `!Ref 'AWS::AccountId'` and should stay there.
+
+**It does not belong in the SharePoint connector.** That connector's `connectionConfiguration` is
+`secretArn` / `tenantId` / `authType` / `certificateS3Path`. Adding a key a connector does not know
+is the same class of edit as misspelling one, with the same hang.
 
 After that: push the branch, watch the pipeline, read the verdict. A green `BlueprintDeploy` means
 the acceptance test passed — that is the design, because it is the only design that works without

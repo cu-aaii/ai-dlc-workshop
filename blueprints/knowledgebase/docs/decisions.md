@@ -29,20 +29,24 @@ look like omissions in the template:
 
 GA in `us-east-1` since 17 June 2026.
 
-### The service role does still get embedding-model permissions
+### The service role keeps embedding-model permissions it almost certainly does not need
 
 An earlier version of this document claimed a managed knowledge base needs no
 `bedrock:InvokeModel`, on the reasoning that AWS owns the embedding model. The managed
 service-role documentation says otherwise: it lists "access to the Amazon Bedrock base models"
 among the three required policies, with `bedrock:ListFoundationModels`, `bedrock:ListCustomModels`
 and `bedrock:InvokeModel` on the named embedding models — and it does not distinguish `MANAGED`
-from `CUSTOM` embedding when it does so.
+from `CUSTOM` embedding when it does so. So the template included them.
 
-It may well be that those statements only matter for `CUSTOM`. But the template includes them,
-because the two outcomes are not symmetric: being over-permissive by four read-scoped statements
-costs nothing, while being wrong costs a failed deploy in a shared account that nobody on this
-track can inspect. `InvokeModel` is scoped to four named embedding models. **Do not** generalise
-it to `bedrock:*` or `Resource: '*'` to be safe — that trades a small cost for a large one.
+**The original reasoning turned out to be right, and the statements are staying anyway.** A managed
+knowledge base in this account — `sharepoint-kb` / `KANPIZQSGD`, the one behind the SharePoint
+defaults — has been observed ingesting and answering with a service role holding **no `bedrock:*`
+permission at all**. Managed embedding does not use them.
+
+They stay because the asymmetry that put them there has not changed: four read-scoped statements
+cost nothing, and deleting them to be tidy risks a failed deploy in a shared account for no gain.
+`InvokeModel` is scoped to four named embedding models. **Do not** generalise it to `bedrock:*` or
+`Resource: '*'` — that trades a small cost for a large one.
 
 ### Rejected: S3 Vectors
 
@@ -84,6 +88,85 @@ scheduler Bedrock doesn't have.
 
 **This is load-bearing.** Softening it to fire-and-forget to make a deploy pass would silently
 turn the blueprint back into something that proves nothing.
+
+## Scheduled re-sync, and the one place this blueprint accepts an unverified action
+
+Every other decision here bends towards "assert it or don't ship it." This one doesn't, so it needs
+the most explanation.
+
+**The problem.** Bedrock has no scheduled sync — confirmed against the current sync documentation,
+not recalled: *"each time you add, modify, or remove files from your data source, you must sync,"*
+and `StartIngestionJob` is the only trigger. Between merges the index goes stale, silently. For S3
+that is a slow drift; for SharePoint, where the corpus is a site anyone can edit without a PR, it is
+the normal case.
+
+**What ships.** `EnableScheduledSync` (default `false`) creates an `AWS::Scheduler::ScheduleGroup`,
+a role with exactly `bedrock:StartIngestionJob` on this one knowledge base, and one
+`AWS::Scheduler::Schedule` per enabled data source, using the universal target
+`arn:aws:scheduler:::aws-sdk:bedrockagent:startIngestionJob`. No Lambda, no code, no new inline-code
+pressure, weekly by default and offset an hour apart.
+
+**What it cannot do, and this is structural rather than an omission.** EventBridge Scheduler refuses
+any API action whose name begins with a read-only prefix, and the published list includes `get`,
+`list`, **`retrieve`** and **`invokeModel`**. So from a schedule:
+
+| Wanted | Reachable? |
+|---|---|
+| `StartIngestionJob` | Yes |
+| `GetIngestionJob` / `ListIngestionJobs` — did it work? | **No** (`get`, `list`) |
+| `Retrieve` — does it still answer? | **No** (`retrieve`) |
+
+A schedule can therefore start a sync and can never find out what happened. All five assertions
+still exist, and they only ever run on a deploy. **A scheduled sync keeps the index fresh and proves
+nothing**, which is precisely the fire-and-forget shape `warnings.md` tells you not to build — the
+difference being that here it is additive: it cannot make a deploy pass that would otherwise fail,
+because it is not in the deploy path at all. That is the whole argument for accepting it.
+
+### Rejected for now: Scheduler → Step Functions
+
+The verified version. `startExecution` is not a blocked prefix, and Step Functions' SDK integrations
+*can* call `GetIngestionJob` and `Retrieve`, so a state machine can start the job, poll it, assert
+the statistics, run the smoke query and write the result somewhere — the deploy-time verifier's five
+assertions, on a timer, with a real outcome to record.
+
+It also retires a warning this blueprint already carries: the verifier's 900-second Lambda ceiling
+bounds corpus size, and `warnings.md` says the shape has to change to Step Functions or
+fire-and-forget-plus-alarm before this takes real volume. Same work, two problems.
+
+Deferred because it is a second implementation of the assertions, which either duplicates them or
+means rewriting the one artifact in this blueprint that is known to work, days before a workshop.
+The right sequence is: ship the schedule, then replace *both* the schedule target and the custom
+resource's Lambda with one state machine, rather than adding a third thing.
+
+### Rejected: event-driven on change
+
+For S3 this needs `NotificationConfiguration.EventBridgeConfiguration` on the bucket, which requires
+CloudFormation to **own** the bucket — the import `assumptions.md` already calls the honest fix.
+There is also a debounce problem: fifty uploaded files are fifty events, and ingestion jobs conflict,
+so most of them would fail. Worth doing after the import, with a queue in front.
+
+For SharePoint there is no AWS-visible change event at all. Microsoft Graph change notifications
+would mean a public HTTPS endpoint, a validation handshake and subscription renewal every few days —
+a new inbound surface for a blueprint that indexes a syllabus. Polling is the answer there.
+
+### Rejected: reusing the verifier Lambda on a schedule
+
+It speaks only the custom-resource protocol — it reads `ResponseURL` and `StackId` and `PUT`s a
+response — so a scheduled invocation would fail on the event shape. Adapting it means editing the
+one load-bearing artifact, which has ~280 characters of inline headroom, to do double duty. The
+tempting version of this idea costs more than the state machine and leaves less.
+
+### Where the outcome is recorded: nowhere, and the SSM parameter says so
+
+`/aidlc/main/knowledgebase/sync-schedule` records the *configuration* — the expressions, the group,
+and the literal string `outcomes=not-recorded`. It is deliberately not a result record, because
+there is no result to record: nothing in the stack ever learns what a scheduled sync did.
+
+The two `last-ingestion-result` parameters sit next to it and *are* real results — of the last
+**deploy**. Reading them as evidence that scheduled syncs are healthy is the specific mistake this
+wording exists to make harder. An alarm on Scheduler's `TargetErrorCount` would at least catch "the
+API call itself failed"; it still would not catch a failed ingestion job, and nothing subscribes to
+anything today.
 
 ## Reference the existing bucket, don't create one
 
@@ -141,22 +224,22 @@ inferred. The all-four-`cornell:*`-tags rule is therefore impossible on it.
 Rather than quietly skip it, `DataSourceIdParameter` gives tag-based inventory a join key that
 tags cannot reach. Deleting that parameter hides the data source from Track E entirely.
 
-## S3 only; SharePoint pinned — but not for the reason first given
+## SharePoint: wired, verified, and off by default
 
-**Retraction.** An earlier version of this document called SharePoint an *authentication dead end*:
-the managed connector offers `ENTRA_ID_APP_ONLY` (certificate mandatory) or `OAUTH2_APP` (a
-resource-owner password grant needing an MFA-exempt account), and the workshop's Entra app uses a
-client secret, which fits neither.
+The operational detail lives in `sharepoint-source.md`. This section is the decisions and the
+retractions, because this is the part of the blueprint that has been wrong in public twice.
 
-There is a managed SharePoint data source in the account — `knowledge-base-quick-start-9as4d` /
-`GBHYGKPMYL` — configured with `authType: ENTRA_ID_APP_ONLY`, a `certificateS3Path` pointing at
-`public.cer` in `config-bucket-890349359349`, `https://8chzbf.sharepoint.com/sites/kb`, and the very
-secret the retracted paragraph called unusable. So `ENTRA_ID_APP_ONLY` is at least *reachable* here:
-someone generated a certificate for the Entra app. That much is configuration anyone can read.
+**Retraction 1.** An earlier version called SharePoint an *authentication dead end*: the managed
+connector offers `ENTRA_ID_APP_ONLY` (certificate mandatory) or `OAUTH2_APP` (a resource-owner
+password grant needing an MFA-exempt account), and the workshop's original Entra app used a client
+secret, which fits neither. The conclusion drawn from that — SharePoint is unreachable here — was
+wrong. A new app registration with a certificate is a modest amount of work, not a blocker, and
+that is what now exists.
 
-**Second retraction, and this one was mine.** An earlier version of this section called that data
-source **working** and a "known-good example." It is neither. It has never ingested a document. Its
-last five ingestion jobs all `FAILED` with zero documents scanned, every one of them:
+**Retraction 2, the worse one.** A later version called the account's existing quick-start data
+source `knowledge-base-quick-start-9as4d` / `GBHYGKPMYL` **working** and a "known-good example." It
+was neither. It never ingested a document; its last five ingestion jobs all `FAILED` with zero
+documents scanned:
 
 ```
 SharePoint app is missing required scopes: Missing required permissions:
@@ -164,35 +247,97 @@ SharePoint app is missing required scopes: Missing required permissions:
  one of [Sites.FullControl.All, Sites.Selected, Sites.Read.All]]
 ```
 
-I concluded "working" from `status: AVAILABLE` plus a complete-looking `connectorParameters`, and
-never listed its ingestion jobs. **`AVAILABLE` describes the connector's validity, not whether it
-ever ingested anything** — the same mistake as reading a stack status instead of an outcome, which
-is the lesson at the top of `warnings.md`. Nothing in this repo had evidence for the claim when it
-was written.
+"Working" was concluded from `status: AVAILABLE` plus a complete-looking `connectorParameters`,
+without ever listing the ingestion jobs. **`AVAILABLE` describes the connector's validity, not
+whether it ever ingested anything** — the same class of mistake as reading a stack status instead
+of an outcome, which is the lesson at the top of `warnings.md`.
 
-What is *not* established: whether `siteUrls` is correct. Bedrock validates the app's granted Graph
-permissions before it reaches the site, so a wrong site URL would fail at scopes first regardless.
-The scope error is the current blocker; it is not proof that anything behind it is right.
+Worth keeping because that failure is also the design input for what shipped: the missing scopes
+were `GroupMember.Read.All` and `User.Read.All`, which Bedrock demands *only* because that
+configuration sets `aclEnabled: true` and `crawlIdentities: true`. Turning ACL crawling off drops
+the requirement to a `Sites` scope alone, which is a far smaller consent ask. Hence
+`aclEnabled: false` in this template.
 
-Two things follow for anyone unpinning SharePoint. The consent is an Entra admin task, not a code
-task — `Sites.*` plus, because this config sets `aclEnabled: true` and `crawlIdentities: true`,
-`GroupMember.Read.All` and `User.Read.All` for identity crawling. Turning ACL and identity crawling
-off should drop the requirement to a Sites scope alone, which is a much smaller consent ask. And
-`GBHYGKPMYL` is a **shape** reference only — copy its structure if you like, but do not treat it as
-proof the shape ingests.
+**What is now true, and verified rather than reasoned.** A managed knowledge base with a SharePoint
+data source has been observed ingesting and answering in this account — `sharepoint-kb` /
+`KANPIZQSGD`, one job `COMPLETE`, one document scanned, one indexed, none failed. The template's
+`ConnectorParameters` body and its parameter defaults are that configuration, field for field.
 
-Independently of all that, SharePoint stays pinned on **scope**: adding a second data source means
-extending the verifier, which asserts on a single ingestion job and would otherwise let an empty
-second source pass green. `infra/azure/sharepoint-entra.tf.sample` records the shape.
+### Off by default
 
-The self-managed connector remains rejected: preview, and its docs state only OpenSearch Serverless
-is available with it — the continuous OCU floor, on a shared account, for a demo.
+`EnableSharePointSource` defaults to `false` and `pipeline/pipeline.yml` passes `false`, so the
+deployed `main` stack is S3-only. This is the decision most likely to read as timidity, so the
+reason is worth being explicit about: enabling it makes **every merge to `main`, by every track,**
+depend on an Entra app registration, an admin consent, a per-site grant and an unexpired
+certificate. None of those is in this repo, none is visible to `tools/check`, and the verifier
+correctly fails the stack when any of them lapses — so a lapsed certificate is a red
+`BlueprintDeploy` for everyone during a workshop.
 
-The secret `dev/workshop/entra/sharepoint` stays where it is; nothing in this blueprint's deployed
-template references its values.
+An S3-only deploy is byte-for-byte what it was before SharePoint existed: everything
+SharePoint-shaped hangs off one `Condition`.
 
-Web crawler is pinned only because one data source proves the pattern. It is a much smaller lift:
-another `AWS::Bedrock::DataSource` with `type: WEB`.
+### Rejected: making the certificate or the secret value IaC
+
+CloudFormation cannot generate a `.p12`, and a certificate password in a template is a secret in a
+public repo with no secret scanning. Terraform *can* generate one, but its state then holds the
+password, and the `.p12` has to exist on disk for the S3 upload. So the certificate, the secret's
+value and the per-site Graph grant are by-hand steps, documented rather than automated. The
+template references them and never contains them, which is this repo's standing pattern for
+credentials.
+
+### `DataDeletionPolicy: DELETE` on SharePoint, `RETAIN` on S3
+
+A deliberate divergence between two otherwise identical resources.
+
+SharePoint has **no document-level deletion** — Bedrock rejects it with *"Invalid data source type
+[SHAREPOINTV3] provided. Only S3 and Custom data source supported for document level request."* And
+narrowing scope does not purge: **verified**, turning `crawlPages` off left the already-indexed
+`SitePages/*.aspx` documents retrievable, because the connector can no longer see them to diff
+them as deleted. Deleting the data source is therefore the only purge that exists, and it only
+purges if the policy says `DELETE`.
+
+`RETAIN` would make every stale SharePoint chunk permanent for the life of the knowledge base. The
+price of `DELETE` is that replacing the resource empties the SharePoint half and re-ingests from
+zero — which the verifier asserts, so it is loud rather than silent. For S3, document-level
+deletion *is* available, so `RETAIN` keeps its original protective meaning there.
+
+### A second verifier instance, not a second verifier
+
+The previous version of this blueprint listed "extend the verifier" as the step that gets
+forgotten, because the handler asserted on one ingestion job and a second data source could sit
+empty behind a green stack.
+
+The fix cost zero lines of Python. The handler already takes `KnowledgeBaseId`, `DataSourceId` and
+`SmokeQuery` as custom-resource properties, so a second `AWS::CloudFormation::CustomResource`
+pointed at the same Lambda verifies the second source. That mattered concretely: inline
+`Code.ZipFile` is capped at 4096 characters with ~280 to spare, and a code-touching approach would
+probably not have fit.
+
+`DependsOn` sequences the two, because Bedrock rejects concurrent ingestion jobs with a conflict
+and two instances racing would spend their 900-second budgets waiting on each other.
+
+The residual gap is stated in the template and in `sharepoint-source.md`: the ingestion statistics
+are per-data-source, so an empty SharePoint source cannot pass, but `bedrock:Retrieve` spans the
+whole knowledge base, so a smoke query the S3 corpus can also answer weakens assertion five to
+nothing. The default `SharePointSmokeQuery` is currently exactly that mistake and is labelled a
+placeholder.
+
+### Still rejected: the self-managed SharePoint connector
+
+Preview, and its documentation states only OpenSearch Serverless is available as the vector store
+with it — a continuous OCU floor of roughly $350/month, on a shared account, for a blueprint that
+indexes a syllabus. It accepts a client secret, which is its only advantage, and that advantage
+evaporated the moment a certificate existed.
+
+### The old secret
+
+`dev/workshop/entra/sharepoint` (keys `entraAppID`, `entraAppDirectoryID`, `entraAppSecretID`,
+`entraAppSecretValue`) is the client-secret credential from the original app. Nothing in this
+blueprint reads it. The connector reads
+`bedrock/sharepoint-cert-connector`, which holds exactly `clientId` and `certificatePassword`.
+
+Web crawler remains unbuilt, now purely because nothing asks for it: another
+`AWS::Bedrock::DataSource` with `type: WEB` plus a third verifier instance.
 
 ## `BlueprintVersion` duplicated in the pipeline action
 
@@ -237,13 +382,14 @@ Everything below was read out of `cfn-lint>=1.53,<2`'s bundled `us-east-1` schem
 | `DataSourceType` includes `MANAGED_KNOWLEDGE_BASE_CONNECTOR` | The managed connector is reachable from CloudFormation. |
 | `ConnectorParameters` is free-form `Json` | **cfn-lint validates nothing inside it.** A typo passes `tools/check` and fails at deploy. The single biggest risk in this template, and the other reason the verifier exists. |
 
-One thing the live data source shows that no document states: the Bedrock API returns
-`connectorParameters` as a **JSON-encoded string**, not an object. This template writes it as a YAML
-mapping and relies on CloudFormation to marshal it, which is what the `Json` schema type implies.
-That is the last untested assumption in the template, and the reason to rehearse a deploy by hand
-before merging rather than after.
 | `KnowledgeBaseConfiguration` sub-objects and `VectorIngestionConfiguration/ChunkingConfiguration` are create-only | Changing type or embedding model replaces the resource. |
 | The schema **accepts** `ChunkingConfiguration` next to a managed embedding model | And the API **rejects** it. See below — the sharpest example of cfn-lint clean meaning less than usual here. |
+
+The Bedrock API returns `connectorParameters` as a **JSON-encoded string**, not an object, which no
+document states and which makes the round trip look asymmetric. This template writes it as a YAML
+mapping and relies on CloudFormation to marshal it, as the `Json` schema type implies. That was the
+last untested assumption in the template until the by-hand rehearsal below; it is now confirmed for
+the S3 body, and the SharePoint body is the same mechanism with different keys.
 
 Confirmed from AWS documentation rather than memory:
 

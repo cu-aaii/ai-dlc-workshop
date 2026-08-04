@@ -64,7 +64,12 @@ TF_MODULE_GLOB = 'blueprints/*/infra/azure'
 TEMPLATE_MARKER = 'AWSTemplateFormatVersion'
 
 # Directories with no deployable templates in them.
-SKIP_DIRS = {'.git', '.github', 'node_modules', '.venv', '__pycache__'}
+#
+# .claude is in here because Claude Code puts git worktrees under .claude/worktrees/, and a
+# worktree is a full second checkout -- so every template in the repo appears twice and the
+# registry check fails against paths that are not repo content. CI never sees this (it checks out
+# clean), which makes it purely a local false positive, and a confusing one.
+SKIP_DIRS = {'.git', '.github', '.claude', 'node_modules', '.venv', '__pycache__'}
 
 VALID_DEPLOYED_BY = {'pipeline', 'manual'}
 

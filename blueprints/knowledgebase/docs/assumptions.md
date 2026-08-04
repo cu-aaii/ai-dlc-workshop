@@ -70,12 +70,77 @@ happens at real volume.
 Both of these are true for one PDF and neither survives contact with a real document set. Growing
 the corpus means revisiting the timeout and probably making the smoke query less specific.
 
+## The SharePoint source, only when it is enabled
+
+None of this is assumed by the deployed `main` stack: `EnableSharePointSource` is `false`, and with
+the flag off the template makes no SharePoint claims at all. Everything here becomes a deploy
+prerequisite the moment it is `true` — and a prerequisite for **every track's merges**, since they
+share the stage. Detail and the how in `sharepoint-source.md`.
+
+**The knowledge base is `Type: MANAGED`.** Not a preference in this context: a customer-managed
+knowledge base supports S3 and Custom data sources only, and attaching SharePoint to one fails at
+*sync* time with an error that blames the secret.
+
+**An Entra app registration exists with a live certificate, and it is not the original one.** The
+app registered during workshop prep uses a client secret, which `ENTRA_ID_APP_ONLY` cannot use. The
+connector's app has a certificate and should have no client secret at all.
+
+**Both resource applications are consented.** Microsoft Graph
+(`00000003-0000-0000-c000-000000000000`) *and* the SharePoint REST API
+(`00000003-0000-0ff1-ce00-000000000000`), each with an application-permission grant. Graph alone
+yields a token that reads site metadata and fails on content, which surfaces as a scope error rather
+than as a partial success.
+
+**The site named by `SharePointSiteUrl` has an explicit per-site grant.** `Sites.Selected` on its
+own grants nothing. The grant is a Graph `POST` issued by a principal holding
+`Sites.FullControl.All`, and it survives the deletion of the app that issued it — verified. The
+parameter holds one site; the template renders `siteUrls` as a one-element list, so more than one
+site is a `ConnectorParameters` edit rather than a parameter value.
+
+**The certificate has not expired.** This is a date, not a configuration, and nothing in this repo
+watches it. It is the most likely cause of a SharePoint failure that appears without anyone
+changing anything.
+
+**The `.p12` is at `s3://<SharePointCertificateBucket>/<SharePointCertificateKey>`, under a
+prefix.** The connector fetches it itself and also probes for a sibling `<key>.metadata.json`, so
+the role grants `GetObject` on the prefix rather than the object — a key at the bucket root would
+make that probe a denied call.
+
+**The secret holds exactly `clientId` and `certificatePassword`.** camelCase, those two keys, for
+`ENTRA_ID_APP_ONLY`. Wrong names fail with the same generic error as a wrong knowledge base type.
+`bedrock/sharepoint-cert-connector` is that secret; `dev/workshop/entra/sharepoint` is the old
+client-secret credential and is read by nothing here.
+
+**`SharePointSmokeQuery` is answerable from the SharePoint corpus and *not* from the S3 bucket.**
+Retrieval spans the whole knowledge base, so a question both corpora answer makes the retrieval
+assertion prove nothing. The current default fails this test on purpose-visible grounds — it is a
+placeholder. See `warnings.md`.
+
+## Scheduled re-sync, only when it is enabled
+
+**Nothing watches it.** `EnableScheduledSync` is `false` by default; when it is `true`, the
+assumption being made is that an unverified weekly `StartIngestionJob` is worth having. Scheduler
+cannot check a result — `get`, `list` and `retrieve` are all blocked prefixes — so the assumption
+cannot be validated from inside the stack, only from the console by someone with access.
+
+**`bedrockagent` is the right SDK service identifier for the universal-target ARN.** Nothing
+validates that string; a wrong one fails at invocation time, unobserved. It is the one thing in the
+schedule worth confirming during the `Environment=test` rehearsal, by reading Bedrock's ingestion-job
+history after the first fire rather than by trusting the stack.
+
+**Ingestion jobs conflict, so the two schedules are offset by an hour.** Whether the concurrency
+limit is per data source or per knowledge base has not been tested here; the offset makes it moot.
+
 ## Out of scope, deliberately
 
-**SharePoint is pinned.** `infra/azure/sharepoint-entra.tf.sample` is illustrative and is not
-pipeline-runnable — CLAUDE.md lists the Terraform CodeBuild stage as deliberately not built. The
-Entra app and secret `dev/workshop/entra/sharepoint` exist, but nothing in this blueprint reads
-them, and the reason is an auth-type mismatch documented in `decisions.md`, not an oversight.
+**The Entra half is not pipeline-runnable from this blueprint.**
+`infra/azure/sharepoint-entra.tf.sample` records the shape of the app registration, its consent and
+its certificate, but it stays a `.tf.sample`: no `Terraform` stage action names this directory, and
+`validate_stacks.py` cross-checks that in both directions, so a real `.tf` here would fail PR
+checks until the action exists. The certificate generation and the per-site grant are by-hand steps
+regardless.
 
 **No teardown automation.** Nothing in this repo has any, because until now everything was S3 and
-SSM and effectively free. This blueprint is the first thing that bills while idle.
+SSM and effectively free. This blueprint is the first thing that bills while idle. Note that the
+two halves do not tear each other down: deleting the stack leaves the Entra app and the
+certificate, and `terraform destroy` leaves the knowledge base.
