@@ -446,3 +446,12 @@
 **Context**: CONSTRUCTION — U-02 Functional Design complete. Awaiting approval before U-02 NFR Requirements.
 
 ---
+
+## Functional Design U-02 — Approval
+**Timestamp**: 2026-08-03T00:00:00Z
+**Approval Prompt**: "# 🔧 Functional Design Complete - U-02 Dashboard Platform … ✅ **Continue to Next Stage**" — presented with the four artifacts, the four inherited obligations each discharged by a named rule, the three findings (the `TreatMissingData: breaching` trap, the IPv6 gap in my own Q3, and the reuse of the existing notify-topic), and the Q5 = A divergence from another team's addendum flagged for them to decide.
+**User Input**: "Continue to next stage"
+**Decision**: **APPROVED** — U-02 Functional Design closed. Accepted: the 30 rules, the plumbing-only entity set, the algorithms and totality table, the frontend component design including the no-colour-for-group-identity decision, and the three findings as recorded.
+**Context**: CONSTRUCTION — proceeding to U-02 NFR Requirements. Unlike U-01, most NFR categories genuinely apply here: U-02 is deployed, has endpoints, storage, an edge and availability characteristics.
+
+---
