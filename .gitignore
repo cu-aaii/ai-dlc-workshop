@@ -51,6 +51,25 @@ aidlc-docs/
 DEMO.md
 good-morning.sh
 
+# asciinema recordings of demo/demo.sh. A rehearsal artifact by default: committing one means
+# it goes stale silently while still looking authoritative. Commit a specific .cast with
+# `git add -f` when you deliberately want a fixed recording for a session.
+demo/*.cast
+
 .DS_Store
 .idea/
 *.swp
+
+# Playwright MCP session artifacts (snapshots, console logs)
+.playwright-mcp/
+
+# Local deploy previews from packages/builder-mcp/devtools/preview_deploy.py -- the template,
+# parameters and pipeline diff a deployment_create PR would carry. Regenerable from the
+# checkout, so there is nothing to keep.
+#
+# NOT outputs/, which is the deployment shell the Builder writes through a PR and which IS
+# committed. Ignoring that would hide real deployment records.
+#
+# Also listed in validate_stacks.py's SKIP_DIRS: that scan walks the filesystem, not git, and
+# these are verbatim copies of blueprint templates.
+outputs-preview/
