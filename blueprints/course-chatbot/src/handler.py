@@ -1,209 +1,273 @@
-"""Course chatbot: a Lambda behind a Function URL that answers questions with Claude.
+"""Course chatbot: a Bot Framework front door for Microsoft Teams.
 
-Runs as a container image (root Dockerfile target course-chatbot) built by the pipeline's
-Build stage and deployed by digest. Design constraints this code is downstream of:
+Runs as a container image (``blueprints/course-chatbot/Dockerfile``, target
+``course-chatbot``, arm64) built by the pipeline's Build stage and deployed by digest.
 
-- Stateless. The conversation lives in the client, which passes prior turns back on every
-  request. Nothing here reads session state, so the function scales without affinity.
-- The caller holds no model credentials. Bedrock is reached with the Lambda execution
-  role's own AWS credentials, so there is no API key anywhere in this repo.
-- Answers are grounded only in the system prompt. Retrieval over course materials is the
-  Knowledge Base work (see the blueprint README); this deliberately has no retrieval, and
-  says so rather than inventing course specifics.
+Shape of a request: Azure Bot Service POSTs an activity to this function's URL. We prove the
+activity is genuine, ask the model, post the answer back to Teams through the Bot Framework
+API, and return 200. Synchronously, in one function.
+
+Design constraints this code is downstream of:
+
+- **All model traffic goes through Cornell's LiteLLM gateway.** Never Bedrock directly. That
+  routing is what makes medium-risk data permissible, and it is a hard constraint, not a
+  preference. The gateway is Anthropic-compatible, so this is a ``base_url`` on the ordinary
+  Anthropic client -- ``messages.create()`` is unchanged.
+- **Always return 200, including on a rejected token.** A 4xx makes Azure Bot Service retry a
+  request that can never succeed, forever.
+- **Answer only from the system prompt.** Retrieval over course materials is the Knowledge
+  Base work; this says it does not know rather than inventing a due date.
+- **Conversation history is not carried.** Teams hands over one activity and no history, so
+  there is nothing to thread. Multi-turn arrives with AgentCore -- see below.
+
+**Where AgentCore goes**, when step 2 lands: it replaces ``_ask()``. The model call moves out
+of this Lambda into an AgentCore Runtime container and ``_ask()`` becomes an
+``invoke_agent_runtime`` call, keyed on a session id derived from the conversation. That seam
+is the only structural change -- no worker Lambda, no SSE, no queue. ``SYSTEM_PROMPT``,
+``MODEL_ID`` and the gateway key move into the agent with it, and this function's role loses
+its Secrets Manager grant in exchange for ``bedrock-agentcore:InvokeAgentRuntime``.
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
-import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 import boto3
+from anthropic import Anthropic
 
-# The Bedrock Messages API client. The SDK renamed it AnthropicBedrock ->
-# AnthropicBedrockMantle when the Messages-API endpoint became the recommended path, so
-# support both and let the pinned version float.
-try:
-    from anthropic import AnthropicBedrockMantle as _BedrockClient
-except ImportError:  # pragma: no cover
-    from anthropic import AnthropicBedrock as _BedrockClient
+import botframework as bf
 
-LOG = logging.getLogger()
+logging.basicConfig()
+LOG = logging.getLogger("course-chatbot")
 LOG.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
 
-# AWS_REGION is set by the Lambda runtime and cannot be overridden in the function's
-# environment, so a separate variable is what lets the model live in another region.
-REGION = os.environ.get("BEDROCK_REGION") or os.environ["AWS_REGION"]
-MODEL_ID = os.environ["MODEL_ID"]
-COURSE_NAME = os.environ.get("COURSE_NAME", "this course")
-TRANSCRIPT_BUCKET = os.environ.get("TRANSCRIPT_BUCKET", "")
-DEPLOYMENT_ID = os.environ.get("DEPLOYMENT_ID", "unknown")
-MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "4096"))
-# Claude 5 models think by default. Effort is the lever for a chat-latency budget --
-# lower it rather than disabling thinking, which is the more expensive control in every
-# sense and degrades output.
+MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "1024"))
+# Claude 5 models think by default. Effort is the lever for a chat-latency budget -- lower it
+# rather than disabling thinking, which is more expensive in every sense and degrades output.
+# Teams gives us 10-15 seconds before showing the user 504:GatewayTimeout, so this matters.
 EFFORT = os.environ.get("EFFORT", "low")
 
-# Cap on client-supplied history, so one caller can't drive an arbitrarily large (and
-# arbitrarily expensive) request. Turns are user/assistant pairs.
-MAX_HISTORY_TURNS = 20
-MAX_MESSAGE_CHARS = 8000
+# Bounds an inbound message, so one caller cannot drive an arbitrarily large or arbitrarily
+# expensive request (SECURITY-05).
+MAX_MESSAGE_CHARS = 4000
+MAX_BODY_BYTES = 256 * 1024
 
-SYSTEM_PROMPT = f"""You are a teaching assistant for {COURSE_NAME} at Cornell University.
+GENERIC_FAILURE = (
+    "Sorry, something went wrong answering that. If you report it, quote this reference: {ref}"
+)
+
+_ssm = boto3.client("ssm")
+_secrets = boto3.client("secretsmanager")
+
+
+def _param(name: str, default: str = "") -> str:
+    """Read one SSM parameter at cold start.
+
+    Configuration is routed through SSM rather than read straight from an environment variable
+    because deployment_create drops a manifest's `inputs` on the floor (#15 finding 2), so SSM
+    is the only surface a builder-supplied value can reach. Note this does NOT make the value
+    safely editable out of band: the parameter's Value comes from a stack parameter, so a deploy
+    touching that resource reasserts it. A real change is a PR.
+    """
+    if not name:
+        return default
+    try:
+        return _ssm.get_parameter(Name=name)["Parameter"]["Value"]
+    except Exception as exc:
+        LOG.warning("could not read %s, using default: %s", name, exc)
+        return default
+
+
+def _secret(arn: str) -> str:
+    if not arn:
+        return ""
+    return _secrets.get_secret_value(SecretId=arn)["SecretString"]
+
+
+class _Config:
+    """Resolved once per cold start. Fails loudly on anything genuinely required."""
+
+    def __init__(self) -> None:
+        self.bot_app_id = os.environ.get("BOT_APP_ID", "")
+        self.bot_tenant_id = os.environ.get("BOT_TENANT_ID", "")
+        self.deployment_id = os.environ.get("DEPLOYMENT_ID", "unknown")
+        self.gateway_base_url = os.environ.get("GATEWAY_BASE_URL", "")
+        self.course_name = _param(os.environ.get("COURSE_NAME_PARAM", ""), "this course")
+        self.model_id = _param(os.environ.get("MODEL_ID_PARAM", ""), "claude-haiku-4-5")
+        self.greeting = os.environ.get(
+            "GREETING_TEXT",
+            f"Hi! I'm the {self.course_name} assistant. Ask me anything about the course.",
+        )
+        self.system_prompt = self._load_prompt()
+
+    def _load_prompt(self) -> str:
+        """An S3-hosted prompt wins when configured, because a syllabus does not fit in a
+        4096-character CloudFormation parameter (FR-3a)."""
+        bucket = os.environ.get("SYSTEM_PROMPT_S3_BUCKET", "")
+        key = os.environ.get("SYSTEM_PROMPT_S3_KEY", "")
+        if bucket and key:
+            try:
+                body = boto3.client("s3").get_object(Bucket=bucket, Key=key)["Body"].read()
+                return body.decode("utf-8")
+            except Exception as exc:
+                # Falling back is right: a missing prompt object should degrade the bot's
+                # knowledge, not take it off the air mid-demo.
+                LOG.error("could not load system prompt from s3://%s/%s: %s", bucket, key, exc)
+        return DEFAULT_SYSTEM_PROMPT.format(course=self.course_name)
+
+
+DEFAULT_SYSTEM_PROMPT = """You are a teaching assistant for {course} at Cornell University.
 
 Answer students' questions about the course clearly and directly, at the level of someone
 taking it for the first time. Lead with the answer, then the reasoning.
 
-You do not have access to this course's syllabus, assignments, grades, or any other
-course materials. When a question depends on specifics you were not given -- a due date,
-what is on an exam, an individual student's standing -- say you don't have that and point
-the student at the course staff or the course site. Never guess at a date, a policy, or a
-grade.
+You do not have access to this course's syllabus, assignments, grades, or any other course
+materials beyond what appears in these instructions. When a question depends on specifics you
+were not given -- a due date, what is on an exam, an individual student's standing -- say you
+don't have that and point the student at the course staff or the course site. Never guess at a
+date, a policy, or a grade.
 
-Keep responses focused and brief. Skip preamble and restating the question. When asked to
-explain something, give a high-level summary first and go deeper only if asked.
+Keep responses short. You are answering in a Teams chat, not writing a document. Skip preamble
+and do not restate the question.
 
 You cannot change grades, grant extensions, or make policy exceptions. Refer those to the
 course staff."""
 
-_bedrock = _BedrockClient(aws_region=REGION)
-_s3 = boto3.client("s3")
+class _Runtime:
+    """Config, secrets and clients, resolved on first invocation rather than at import.
+
+    **Deliberately lazy.** Anything that runs at module scope runs during Lambda INIT, and an
+    exception there fails the invocation *before* `handler` is reached -- so the function
+    returns a 5xx no matter what `handler` promises, and Azure Bot Service retries a request
+    that can never succeed, forever (FR-10). Building here instead puts every failure mode
+    inside the handler's own try/except, where it becomes a logged 200.
+    """
+
+    def __init__(self) -> None:
+        self.config = _Config()
+        self.teams = bf.BotFrameworkClient(
+            bf.TokenProvider(
+                tenant_id=self.config.bot_tenant_id,
+                client_id=self.config.bot_app_id,
+                client_secret=_secret(os.environ.get("BOT_CLIENT_SECRET_ARN", "")),
+            )
+        )
+        # The gateway, not Bedrock. Anthropic-compatible, so only the construction differs.
+        self.model = Anthropic(
+            base_url=self.config.gateway_base_url,
+            api_key=_secret(os.environ.get("GATEWAY_API_KEY_ARN", "")) or "unset",
+        )
 
 
-class BadRequest(Exception):
-    """The caller's payload is unusable; surfaced as a 400 rather than a stack trace."""
+_RUNTIME: _Runtime | None = None
 
 
-def _parse_request(event: dict[str, Any]) -> tuple[str, str, list[dict[str, str]]]:
-    """Pull message, conversation id and prior turns out of a Function URL event."""
-    raw = event.get("body") or ""
-    if event.get("isBase64Encoded"):
-        import base64
-
-        raw = base64.b64decode(raw).decode("utf-8")
-    try:
-        payload = json.loads(raw) if raw else {}
-    except json.JSONDecodeError as exc:
-        raise BadRequest(f"body is not valid JSON: {exc}") from exc
-    if not isinstance(payload, dict):
-        raise BadRequest("body must be a JSON object")
-
-    message = payload.get("message")
-    if not isinstance(message, str) or not message.strip():
-        raise BadRequest("'message' is required and must be a non-empty string")
-    if len(message) > MAX_MESSAGE_CHARS:
-        raise BadRequest(f"'message' exceeds {MAX_MESSAGE_CHARS} characters")
-
-    conversation_id = payload.get("conversation_id") or str(uuid.uuid4())
-    if not isinstance(conversation_id, str) or len(conversation_id) > 64:
-        raise BadRequest("'conversation_id' must be a string of at most 64 characters")
-
-    history = payload.get("history") or []
-    if not isinstance(history, list):
-        raise BadRequest("'history' must be a list of {role, content} objects")
-    turns: list[dict[str, str]] = []
-    for entry in history[-(MAX_HISTORY_TURNS * 2) :]:
-        if (
-            not isinstance(entry, dict)
-            or entry.get("role") not in {"user", "assistant"}
-            or not isinstance(entry.get("content"), str)
-        ):
-            raise BadRequest("each history entry needs role 'user' or 'assistant' and string content")
-        turns.append({"role": entry["role"], "content": entry["content"]})
-
-    return message, conversation_id, turns
+def _runtime() -> _Runtime:
+    global _RUNTIME
+    if _RUNTIME is None:
+        _RUNTIME = _Runtime()
+    return _RUNTIME
 
 
-def _ask(turns: list[dict[str, str]]) -> tuple[str, dict[str, int]]:
-    """Send the conversation to Claude and return its reply plus token usage."""
-    reply = _bedrock.messages.create(
-        model=MODEL_ID,
+def _ask(rt: _Runtime, question: str) -> str:
+    """Ask the model one question. **This is the seam AgentCore replaces** -- see the module
+    docstring. Narrow in, narrow out, deliberately."""
+    reply = rt.model.messages.create(
+        model=rt.config.model_id,
         max_tokens=MAX_TOKENS,
-        system=SYSTEM_PROMPT,
-        messages=turns,
-        # effort rides in extra_body so this works on any SDK version, typed or not.
-        # Sampling parameters (temperature, top_p, top_k) are rejected by Claude 5
-        # models -- steer with the system prompt instead.
+        system=rt.config.system_prompt,
+        messages=[{"role": "user", "content": question}],
+        # effort rides in extra_body so this works on any SDK version, typed or not. Sampling
+        # parameters (temperature, top_p, top_k) are rejected by Claude 5 models -- steer with
+        # the system prompt instead.
         extra_body={"output_config": {"effort": EFFORT}},
     )
-    # Thinking is on by default and its blocks carry no text unless display is set, so
-    # take the text blocks and ignore everything else rather than indexing content[0].
-    text = "".join(block.text for block in reply.content if block.type == "text").strip()
-    usage = {
-        "input_tokens": reply.usage.input_tokens,
-        "output_tokens": reply.usage.output_tokens,
-    }
-    return text, usage
+    return "".join(b.text for b in reply.content if b.type == "text").strip()
 
 
-def _record(conversation_id: str, question: str, answer: str, usage: dict[str, int]) -> None:
-    """Append the exchange to the transcript bucket. Best effort -- never fails a reply."""
-    if not TRANSCRIPT_BUCKET:
+def _body(event: dict[str, Any]) -> dict[str, Any]:
+    raw = event.get("body") or ""
+    if event.get("isBase64Encoded"):
+        raw = base64.b64decode(raw).decode("utf-8")
+    if len(raw.encode("utf-8")) > MAX_BODY_BYTES:
+        raise ValueError("request body too large")
+    payload = json.loads(raw) if raw else {}
+    if not isinstance(payload, dict):
+        raise ValueError("body must be a JSON object")
+    return payload
+
+
+def _headers(event: dict[str, Any]) -> dict[str, str]:
+    """Function URL headers arrive lowercased, but do not rely on it."""
+    return {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+
+
+def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
+    """Always returns 200. See the module docstring for why that is not laziness."""
+    correlation = "unknown"
+    try:
+        rt = _runtime()
+        activity_json = _body(event)
+        activity = bf.parse_activity(activity_json)
+        # The activity id is the correlation id: it already exists, is stable across retries,
+        # and is what the user is shown on failure -- so a quoted reference leads straight to
+        # every log line for that request.
+        correlation = activity.activity_id or "no-id"
+
+        try:
+            bf.validate_activity(
+                _headers(event).get("authorization"), activity_json, rt.config.bot_app_id
+            )
+        except bf.ValidationError as exc:
+            # The reason is logged and never returned. This is the SECURITY-02 compensating
+            # control -- a Function URL has no access log of its own.
+            LOG.warning(
+                "rejected activity: correlation=%s type=%s reason=%s",
+                correlation,
+                activity.activity_type,
+                exc,
+            )
+            return {"statusCode": 200}
+
+        LOG.info(
+            "accepted activity: correlation=%s type=%s conversation=%s",
+            correlation,
+            activity.activity_type,
+            activity.conversation_type,
+        )
+        _dispatch(rt, activity)
+        return {"statusCode": 200}
+
+    except Exception as exc:
+        LOG.exception("unhandled failure: correlation=%s error=%s", correlation, exc)
+        return {"statusCode": 200}
+
+
+def _dispatch(rt: _Runtime, activity: bf.Activity) -> None:
+    """Route on activity type. Unknown types are accepted and ignored (FR-12)."""
+    if activity.activity_type == "conversationUpdate":
+        # Filtered on the 28: bot prefix inside parse_activity, or the bot greets itself when
+        # it is the member being added.
+        if activity.human_joined:
+            rt.teams.send(activity, rt.config.greeting)
         return
-    now = datetime.now(timezone.utc)
-    key = (
-        f"conversations/{now:%Y/%m/%d}/{conversation_id}/"
-        f"{now:%H%M%S}-{uuid.uuid4().hex[:8]}.json"
-    )
+
+    if activity.activity_type != "message":
+        return
+
+    if not activity.text:
+        # An attachment, a reaction, or a card action. Nothing to answer.
+        return
+
+    question = activity.text[:MAX_MESSAGE_CHARS]
+    rt.teams.typing(activity)
     try:
-        _s3.put_object(
-            Bucket=TRANSCRIPT_BUCKET,
-            Key=key,
-            ContentType="application/json",
-            Body=json.dumps(
-                {
-                    "deployment_id": DEPLOYMENT_ID,
-                    "conversation_id": conversation_id,
-                    "asked_at": now.isoformat(),
-                    "model_id": MODEL_ID,
-                    "question": question,
-                    "answer": answer,
-                    "usage": usage,
-                }
-            ).encode("utf-8"),
-        )
-    except Exception:  # noqa: BLE001 -- a transcript failure must not cost the student a reply
-        LOG.exception("could not write transcript to s3://%s/%s", TRANSCRIPT_BUCKET, key)
-
-
-def _response(status: int, body: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "statusCode": status,
-        "headers": {"content-type": "application/json"},
-        "body": json.dumps(body),
-    }
-
-
-def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
-    """Function URL entry point: one question in, one answer out."""
-    try:
-        message, conversation_id, history = _parse_request(event)
-    except BadRequest as exc:
-        return _response(400, {"error": str(exc)})
-
-    turns = [*history, {"role": "user", "content": message}]
-    try:
-        answer, usage = _ask(turns)
-    except Exception:  # noqa: BLE001 -- the caller gets a narrative, the log gets the trace
-        LOG.exception("model call failed for conversation %s", conversation_id)
-        return _response(
-            502,
-            {
-                "error": "the assistant is unavailable right now; please try again shortly",
-                "conversation_id": conversation_id,
-            },
-        )
-
-    _record(conversation_id, message, answer, usage)
-    return _response(
-        200,
-        {
-            "conversation_id": conversation_id,
-            "answer": answer,
-            "model_id": MODEL_ID,
-            "usage": usage,
-        },
-    )
+        rt.teams.reply(activity, _ask(rt, question))
+    except Exception as exc:
+        LOG.exception("answer failed: correlation=%s error=%s", activity.activity_id, exc)
+        # Best effort: if this fails too, the outer handler logs it and still returns 200.
+        rt.teams.reply(activity, GENERIC_FAILURE.format(ref=activity.activity_id))

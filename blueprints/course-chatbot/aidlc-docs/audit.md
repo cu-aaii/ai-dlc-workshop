@@ -2083,3 +2083,137 @@ rather than as a status summary for a human who already has the context. Eleven 
 
 **Session state**: paused. No further action until the user resumes.
 
+
+---
+
+## 2026-08-04 — Session Resumed: Units Generation Part 2 Gate
+
+**Stage**: INCEPTION - Units Generation (Part 1 approved; Part 2 not started)
+
+### User Input 1
+
+**COMPLETE RAW USER RESPONSE**:
+
+```
+Please read this and explore the repo for context. We'll be continuing with Units Generation Part 2. Please tell me if we have any blockers before we begin.
+```
+
+**AI Action**: Read `aidlc-state.md`, `unit-of-work-plan.md`,
+`inception/upstream-reconciliation-2026-08-04.md`, `docs/AIDLC-TURNOVER-2026-08-04.md`,
+`blueprints/course-chatbot/README.md` and both `infra/` READMEs. Verified repository state against
+the artifacts rather than trusting them.
+
+**Six blockers reported.** Three needing a user decision, three mechanical:
+
+1. The deliverable is no longer `blueprints/teams-bot/`; all ten units name that path.
+2. **D2** (Dockerfile layout) is the only one of the three named gates with no answer.
+3. **Q3 versus the AgentCore mandate** is unresolved and determines whether `U6` exists.
+4. `.gitignore:38` (`aidlc-docs/`, unanchored) will silently swallow every Part 2 artifact.
+   Verified with `git check-ignore` against the not-yet-created filenames.
+5. PR #21 is still **open**, so its ten ratified answers are not in this checkout.
+6. `terraform` was not installed, so `tools/check` aborted before linting anything.
+
+**Two gates found already closed**, contrary to the reconciliation document's status: **D1** settled
+by the track structure, **D5** resolved by per-component placement at `fe7d336`. **No new upstream
+drift** — `team-c-wip` is 0 behind / 11 ahead of `upstream/main`.
+
+**Two findings that shrink units**, recorded so Part 2 does not re-plan delivered work: **U1 is
+largely delivered** upstream (ARM64 project, `Build` stage, `CONTAINER_CONTEXT`/`CONTAINER_DIGEST`,
+exercised by `tiny-chatbot` and `builder-mcp`), which removes the risk that justified the entire
+risk-retirement ordering; and **U0 shrinks substantially under PR #21's Q6** (sideload rather than
+catalog publish), because catalog publish and Entra-group scoping were the only steps needing the
+interactive device-code login.
+
+### User Input 2
+
+**COMPLETE RAW USER RESPONSE**:
+
+```
+install terraform
+```
+
+**AI Action**: Installed Terraform **1.15.8** to `/home/fermin/.local/bin/terraform`, chosen to match
+the CI pin at `.github/workflows/pr-checks.yml:53` rather than taking latest, and satisfying
+`required_version = "~> 1.15"` in `blueprints/entra-probe/infra/azure/versions.tf`. SHA256 verified
+against HashiCorp's published `SHA256SUMS` (`d25ce7b6...`) before unpacking. No sudo required; the
+zip's binary already ships mode 0755.
+
+**Blocker 6 cleared.** `tools/check` now passes end to end: 8 templates registered and present,
+cfn-lint clean, 1 Terraform module wired, `terraform fmt` and `terraform validate` clean, 77
+builder-mcp tests passing. `validate` ran with `-backend=false`, so no S3 backend was contacted and
+no state was touched.
+
+Noted in passing: `CLAUDE.md` describes builder-mcp as having 41 tests; it now has 77.
+
+### User Input 3
+
+**COMPLETE RAW USER RESPONSE**:
+
+```
+1. Can you research that target? Is someone else using it? Why do we have two?
+```
+
+**AI Action**: Researched the `course-chatbot` versus `teams-bot` question across git history (all
+refs), upstream branches, open pull requests, and the workshop brief. Findings:
+
+- **`blueprints/teams-bot/` has never existed.**
+  `git log --all --diff-filter=A -- 'blueprints/teams-bot/*'` returns nothing. It is only a name
+  inside Track C's own artifacts, from the Q2 decision. There is no competing implementation.
+- **`course-chatbot` is a facilitator decision recorded in the brief**, not an improvisation.
+  `docs/Participant Brief — Vision & Workshop MVP.html` §3 states the MVP bundles the Teams
+  frontend, document pipeline and database into one blueprint, with composition as "the very next
+  thing on the roadmap". Created by Ernest Francis in `adfd31b`, the same commit that added that
+  brief, rewrote `CLAUDE.md`, and moved `aidlc-rules/` under `docs/`.
+- **Why two names**: Q2 optimised for the brief's §1 (the long-term composable catalog, whose
+  diagram shows three separate blocks); `course-chatbot` implements §3 (the two-day simplification).
+  Both are in the same document.
+- **Nobody else is using it.** Only three commits have ever touched it: the scaffold, Pete
+  Stergion's unmerged questions file, and Track C's artifacts. No template, manifest, Dockerfile
+  target, `stacks.yml` entry or pipeline action.
+- **Track B already left the bundle.** Despite the blueprint README assigning Track B `infra/` plus
+  retrieval in `src/`, Axel Stevens shipped `blueprints/knowledgebase/` standalone (PR #13).
+  `blueprints/README.md:41` has caught up and lists "Tracks C and D"; the blueprint's own README
+  still says B/C/D. Tracks D and E touch no course-chatbot file.
+- **Consequence that simplifies the decision**: `knowledgebase` is standalone and exports
+  `KnowledgeBaseId`, so retrieval is reachable from either location. The choice is therefore mostly
+  naming and file placement, not architecture — both answers need the same template, manifest,
+  registry entry and two pipeline actions.
+- **Two stale references found**, bearing on D2: `course-chatbot/README.md:22` and the
+  `src/handler.py` docstring both name a **root Dockerfile** target. There is no root Dockerfile —
+  removed when `builder-mcp` moved to `packages/` in PR #15, and `CLAUDE.md` now says so explicitly.
+
+### User Input 4
+
+**COMPLETE RAW USER RESPONSE**:
+
+```
+yes, fold it into the decision file with D2 and Q3
+```
+
+**AI Action**: Created
+`aidlc-docs/inception/plans/units-generation-gate-questions.md` — four questions in the mandatory
+format from `docs/aidlc-rules/aws-aidlc-rule-details/common/question-format-guide.md` (multiple
+choice, blank line between options, "Other" as the mandatory last option, `[Answer]:` tags), with
+the research above folded in as the evidence section for Question 1.
+
+**Questions**: Q1 deliverable location, Q2 the D2 Dockerfile layout, Q3 AgentCore versus Strands in
+one Lambda, Q4 how PR #21's answers reach this checkout.
+
+**Deliberate choices in how it was written:**
+
+- **Question 2 is flagged as partly dependent on Question 3.** If Q3 lands on one Lambda, there is
+  only one image and the two-target design has nothing to be two targets *for* — so Q2 becomes moot
+  rather than merely easier. Stating the interaction is better than discovering it during generation.
+- **Question 3's recommendation is B with the escalation raised in parallel, not instead of it.**
+  Choosing B overrides a mandate recorded from Team E, which is not Track C's to overrule quietly;
+  C is offered as a genuine option rather than as a stalling tactic. It is also recorded that
+  choosing B **reopens Q9**, because conversation history was placed in AgentCore Memory, and that
+  a clarification question will be raised rather than a state design assumed.
+- **Question 1's recommendation is C, not A.** A is right for today, but Q2's reuse argument survives
+  the week, so the extraction is recorded as a follow-up rather than silently overwritten.
+- **The `.gitignore` issue is recorded as a non-question**, with its handling, because it needs no
+  decision and would otherwise be forgotten. This gate file needed `git add -f` itself.
+- **Time pressure named rather than buried**: the leadership demo is Tuesday 2:00 PM and today is
+  Tuesday, August 4.
+
+**GATE**: Part 2 generation not started. Awaiting four answers.

@@ -1,0 +1,383 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'course-chatbot (Track C): a Microsoft Teams chatbot. Bot Framework activities arrive at a public Lambda Function URL, are validated against the Bot Framework JWKS, answered via Cornell''s LiteLLM gateway, and replied to through the Bot Framework API. Image built from blueprints/course-chatbot/Dockerfile (target course-chatbot, arm64). Step 2 replaces the in-Lambda model call with an AgentCore Runtime invoke -- see aidlc-docs/inception/plans/units-generation-clarification-questions.md.'
+
+Parameters:
+
+  # Metadata Parameters
+
+  Application:
+    Default: 'aidlc'
+    AllowedPattern: '[a-z0-9-]{1,10}'
+    Description: 'Name used for billing and other tracking/identification purposes'
+    Type: 'String'
+
+  Environment:
+    Default: 'main'
+    AllowedPattern: '[a-z0-9]{1,4}'
+    Description: 'Name of the deployment branch'
+    Type: 'String'
+
+  # Tagging Convention Parameters
+  #
+  # All four cornell:* tags are required on every resource. Owner and deployment id vary per
+  # deployment; blueprint name and version are properties of this template, so they live
+  # here as defaults and are bumped in the PR that changes the blueprint.
+
+  Owner:
+    Default: 'ai-sei'
+    AllowedPattern: '.{1,128}'
+    Description: 'Who owns this deployment (cornell:owner)'
+    Type: 'String'
+
+  BlueprintVersion:
+    Default: '0.1.0'
+    AllowedPattern: '[0-9]+\.[0-9]+\.[0-9]+'
+    Description: 'Version of the course-chatbot blueprint (cornell:blueprint-version)'
+    Type: 'String'
+
+  # Deploy Parameters
+
+  # Part of the function name and the cornell:deployment-id, so several course chatbots can
+  # coexist per environment. The lookahead caps total length at 2-20 characters; the body
+  # forbids leading, trailing and consecutive hyphens.
+
+  DeploymentName:
+    Default: 'course-chatbot'
+    AllowedPattern: '(?=[a-z0-9-]{2,20}$)[a-z0-9]+(-[a-z0-9]+)*'
+    Description: 'Instance name for this deployment. Lowercase alphanumerics with single hyphens, 2-20 chars.'
+    Type: 'String'
+
+  ContainerImageUri:
+    Default: ''
+    AllowedPattern: '.{0,512}'
+    Description: 'Image for the function, normally the digest URI the pipeline Build stage exports (#{CourseChatbotContainer.CONTAINER_DIGEST}). Empty deploys no function, so the template still validates before its Build action is wired.'
+    Type: 'String'
+
+  # Bot Framework Parameters
+  #
+  # The Entra application (client) id is NOT a secret -- it is the aud claim every inbound
+  # activity is validated against (FR-8), and hardcoding it in code is forbidden. The
+  # matching client secret never appears here; see BotClientSecret below.
+
+  BotAppId:
+    Default: ''
+    AllowedPattern: '.{0,64}'
+    Description: 'Entra application (client) id of the Azure Bot registration. Validated as the inbound JWT aud claim and used for the outbound client_credentials grant. Empty disables JWT validation ONLY in the sense that the function will reject everything -- absence fails closed.'
+    Type: 'String'
+
+  BotTenantId:
+    Default: ''
+    AllowedPattern: '.{0,64}'
+    Description: 'Entra tenant id for the outbound token endpoint (single-tenant bot).'
+    Type: 'String'
+
+  # Behaviour Parameters
+  #
+  # NOTE (#15 finding 2): deployment_create passes only Application, Environment, Owner and
+  # the manifest's pipeline_parameters. Values declared under a manifest's `inputs` are
+  # collected from the builder and then DROPPED. Anything a builder configures must
+  # therefore arrive as a pipeline parameter or be read from SSM at runtime -- which is why
+  # the prompt and course name are mirrored into SSM below.
+
+  ModelId:
+    Default: 'claude-haiku-4-5'
+    AllowedPattern: '.{1,128}'
+    Description: 'Model id as the LiteLLM gateway names it (gateway naming, not Bedrock native ids).'
+    Type: 'String'
+
+  CourseName:
+    Default: 'this course'
+    AllowedPattern: '.{1,128}'
+    Description: 'Course this bot answers for; goes into the system prompt.'
+    Type: 'String'
+
+  # A CloudFormation parameter value caps at 4096 characters and an SSM standard parameter
+  # at 4 KB, so a long syllabus-bearing prompt belongs in S3 with the key passed instead
+  # (FR-3a). Empty means "use the built-in prompt".
+
+  SystemPromptS3Bucket:
+    Default: ''
+    AllowedPattern: '.{0,64}'
+    Description: 'Optional bucket holding the system prompt, for prompts over 4096 characters (FR-3a).'
+    Type: 'String'
+
+  SystemPromptS3Key:
+    Default: ''
+    AllowedPattern: '.{0,256}'
+    Description: 'Optional key of the system prompt object in SystemPromptS3Bucket.'
+    Type: 'String'
+
+  LogRetentionDays:
+    Default: 90
+    AllowedValues: [90, 180, 365]
+    Description: 'CloudWatch retention. SECURITY-14 requires at least 90 days.'
+    Type: 'Number'
+
+Conditions:
+
+  HasImage: !Not [!Equals [!Ref 'ContainerImageUri', '']]
+  HasPromptBucket: !Not [!Equals [!Ref 'SystemPromptS3Bucket', '']]
+
+Resources:
+
+  # --- Secrets -------------------------------------------------------------------------
+  #
+  # Both secrets declare their RESOURCE here and never their VALUE. GenerateSecretString is
+  # evaluated only at create, so PipelineDeploy redeploying this stack on every merge to
+  # main cannot clobber the injected value. A SecretString property WOULD be reasserted on
+  # every update, resetting the live credential to a placeholder several times a day.
+  #
+  # Inject once, by CLI:
+  #   aws secretsmanager put-secret-value --secret-id <name> --secret-string '<value>'
+  #
+  # Editing the GenerateSecretString block later DOES clobber it. Don't.
+
+  BotClientSecret:
+    Type: 'AWS::SecretsManager::Secret'
+    DeletionPolicy: 'Retain'
+    UpdateReplacePolicy: 'Retain'
+    Properties:
+      Name: !Sub '${Application}/${Environment}/${DeploymentName}/bot-client-secret'
+      Description: 'Entra client secret for the Azure Bot registration. Value injected by CLI, never in git.'
+      GenerateSecretString:
+        PasswordLength: 32
+        ExcludePunctuation: true
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'course-chatbot'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  GatewayApiKeySecret:
+    Type: 'AWS::SecretsManager::Secret'
+    DeletionPolicy: 'Retain'
+    UpdateReplacePolicy: 'Retain'
+    Properties:
+      Name: !Sub '${Application}/${Environment}/${DeploymentName}/gateway-api-key'
+      Description: 'LiteLLM gateway service key for this bot (FR-23a -- a service key, never a person''s key). Value injected by CLI.'
+      GenerateSecretString:
+        PasswordLength: 32
+        ExcludePunctuation: true
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'course-chatbot'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # --- Configuration the builder cannot pass as a parameter ------------------------------
+  #
+  # AWS::SSM::Parameter takes Tags as a MAP, not the usual list of Key/Value pairs.
+
+  CourseNameParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub '/${Application}/${Environment}/${DeploymentName}/course-name'
+      Type: 'String'
+      Value: !Ref 'CourseName'
+      Description: 'Course this bot answers for. Read at cold start.'
+      Tags:
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'course-chatbot'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  ModelIdParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub '/${Application}/${Environment}/${DeploymentName}/model-id'
+      Type: 'String'
+      Value: !Ref 'ModelId'
+      Description: 'Gateway model id. Read at cold start.'
+      Tags:
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'course-chatbot'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # --- Logs ------------------------------------------------------------------------------
+  #
+  # Declared explicitly rather than left to Lambda's implicit creation, so retention is
+  # enforced (SECURITY-14) and the execution role can be scoped to this group alone.
+
+  FrontDoorLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Application}-${Environment}-${DeploymentName}'
+      RetentionInDays: !Ref 'LogRetentionDays'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'course-chatbot'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # --- Execution role --------------------------------------------------------------------
+  #
+  # No wildcard actions and no wildcard resources (SECURITY-06). Log permissions are scoped
+  # to this function's own group and deliberately EXCLUDE Delete*, so the function cannot
+  # destroy its own audit trail (SECURITY-14).
+
+  FrontDoorRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-${DeploymentName}-frontdoor'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'logs'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${Application}-${Environment}-${DeploymentName}:*'
+        - PolicyName: 'secrets'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: 'secretsmanager:GetSecretValue'
+                Resource:
+                  - !Ref 'BotClientSecret'
+                  - !Ref 'GatewayApiKeySecret'
+        - PolicyName: 'config'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: 'ssm:GetParameter'
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Application}/${Environment}/${DeploymentName}/*'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'course-chatbot'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # A separate managed policy so the prompt-bucket grant appears only when a bucket is
+  # supplied -- an unconditional statement would need a wildcard resource when empty.
+
+  PromptBucketPolicy:
+    Type: 'AWS::IAM::RolePolicy'
+    Condition: 'HasPromptBucket'
+    Properties:
+      PolicyName: 'system-prompt'
+      RoleName: !Ref 'FrontDoorRole'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Action: 's3:GetObject'
+            Resource: !Sub 'arn:${AWS::Partition}:s3:::${SystemPromptS3Bucket}/*'
+
+  # --- The front door --------------------------------------------------------------------
+  #
+  # FunctionName is deterministic on purpose (FR-7): CloudFormation replacing the function
+  # would issue a NEW Function URL, and the URL is configured on the Azure Bot resource as
+  # the messaging endpoint. A replacement therefore costs a manual Azure edit.
+  #
+  # Timeout is set EXPLICITLY. The 3-second default would truncate every reply -- this
+  # function holds the request open while the model works. Teams' own acknowledgement budget
+  # is 10-15 seconds depending on channel, and overrunning it shows the user
+  # 504:GatewayTimeout, so 60 seconds here is a failure ceiling rather than a target.
+
+  FrontDoorFunction:
+    Type: 'AWS::Lambda::Function'
+    Condition: 'HasImage'
+    Properties:
+      FunctionName: !Sub '${Application}-${Environment}-${DeploymentName}'
+      Description: 'Bot Framework front door for the Teams course chatbot'
+      Role: !GetAtt 'FrontDoorRole.Arn'
+      PackageType: 'Image'
+      Code:
+        ImageUri: !Ref 'ContainerImageUri'
+      Architectures: ['arm64']
+      MemorySize: 1024
+      Timeout: 60
+      LoggingConfig:
+        LogGroup: !Ref 'FrontDoorLogGroup'
+      Environment:
+        Variables:
+          PYTHONUNBUFFERED: '1'
+          LOG_LEVEL: 'INFO'
+          BOT_APP_ID: !Ref 'BotAppId'
+          BOT_TENANT_ID: !Ref 'BotTenantId'
+          BOT_CLIENT_SECRET_ARN: !Ref 'BotClientSecret'
+          GATEWAY_API_KEY_ARN: !Ref 'GatewayApiKeySecret'
+          GATEWAY_BASE_URL: 'https://api.ai.it.cornell.edu'
+          COURSE_NAME_PARAM: !Ref 'CourseNameParameter'
+          MODEL_ID_PARAM: !Ref 'ModelIdParameter'
+          SYSTEM_PROMPT_S3_BUCKET: !Ref 'SystemPromptS3Bucket'
+          SYSTEM_PROMPT_S3_KEY: !Ref 'SystemPromptS3Key'
+          DEPLOYMENT_ID: !Sub '${Application}-${Environment}-${DeploymentName}'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'course-chatbot'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # AuthType NONE is required by design: Azure Bot Service must reach this endpoint and its
+  # source addresses are not fixed, so there is no IAM caller to authenticate. This is the
+  # SECURITY-07 public-facing exception, and authorisation is enforced at the application
+  # layer -- every request's Bot Framework JWT is validated, including the serviceurl
+  # correlation, before any action is taken (FR-8).
+
+  FrontDoorUrl:
+    Type: 'AWS::Lambda::Url'
+    Condition: 'HasImage'
+    Properties:
+      TargetFunctionArn: !GetAtt 'FrontDoorFunction.Arn'
+      AuthType: 'NONE'
+
+  FrontDoorUrlPermission:
+    Type: 'AWS::Lambda::Permission'
+    Condition: 'HasImage'
+    Properties:
+      FunctionName: !GetAtt 'FrontDoorFunction.Arn'
+      Action: 'lambda:InvokeFunctionUrl'
+      Principal: '*'
+      FunctionUrlAuthType: 'NONE'
+
+Outputs:
+
+  # Read by the post-deploy step that pushes the messaging endpoint to Azure:
+  #   az bot update --name <bot> --resource-group <rg> --endpoint <this>/api/messages
+  # A human transcribing this value is what FR-7a withdrew.
+
+  FunctionUrl:
+    Condition: 'HasImage'
+    Description: 'Public HTTPS endpoint. Set as the Azure Bot messaging endpoint.'
+    Value: !GetAtt 'FrontDoorUrl.FunctionUrl'
+
+  BotClientSecretArn:
+    Description: 'ARN of the Entra client secret. Inject the value with put-secret-value; it is never in git.'
+    Value: !Ref 'BotClientSecret'
+
+  GatewayApiKeySecretArn:
+    Description: 'ARN of the LiteLLM gateway service key. Inject the value with put-secret-value.'
+    Value: !Ref 'GatewayApiKeySecret'

@@ -1,9 +1,21 @@
 # Runtime dependencies for the course-chatbot Lambda image.
 #
-# boto3 is deliberately absent: the AWS Lambda Python base image ships it, and the only
-# call this makes through it (s3:PutObject) is stable across versions.
+# boto3 is deliberately absent: the AWS Lambda Python base image ships it, and the calls this
+# makes through it (ssm:GetParameter, secretsmanager:GetSecretValue, s3:GetObject) are stable
+# across versions. That assumption is why the Dockerfile builds on the Lambda base image
+# rather than the uv image builder-mcp uses -- switching bases would break it silently.
 #
-# The floor is the SDK version that carries the Bedrock Messages API client; the ceiling
-# keeps a major release from landing in an unrelated PR's image build. This is a floating
-# range rather than a lockfile -- see "Pinning" in this blueprint's README.
-anthropic[bedrock]>=0.92,<2
+# Floors are the versions carrying what this code uses; ceilings keep a major release from
+# landing in an unrelated PR's image build. This is a floating range rather than a lockfile --
+# see "Pinning" in this blueprint's README.
+
+# The Messages API client. Pointed at Cornell's LiteLLM gateway via base_url, NOT at Bedrock,
+# so the [bedrock] extra is deliberately absent: it pulls a second AWS SDK stack for an
+# endpoint this blueprint is forbidden to call.
+anthropic>=0.92,<2
+
+# Inbound Bot Framework JWT validation. The [crypto] extra brings `cryptography`, which
+# PyJWKClient needs for RS256 -- without it, verification raises at runtime rather than at
+# install time. It has a native extension, so it must resolve an aarch64 wheel; that happens
+# for free because the image is built inside an arm64 container.
+PyJWT[crypto]>=2.8,<3

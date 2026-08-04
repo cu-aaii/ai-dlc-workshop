@@ -99,8 +99,30 @@ knowledge of them.
   and **D5** (`aidlc-docs/` tracked or untracked) gate it.
 - **Resume with**: `docs/AIDLC-TURNOVER-2026-08-04.md` — written for a fresh session, covering the next action,
   every decision made, the accumulated gotchas, and what not to reopen.
-- **Next action**: read `aidlc-docs/inception/plans/unit-of-work-plan.md`, then generate the three unit
-  artifacts. **No questions outstanding.**
+
+### Gate status updated 2026-08-04 — four questions outstanding
+
+**Supersedes the "no questions outstanding" note previously in this section.** The repository was
+re-checked against the artifacts; two of the three named gates were already closed, and two further
+blockers were found that change what the unit artifacts say.
+
+| Gate | State |
+| --- | --- |
+| **D1** — Terraform's scope in U0 | **CLOSED.** Settled by the track structure, not by us. `azuread` yes, `azurerm` blocked on Azure subscription RBAC, catalog publish and availability scoping never. |
+| **D5** — `aidlc-docs/` tracked | **CLOSED.** Per-component placement, 33 files tracked at `fe7d336`. |
+| **D2** — Dockerfile layout | **OPEN** — gate question 2. |
+| Deliverable location | **OPEN** — gate question 1. `blueprints/teams-bot/` has never existed in any commit on any branch; `blueprints/course-chatbot/` is a facilitator decision recorded in the brief's §3. Nobody else occupies it, and Track B left the bundle for a standalone `blueprints/knowledgebase/`. |
+| Q3 vs the AgentCore mandate | **OPEN** — gate question 3. Determines whether `U6` exists; choosing one Lambda reopens Q9. |
+| PR #21's ten answers | **OPEN** — gate question 4. PR still open, so the file is not in this checkout. |
+
+- **Next action**: answer
+  **`aidlc-docs/inception/plans/units-generation-gate-questions.md`** (four questions, `[Answer]:`
+  tags). Then check for contradictions — question 2 can be mooted by question 3 — and generate the
+  three unit artifacts.
+- **Cleared since Part 1**: `terraform` **1.15.8** installed locally (matches the CI pin), so
+  `tools/check` now passes end to end. No new upstream drift — 0 behind, 11 ahead of `upstream/main`.
+- **Carry into Part 2**: `.gitignore:38` (`aidlc-docs/`, unanchored) silently swallows new artifacts.
+  Every Part 2 file needs `git add -f`, verified with `git status --short` before committing.
 
 ### Units Generation decisions
 
