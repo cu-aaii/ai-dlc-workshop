@@ -816,14 +816,41 @@ Resources:
                 # to template defaults, so a stack deploys the same way by hand or by pipeline.
                 # BlueprintVersion is duplicated from the template's default on purpose: bump
                 # both in the same PR, or the cornell:blueprint-version tag will lie.
+                #
+                # EnableSharePointSource is "false" here, which is what makes the deployed stack
+                # S3-only. Flipping it to "true" makes every merge to main depend on Entra consent,
+                # a per-site grant and an unexpired certificate -- when any of those lapses the
+                # SharePoint ingestion job fails, the verifier fails the stack, and BlueprintDeploy
+                # is red for every track. Flip it in its own PR, after an Environment=test
+                # rehearsal, and read blueprints/knowledgebase/docs/sharepoint-source.md first.
+                #
+                # The SharePoint values are passed even while disabled, per the pass-everything
+                # rule: a tenant id, a site URL, a bucket, an object key and a secret ARN are all
+                # references. The certificate and its password live in the secret and in S3.
+                #
+                # EnableScheduledSync is also "false". It creates EventBridge Scheduler schedules
+                # that start ingestion jobs between deploys -- fire-and-forget, because Scheduler
+                # cannot call the read APIs needed to check a result. It keeps the index fresh and
+                # proves nothing, so a green deploy stays the only evidence the knowledge base
+                # answers. See blueprints/knowledgebase/docs/warnings.md.
                 ParameterOverrides: !Sub >-
                   {
                   "Application": "${Application}",
                   "Environment": "${Environment}",
                   "Owner": "${Owner}",
-                  "BlueprintVersion": "0.1.0",
+                  "BlueprintVersion": "0.2.0",
                   "IngestionBucketName": "aidlc-kb-ingestion-890349359349",
                   "SmokeQuery": "What is the late homework policy?",
+                  "EnableSharePointSource": "false",
+                  "SharePointSiteUrl": "https://8chzbf.sharepoint.com/sites/kb",
+                  "SharePointTenantId": "3ce7e7fb-ef51-4972-bfd5-f43f6668ccca",
+                  "SharePointConnectorSecretArn": "arn:aws:secretsmanager:us-east-1:890349359349:secret:bedrock/sharepoint-cert-connector-eK6OLN",
+                  "SharePointCertificateBucket": "bedrock-sharepoint-certs-890349359349",
+                  "SharePointCertificateKey": "certs/certificate.p12",
+                  "SharePointSmokeQuery": "What does the syllabus say about attendance?",
+                  "EnableScheduledSync": "false",
+                  "SyncScheduleExpression": "cron(0 7 ? * MON *)",
+                  "SharePointSyncScheduleExpression": "cron(0 8 ? * MON *)",
                   "SourceCommitId": "#{GitRepository.CommitId}"
                   }
 

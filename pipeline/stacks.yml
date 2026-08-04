@@ -57,4 +57,4 @@ templates:
   - name: 'knowledgebase'
     template: 'blueprints/knowledgebase/infra/knowledgebase.yml'
     deployed_by: 'pipeline'
-    description: 'Bedrock managed knowledge base over the existing document bucket. Verifies at deploy time that the documents are indexed and answerable, so a green deploy is the acceptance test.'
+    description: 'Bedrock managed knowledge base over the existing document bucket, plus an optional SharePoint source gated off by EnableSharePointSource. Verifies at deploy time that every enabled source is indexed and answerable, so a green deploy is the acceptance test.'

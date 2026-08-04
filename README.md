@@ -259,6 +259,39 @@ stage action names the component's directory as the context and its named target
 step with where the component lives: a stale `CONTAINER_CONTEXT` fails the build on a missing path
 and says nothing about the move that caused it.
 
+## The knowledge base, for the teams consuming it
+
+`blueprints/knowledgebase` is deployed and queryable. Two identifiers are all a consumer needs, and
+both are in SSM rather than a CloudFormation `Export`, so nothing couples your stack's lifecycle
+to ours:
+
+```sh
+aws ssm get-parameter --name /aidlc/main/knowledgebase/knowledge-base-id     --query Parameter.Value --output text
+aws ssm get-parameter --name /aidlc/main/knowledgebase/retrieval-policy-arn  --query Parameter.Value --output text
+```
+
+Attach that managed policy to your role instead of writing your own `bedrock:Retrieve` statement,
+then call `bedrock-agent-runtime:Retrieve`. Two shapes to get right on a **managed** knowledge base,
+both observed rather than assumed:
+
+- retrieval takes `managedSearchConfiguration`; `vectorSearchConfiguration` is rejected outright;
+- **`retrieve-and-generate` is not supported**, whatever your IAM says. Retrieve, then `Converse`
+  with the chunks. The policy grants `Retrieve` only, so that limit shows up as a readable denial
+  instead of a puzzling service error.
+
+| | |
+|---|---|
+| Indexed today | One syllabus PDF from `aidlc-kb-ingestion-890349359349`. **One document is not a corpus** — expect mediocre relevance, and scores that don't track it. |
+| Freshness | A merge re-ingests and re-verifies. Nothing else does: `EnableScheduledSync` exists and is off, and a scheduled sync cannot report its own result anyway. |
+| SharePoint | Built and verified against a real site, **off by default** (`EnableSharePointSource`). On, it would make every team's merge depend on an Entra certificate nobody watches. |
+| Proof it works | A green `BlueprintDeploy` asserts the documents are indexed **and** answerable — the stack fails otherwise. `DocumentsIndexed` and `SmokeQueryResult` are stack outputs. |
+| Costs while idle | Per-GB stored plus per-retrieve. It does not stop when the workshop ends, and no OpenSearch collection exists to add an hourly floor. |
+
+Changing the corpus means `IngestionBucketName` plus a `SmokeQuery` the new corpus can answer, in
+`pipeline/pipeline.yml`, `blueprints/knowledgebase/blueprint.yaml` **and** the template. If that
+smoke query stops being answerable, every team's deploy goes red — the verifier is doing its job.
+Details in `blueprints/knowledgebase/README.md`.
+
 ## Not here yet
 
 The deploy path works, the Cornell Builder is written, and the Terraform stage and the managed
