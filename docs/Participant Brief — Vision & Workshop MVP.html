@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-DLC Workshop — Participant Brief</title>
+<style>
+  :root {
+    --cornell-red: #b31b1b;
+    --aws-navy: #232f3e;
+    --aws-orange: #ec7211;
+    --ink: #1a1a1a;
+    --muted: #5c5c5c;
+    --line: #e3e3e3;
+    --bg-accent: #f7f8fa;
+    --bg-warm: #fff7ef;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    line-height: 1.5;
+    margin: 0;
+    background: #f4f4f5;
+    padding: 32px 16px;
+  }
+  .page {
+    max-width: 820px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  header.masthead {
+    background: linear-gradient(135deg, var(--aws-navy) 0%, #0f1620 100%);
+    color: #fff;
+    padding: 26px 40px 22px;
+  }
+  header.masthead .eyebrow {
+    text-transform: uppercase; letter-spacing: 0.12em; font-size: 11px;
+    font-weight: 600; color: var(--aws-orange); margin: 0 0 7px;
+  }
+  header.masthead h1 { margin: 0; font-size: 24px; line-height: 1.2; font-weight: 700; }
+  .content { padding: 26px 40px 32px; }
+  .meta {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px 24px;
+    background: var(--bg-accent); border: 1px solid var(--line); border-radius: 8px;
+    padding: 13px 18px; margin-bottom: 22px; font-size: 13px;
+  }
+  .meta .label {
+    display: block; text-transform: uppercase; letter-spacing: 0.07em;
+    font-size: 10px; font-weight: 700; color: var(--aws-navy);
+  }
+  h2 {
+    font-size: 17px; margin: 26px 0 10px; padding-bottom: 5px;
+    border-bottom: 2px solid var(--line);
+  }
+  h2:first-of-type { margin-top: 0; }
+  h2 .num { color: var(--aws-orange); font-weight: 800; margin-right: 7px; }
+  p { margin: 0 0 10px; font-size: 14.5px; }
+  ul { margin: 0 0 10px; padding-left: 20px; font-size: 14.5px; }
+  li { margin-bottom: 4px; }
+  strong { color: #111; }
+  code {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.88em;
+    background: var(--bg-accent); border: 1px solid var(--line);
+    border-radius: 4px; padding: 1px 4px;
+  }
+  .callout {
+    background: var(--bg-warm); border-left: 4px solid var(--aws-orange);
+    border-radius: 0 8px 8px 0; padding: 12px 16px; margin: 0 0 14px;
+  }
+  .callout.q { background: #f2f7fb; border-left-color: #2c6fa6; }
+  .callout p:last-child { margin-bottom: 0; }
+  .diagram { width: 100%; height: auto; display: block; margin: 4px 0 6px; }
+  .flow {
+    background: var(--bg-accent); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 16px; margin: 0 0 12px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12.5px; line-height: 1.75; overflow-x: auto;
+  }
+  table.oc { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 14px; }
+  table.oc td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.oc td.n {
+    width: 30px; font-weight: 800; color: var(--aws-orange);
+    font-size: 15px; text-align: center;
+  }
+  table.oc tr.key td { background: var(--bg-warm); }
+  table.oc tr.hard td { background: #fdf4f4; }
+  table.oc .t { font-weight: 700; color: var(--cornell-red); display: block; margin-bottom: 2px; }
+  table.oc .ask { display: block; margin-top: 5px; font-size: 13px; color: #1c4f78; }
+  table.env { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-bottom: 12px; }
+  table.env th, table.env td {
+    text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  table.env th {
+    background: var(--bg-accent); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--aws-navy); width: 24%;
+  }
+  .pill {
+    display: inline-block; font-size: 12px; background: var(--bg-accent);
+    border: 1px solid var(--line); border-radius: 20px; padding: 2px 11px; margin: 0 4px 4px 0;
+  }
+  footer.note {
+    margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--muted); font-style: italic;
+  }
+  @media (max-width: 640px) {
+    .content { padding: 20px 18px 26px; }
+    header.masthead { padding: 22px 18px 18px; }
+    .meta { grid-template-columns: 1fr; }
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page { box-shadow: none; border-radius: 0; max-width: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="masthead">
+    <p class="eyebrow">Cornell University · AI-DLC Workshop · Participant Brief</p>
+    <h1>What We're Building, and Why — August 3–4</h1>
+  </header>
+
+  <div class="content">
+    <div class="meta">
+      <div><span class="label">When</span>Mon–Tue Aug 3–4, 9:00–5:00 both days</div>
+      <div><span class="label">Where</span>CIS Building, Room 250 (Young Conference Room)</div>
+      <div><span class="label">Format</span>Hands-on, AWS-facilitated, in person</div>
+      <div><span class="label">You</span>30 people from 23 units and 8 colleges</div>
+      <div><span class="label">Leadership demo</span>Tuesday 2:00 PM</div>
+      <div><span class="label">Prerequisites</span>Already sent — see §6</div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Short version.</strong> We're spending two days building the layer that lets anyone at Cornell get a governed, running piece of AI infrastructure by asking for it in plain language — and learning AWS's AI-DLC methodology by doing it for real rather than in an exercise. This brief replaces the one you got with your invitation; §7 notes what changed.</p>
+    </div>
+
+    <h2><span class="num">1</span>The long-term vision</h2>
+    <p>AI-SEI runs Cornell's central <strong>AI Platform</strong>. What we're missing is the layer between that platform and you: a catalog of reusable, governed <strong>building blocks</strong> that any unit can compose into a working application, without needing to become cloud engineers and without us hand-building it for them.</p>
+    <p>The way it should feel: an instructor — not an engineer — says <em>"I want a chatbot my students can ask questions about my course material,"</em> and something works out what that needs and stands it up.</p>
+
+    <svg class="diagram" viewBox="0 0 900 592" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vision diagram: builder intent to Cornell Builder MCP to blueprint catalog to GitHub repo, PR review, CI/CD, and a dev environment containing the Teams bot, ETL and database blocks.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker>
+        <marker id="ahO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ec7211"/></marker>
+      </defs>
+      <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+
+        <!-- ROW 1 -->
+        <text x="60" y="30" font-size="11" font-weight="700" letter-spacing="1.1" fill="#ec7211">1 · DISCOVER &amp; COMPOSE</text>
+
+        <rect x="60" y="62" width="150" height="76" rx="7" fill="#f7f8fa" stroke="#232f3e" stroke-width="1.5"/>
+        <text x="135" y="88" text-anchor="middle" font-size="14" font-weight="700" fill="#232f3e">Builder</text>
+        <text x="135" y="105" text-anchor="middle" font-size="11" fill="#5c5c5c">e.g. an instructor —</text>
+        <text x="135" y="118" text-anchor="middle" font-size="11" fill="#5c5c5c">not an engineer —</text>
+        <text x="135" y="131" text-anchor="middle" font-size="11" fill="#5c5c5c">in Claude Cowork</text>
+
+        <line x1="212" y1="100" x2="264" y2="100" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah)"/>
+
+        <rect x="270" y="56" width="210" height="88" rx="7" fill="#fff7ef" stroke="#ec7211" stroke-width="2"/>
+        <text x="375" y="82" text-anchor="middle" font-size="13.5" font-weight="700" fill="#b34700">Cornell Builder MCP</text>
+        <text x="375" y="100" text-anchor="middle" font-size="11" fill="#5c5c5c">registered in the AI Gateway,</text>
+        <text x="375" y="114" text-anchor="middle" font-size="11" fill="#5c5c5c">on the builder's API key</text>
+        <text x="375" y="132" text-anchor="middle" font-size="11" font-weight="700" fill="#b34700">blueprint_search</text>
+
+        <line x1="482" y1="100" x2="534" y2="100" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah)"/>
+
+        <rect x="540" y="52" width="290" height="100" rx="7" fill="#f7f8fa" stroke="#232f3e" stroke-width="1.5"/>
+        <text x="685" y="76" text-anchor="middle" font-size="13.5" font-weight="700" fill="#232f3e">Blueprint catalog</text>
+        <text x="685" y="93" text-anchor="middle" font-size="11" fill="#5c5c5c">GitHub templates we manage</text>
+        <rect x="552" y="106" width="84" height="26" rx="13" fill="#fff" stroke="#b31b1b"/>
+        <text x="594" y="123" text-anchor="middle" font-size="10.5" font-weight="600" fill="#b31b1b">Teams bot</text>
+        <rect x="644" y="106" width="98" height="26" rx="13" fill="#fff" stroke="#b31b1b"/>
+        <text x="693" y="123" text-anchor="middle" font-size="10.5" font-weight="600" fill="#b31b1b">Document ETL</text>
+        <rect x="750" y="106" width="70" height="26" rx="13" fill="#fff" stroke="#b31b1b"/>
+        <text x="785" y="123" text-anchor="middle" font-size="10.5" font-weight="600" fill="#b31b1b">Database</text>
+
+        <text x="60" y="172" font-size="11.5" font-style="italic" fill="#5c5c5c">“I want a chatbot my students can ask questions about my course material.”</text>
+
+        <path d="M812 152 L812 206" stroke="#6b7280" stroke-width="1.6" fill="none" marker-end="url(#ah)"/>
+
+        <!-- ROW 2 -->
+        <text x="762" y="200" text-anchor="end" font-size="11" font-weight="700" letter-spacing="1.1" fill="#2c6fa6">2 · BUILD &amp; GOVERN, IN GITHUB</text>
+
+        <rect x="590" y="212" width="240" height="76" rx="7" fill="#f2f7fb" stroke="#2c6fa6" stroke-width="1.5"/>
+        <text x="710" y="238" text-anchor="middle" font-size="13" font-weight="700" fill="#1c4f78">New repo in our GitHub org</text>
+        <text x="710" y="256" text-anchor="middle" font-size="11" fill="#5c5c5c">composed from the three templates</text>
+        <text x="710" y="272" text-anchor="middle" font-size="11" fill="#5c5c5c">— they needn't know GitHub exists</text>
+
+        <line x1="586" y1="250" x2="546" y2="250" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah)"/>
+
+        <rect x="320" y="212" width="220" height="76" rx="7" fill="#f2f7fb" stroke="#2c6fa6" stroke-width="1.5"/>
+        <text x="430" y="238" text-anchor="middle" font-size="13" font-weight="700" fill="#1c4f78">Their AI harness</text>
+        <text x="430" y="254" text-anchor="middle" font-size="13" font-weight="700" fill="#1c4f78">writes the code</text>
+        <text x="430" y="273" text-anchor="middle" font-size="11" fill="#5c5c5c">no direct write access</text>
+
+        <line x1="316" y1="250" x2="296" y2="250" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah)"/>
+
+        <rect x="60" y="212" width="230" height="76" rx="7" fill="#f2f7fb" stroke="#2c6fa6" stroke-width="1.5"/>
+        <text x="175" y="236" text-anchor="middle" font-size="13" font-weight="700" fill="#1c4f78">Pull request → review gate</text>
+        <text x="175" y="254" text-anchor="middle" font-size="11" fill="#5c5c5c">human review this week;</text>
+        <text x="175" y="270" text-anchor="middle" font-size="11" fill="#5c5c5c">an automated agent is the target state</text>
+
+        <path d="M175 290 L175 336" stroke="#6b7280" stroke-width="1.6" fill="none" marker-end="url(#ah)"/>
+
+        <!-- ROW 3 -->
+        <text x="850" y="323" text-anchor="end" font-size="11" font-weight="700" letter-spacing="1.1" fill="#b31b1b">3 · A DEV ENVIRONMENT THEY CAN ITERATE ON</text>
+
+        <rect x="60" y="340" width="230" height="68" rx="7" fill="#f7f8fa" stroke="#232f3e" stroke-width="1.5"/>
+        <text x="175" y="366" text-anchor="middle" font-size="12.5" font-weight="700" fill="#232f3e">CodePipeline → CodeBuild</text>
+        <text x="175" y="386" text-anchor="middle" font-size="12.5" font-weight="700" fill="#232f3e">→ CloudFormation</text>
+        <text x="175" y="401" text-anchor="middle" font-size="10.5" fill="#5c5c5c">Terraform for the M365 side</text>
+
+        <line x1="294" y1="374" x2="326" y2="374" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah)"/>
+
+        <rect x="330" y="332" width="520" height="196" rx="9" fill="#fffaf5" stroke="#ec7211" stroke-width="2" stroke-dasharray="7 5"/>
+        <text x="590" y="356" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b34700">Dev environment — in the AWS account(s) we control</text>
+        <text x="590" y="374" text-anchor="middle" font-size="11" fill="#5c5c5c">with our guardrails · the builder never sees this layer</text>
+
+        <rect x="346" y="396" width="145" height="88" rx="7" fill="#fff" stroke="#b31b1b" stroke-width="1.5"/>
+        <text x="418" y="428" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b31b1b">Teams bot</text>
+        <text x="418" y="446" text-anchor="middle" font-size="10.5" fill="#5c5c5c">Bot Framework</text>
+        <text x="418" y="460" text-anchor="middle" font-size="10.5" fill="#5c5c5c">front end,</text>
+        <text x="418" y="474" text-anchor="middle" font-size="10.5" fill="#5c5c5c">AWS backend</text>
+
+        <rect x="511" y="396" width="145" height="88" rx="7" fill="#fff" stroke="#b31b1b" stroke-width="1.5"/>
+        <text x="583" y="428" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b31b1b">Document ETL</text>
+        <text x="583" y="446" text-anchor="middle" font-size="10.5" fill="#5c5c5c">extract, transform,</text>
+        <text x="583" y="460" text-anchor="middle" font-size="10.5" fill="#5c5c5c">embed, load</text>
+
+        <rect x="676" y="396" width="155" height="88" rx="7" fill="#fff" stroke="#b31b1b" stroke-width="1.5"/>
+        <text x="753" y="428" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b31b1b">Database</text>
+        <text x="753" y="446" text-anchor="middle" font-size="10.5" fill="#5c5c5c">Aurora Serverless</text>
+        <text x="753" y="460" text-anchor="middle" font-size="10.5" fill="#5c5c5c">+ pgvector</text>
+
+        <line x1="491" y1="440" x2="511" y2="440" stroke="#b31b1b" stroke-width="1.6"/>
+        <text x="501" y="432" text-anchor="middle" font-size="13" font-weight="800" fill="#b31b1b">?</text>
+        <line x1="656" y1="440" x2="676" y2="440" stroke="#b31b1b" stroke-width="1.6"/>
+        <text x="666" y="432" text-anchor="middle" font-size="13" font-weight="800" fill="#b31b1b">?</text>
+        <text x="590" y="508" text-anchor="middle" font-size="10.5" font-style="italic" fill="#b31b1b">three pieces that fit together like a puzzle — the protocol between them is track D</text>
+
+        <!-- RETURN LOOP -->
+        <path d="M590 528 L590 566 L28 566 L28 100 L54 100" stroke="#ec7211" stroke-width="1.8" fill="none" stroke-dasharray="6 4" marker-end="url(#ahO)"/>
+        <text x="316" y="582" text-anchor="middle" font-size="11.5" font-weight="700" fill="#b34700">iterate — they keep building against the running dev environment</text>
+      </g>
+    </svg>
+    <p style="font-size:12.5px;color:#5c5c5c;margin:-2px 0 12px;">Three blocks get selected: <em>internal audience</em> → a Teams bot; <em>needs the course material</em> → a document pipeline; <em>needs somewhere to retrieve from</em> → a database. They're deployed together, into AWS accounts we manage, with our guardrails around them. The builder never touches the cloud — the whole point is that it's abstracted away.</p>
+
+    <div class="callout">
+      <p><strong>Where this goes: eventually all custom development at Cornell targets this platform and this methodology.</strong> Not just AI features and not just agents — everything from a full-stack web application down to a two-step workflow automation, built as a composition of governed blueprints, developed with AI-DLC, deployed through one pipeline, and visible in one inventory.</p>
+      <p>That means the catalog has to grow well past AI-shaped things: SSO-protected dashboards and web apps, API layers in front of systems of record, scheduled and event-driven jobs, batch data processing, UI hosting. Today, a unit that needs any of those builds it however it likes, wherever it likes, and we often find out later. The end state is <strong>one sanctioned path that's faster than the alternative</strong> — which is the only reason anyone ever takes a sanctioned path.</p>
+    </div>
+
+    <p><strong>Why you're in the room.</strong> This is meant to be a <em>shared, contributable</em> platform, not something one team owns and everyone else queues for. "Your platform doesn't let me do X" should start a contribution that improves it for every unit. You're here because that only works if the people who'd actually use it help design it — and because AI-DLC is deliberately not a developers-only method.</p>
+
+    <h2><span class="num">2</span>What we're building in the two days</h2>
+    <p>The vision above is months of work — that's the bet AI-DLC makes, and this workshop is how we test it. Here's the slice we think is achievable in roughly six hours of build time, organised as six tracks. <strong>You don't need to pick now</strong> — we'll sort teams Monday morning with the AWS facilitators, and several places are deliberately left open.</p>
+    <table class="oc">
+      <tr>
+        <td class="n">0</td>
+        <td><span class="t">The deploy path</span>
+        GitHub → CodePipeline → CodeBuild → CloudFormation, working and debuggable, so no other track loses an hour to a red pipeline. Terraform for the Microsoft 365 pieces.
+        <br><span class="ask">Marty Sullivan, Dan Klinger, with Mike Brugnoni (AWS)</span></td>
+      </tr>
+      <tr class="key">
+        <td class="n">A</td>
+        <td><span class="t">The "Cornell Builder" — the keystone</span>
+        The thing in the diagram. A tool in your Claude Cowork or Claude Code that searches available blueprints, creates a repo from a template, and kicks off a deployment. Includes the review gate: you open a pull request, it's reviewed, and merge deploys. (Long term that reviewer is an automated agent; this week it's a person.)
+        <br><span class="ask">Ayham Boucher, Jai Chandnani, Zain Kahn, Tim Fraser</span></td>
+      </tr>
+      <tr class="key">
+        <td class="n">B</td>
+        <td><span class="t">Documents → searchable knowledge</span>
+        Take a pile of documents and make them retrievable by an application — using a managed <strong>Amazon Bedrock Knowledge Base</strong> to handle the extraction, chunking, and indexing. The classic "we have a folder of PDFs, make them useful" job, with the effort going into ingestion quality and retrieval tuning rather than plumbing.
+        <br><span class="ask">Steve Mandl, Ido Efrati, Axel Stevens</span></td>
+      </tr>
+      <tr class="key">
+        <td class="n">C</td>
+        <td><span class="t">A Microsoft Teams chatbot</span>
+        Internal chatbots at Cornell should front on Teams. Azure Bot Framework on the Microsoft side, everything behind it running on AWS. Success is someone in the room messaging it and getting a real answer.
+        <br><span class="ask">Scott Ross, Jason Woodward, Andre Hafner</span></td>
+      </tr>
+      <tr class="hard">
+        <td class="n">D</td>
+        <td><span class="t">How the blocks talk to each other, and stay separated</span>
+        Our hardest open question. If a deployment is three blocks, what do they use to communicate — and how do we guarantee one unit's deployment can't reach another's? Deliverable is a decision with the trade-offs written down, plus a working example.
+        <br><span class="ask">Philip Williammee, Tom Davko</span></td>
+      </tr>
+      <tr class="hard">
+        <td class="n">E</td>
+        <td><span class="t">Seeing what's running</span>
+        A dashboard: centrally, every deployment across the university with its owner and health; for a unit, only their own — metrics, logs, failures, cost — without giving them access to our AWS account.
+        <br><span class="ask">Jasdev Imani, Christopher Cameron, Franklin Castle</span></td>
+      </tr>
+    </table>
+    <p style="font-size:13.5px;color:#5c5c5c;">Chris Garlington, Pete Caforio, Pete Stergion, Dennis Nardi and Sean Gnau are unassigned on purpose — we'll place you Monday where the room needs you.</p>
+
+    <h2><span class="num">3</span>What success looks like at 2:00 PM Tuesday</h2>
+    <div class="callout">
+      <p><strong>One sentence: someone asks for something in plain language, and the room watches it become a governed, running, observable deployment.</strong> The Tuesday audience is provost-level, and the question in that room is whether Cornell should build things like this or buy them. Slides won't answer it. A working chain will.</p>
+    </div>
+    <p>Concretely, the seven beats every track is working toward:</p>
+    <ol>
+      <li>A Cornell instructor types into Claude Cowork: <em>"I want a chatbot my students can ask questions about my course material."</em></li>
+      <li>The <strong>Cornell Builder</strong> comes back with matching blueprints and one gets picked. <em>(A)</em></li>
+      <li>A <strong>new repo appears</strong> in our GitHub org from the template — shown live. <em>(A + 0)</em></li>
+      <li>Claude Code writes the customization and opens a <strong>pull request</strong> — no one gets direct write access, and review-then-merge is the governance gate. In the target state that reviewer is an automated agent. <em>(A)</em></li>
+      <li><strong>The pipeline runs</strong> — CodePipeline → CodeBuild → CloudFormation — live, going green. <em>(0)</em></li>
+      <li>Someone opens <strong>Teams</strong>, messages the bot, and it answers <strong>from the actual course documents</strong>. <em>(B + C)</em></li>
+      <li>The <strong>dashboard</strong> shows the deployment that just appeared, with its owner and estimated cost. <em>(E)</em></li>
+    </ol>
+    <p>The plan is to show the governance loop live (beats 1–5) and then message a bot deployed earlier that same morning — two instances rather than one. If everything rehearses green, we upgrade to running all seven beats as a single continuous chain. Either way we're demonstrating software, not presenting diagrams — which is why the scope above is smaller than our ambition.</p>
+    <p style="font-size:13.5px;color:#5c5c5c;">One honest simplification: in the diagram in §1, the Builder composes <em>multiple</em> blocks into one deployment. This week each request deploys <em>one</em> blueprint — the course-chatbot template bundles the Teams frontend, document pipeline, and database together. Composition of separate blocks is the very next thing on the roadmap; tracks B–D exist to make those seams real.</p>
+
+    <h2><span class="num">4</span>The agenda</h2>
+    <table class="env">
+      <tr><th>Mon 9:00–10:00</th><td>Introduction and kick-off. Teams get formed here.</td></tr>
+      <tr><th>Mon 10:00–12:00</th><td><strong>Inception</strong> — intent into user stories, user stories into Units of Work. This is Mob Elaboration, and it's the part where non-developers matter most.</td></tr>
+      <tr><th>Mon 12:00–1:30</th><td>Lunch, likely a working one.</td></tr>
+      <tr><th>Mon 1:30–4:00</th><td><strong>Construction</strong> — component model design, then code generation.</td></tr>
+      <tr><th>Mon 4:00–5:00</th><td>Day 1 retrospective — also where we honestly re-cut scope if something isn't moving.</td></tr>
+      <tr><th>Tue 9:00–9:30</th><td>Day 2 kick-off.</td></tr>
+      <tr><th>Tue 9:30–2:00</th><td><strong>Construction</strong> continues, working lunch. The most productive block of the event.</td></tr>
+      <tr><th>Tue 2:00–4:00</th><td><strong>Demo and reflections.</strong> §3 is what we're demoing.</td></tr>
+      <tr><th>Tue 4:00–5:00</th><td>Wrap-up, possibly some deployment work.</td></tr>
+    </table>
+
+    <h2><span class="num">5</span>Drivers and everyone else</h2>
+    <p>Roughly two-thirds of the room will be at a keyboard with Claude Code open. The rest are not spectating — AI-DLC is explicitly not a developers-only method, and a few of the roles below are genuinely load-bearing:</p>
+    <table class="env">
+      <tr><th>Driving</th><td>Running Claude Code, writing and reviewing what it produces, deploying. If that's you, §6 is mandatory.</td></tr>
+      <tr><th>Program management<br><em>Sylvie Honig, Andrea Frank, Erica Ellis</em></th><td>Capturing the AI-DLC artifacts — requirements, Units of Work, design decisions — that let us keep going after AWS leaves. Without this the workshop evaporates on Wednesday.</td></tr>
+      <tr><th>Service management &amp; operations<br><em>Alysia Villanti, Sean Walsh</em></th><td>The path from "this works" to "this is a supported service": intake, TDX, and what it takes to run a fleet of these once units start shipping.</td></tr>
+      <tr><th>Requirements &amp; demand<br><em>Zach Jacques, Fermin Romero, Ernie Francis</em></th><td>Leading the discussion from the consuming side. You run teams and units with real backlogs — you're the ones who can say whether a blueprint is worth adopting and what's missing from the catalog.</td></tr>
+      <tr><th>Everyone</th><td>Inception, Monday 10:00–12:00, is a whole-room activity. The quality of the two days depends more on that block than on anyone's typing speed.</td></tr>
+    </table>
+
+    <h2><span class="num">6</span>Prerequisites — a reminder</h2>
+    <p>We've already sent the prerequisites separately; this is just the summary so it's in one place with everything else.</p>
+    <ul>
+      <li><strong>GitHub username</strong> — if you expect to drive. Everything we build deploys through GitHub, and access has to be granted ahead of time. If you don't plan to drive, you don't need one.</li>
+      <li><strong>Claude Code installed and working</strong>, with your AI Gateway API key configured.</li>
+      <li><strong>Your laptop and a charger</strong> either way. Room 250 has limited outlets.</li>
+      <li><strong>Optional but useful:</strong> come with one thing your unit would want from the catalog in §1 — not to solve this week, but as input to Inception.</li>
+    </ul>
+    <p>You will <em>not</em> need an AWS account or console access. That's deliberate: the builder experience we're designing doesn't include one, so we're rehearsing the real thing. Kick-off runs 9:00–10:00 and Inception starts at 10:00, so arriving with working tooling means you don't miss any of it.</p>
+
+    <h2><span class="num">7</span>What changed since your invitation</h2>
+    <p>The brief you received listed six candidate blueprints, including <strong>event-driven automations</strong> and <strong>UI automation of legacy desktop applications via Amazon WorkSpaces</strong>. Both are real parts of the long-term vision and neither is in scope for these two days — with six hours of build time we'd rather finish a narrow chain end to end than start six things. If one of those was why you said yes, please tell us; they're near the front of the queue for what comes next, and there's a broader workshop planned once this MVP is done.</p>
+
+    <footer class="note">
+      Questions before Monday: Marty Sullivan (technical) or Sylvie Honig (logistics), AI-SEI. Supersedes the participant brief sent with your invitation.
+    </footer>
+  </div>
+</div>
+</body>
+</html>

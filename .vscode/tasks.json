@@ -1,0 +1,18 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "builder-mcp: dev server (uv)",
+      "type": "shell",
+      "command": "./tools/dev",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "windows": {
+        "command": "\"C:\\Program Files\\Git\\bin\\bash.exe\" tools/dev"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}

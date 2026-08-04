@@ -2,10 +2,21 @@
   "mcpServers": {
     "cornell-builder": {
       "command": "uv",
-      "args": ["run", "--directory", "builder-mcp", "builder-mcp"],
+      "args": ["run", "--directory", "packages/builder-mcp", "builder-mcp"],
       "env": {
         "BUILDER_MCP_TRANSPORT": "stdio"
       }
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_MCP_PAT}"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
     }
   }
 }

@@ -1,0 +1,51 @@
+# Blueprint manifest -- the contract the Cornell Builder MCP reads (product proposal §04).
+# Not a CloudFormation template: it declares no template format version, so
+# validate_stacks.py and cfn-lint ignore it by design (that check is a text scan, so even
+# naming the marker key here would trip it). The CFN template it points at is registered
+# in pipeline/stacks.yml as usual.
+apiVersion: builder.cornell.edu/v1
+kind: Blueprint
+metadata:
+  name: notify-topic
+  version: 0.1.0        # keep in lockstep with BlueprintVersion default in the template
+  maintainer: ai-sei@cornell.edu
+  maturity: supported
+summary: >-
+  A single SNS topic other blueprints, scripts, or people can publish to, with an optional
+  email subscription so a person gets the notification directly. The simplest way to wire
+  "tell me when X happens" without standing up any compute.
+matches:
+  - "notify me when something happens"
+  - "send an email alert"
+  - "sns topic"
+  - "pub/sub notification channel"
+  - "alert channel"
+  - "email me if a job fails"
+inputs:
+  owner_netid:
+    type: string
+    required: true
+    description: NetID of the person who owns the deployment (cornell:owner)
+  notification_email:
+    type: string
+    required: false
+    description: >-
+      Email address to subscribe to the topic. Leave blank to skip -- SNS emails a
+      confirmation link before delivery starts.
+template: blueprints/notify-topic/infra/notify-topic.yml
+# CodePipeline-level parameters, resolved by the pipeline at deploy time (not by the MCP).
+pipeline_parameters:
+  SourceCommitId: "#{GitRepository.CommitId}"
+# The template hardcodes the topic name and deployment id to <app>-<env>-notify-topic, so
+# only one deployment of it can exist per app/environment -- same tradeoff hello-world makes,
+# for the same reason. A blueprint meant to be deployed per-team would take a DeploymentName
+# parameter instead.
+singleton: true
+cost:
+  baseline_monthly_usd: 0
+  scales_with: ['sns-notifications-published', 'email-notification-deliveries']
+data_classification: [internal]
+# Backup/recovery contract (see versioning-releases-and-recovery-options.md):
+# stateless | derived | authoritative. SNS holds no durable message data -- nothing here
+# needs backing up.
+state: []
