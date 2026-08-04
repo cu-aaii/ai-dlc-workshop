@@ -65,6 +65,23 @@ run() {
   "$@"
 }
 
+# run(), with the output capped. A retrieved syllabus passage is over a thousand characters and
+# would scroll the command off the screen; wrapping the call in `bash -c "... | cut"` to trim it
+# would put the pipe in the echoed line and make it unreadable.
+CAP=900
+run_capped() {
+  local shown='' arg
+  for arg in "$@"; do
+    case "$arg" in
+      *[\ \{\}\"\']*) shown="$shown '$arg'" ;;
+      *)              shown="$shown $arg" ;;
+    esac
+  done
+  printf '\n%s$%s%s\n' "$BOLD" "$shown" "$RESET"
+  beat
+  "$@" | cut -c1-"$CAP"
+}
+
 # ---------------------------------------------------------------------------- scenes
 
 scene_1_ask() {
@@ -168,15 +185,21 @@ scene_5_answer() {
   say "Now ask it the question a student would ask:"
   note "\"$question\""
   beat
-  # retrieve-and-generate, not retrieve: the audience wants the answer, not the chunks.
-  run aws bedrock-agent-runtime retrieve-and-generate --region "$region" \
-    --input "{\"text\": \"$question\"}" \
-    --retrieve-and-generate-configuration \
-    "{\"type\":\"KNOWLEDGE_BASE\",\"knowledgeBaseConfiguration\":{\"knowledgeBaseId\":\"$kb_id\",\"modelArn\":\"${DEMO_MODEL_ARN:-arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0}\"}}" \
-    --query 'output.text' --output text
+  # retrieve, NOT retrieve-and-generate: the latter fails on a managed knowledge base with
+  # "This operation is not supported for managed knowledge bases." Retrieval returns the
+  # passages; generating prose from them is the chatbot's job, which is the handoff this
+  # blueprint exists to make possible. The blueprint's own deploy-time verifier uses retrieve
+  # for the same reason.
+  run_capped aws bedrock-agent-runtime retrieve --region "$region" \
+    --knowledge-base-id "$kb_id" \
+    --retrieval-query "{\"text\": \"$question\"}" \
+    --query 'retrievalResults[0].{score:score,passage:content.text}' --output json
   beat
-  ok "That answer came from a document a faculty member dropped in a bucket, indexed by a"
+  ok "That passage came from a syllabus a faculty member dropped in a bucket, indexed by a"
   ok "blueprint a builder deployed without ever seeing the AWS console."
+  note "Passages, not prose: a managed knowledge base serves retrieval, and turning the top"
+  note "passages into an answer is the chatbot's half of the handoff -- which is what reads"
+  note "/aidlc/main/knowledgebase/knowledge-base-id and attaches the retrieval policy."
 }
 
 # ---------------------------------------------------------------------------- driver

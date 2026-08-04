@@ -277,6 +277,12 @@ and CI gets it from `hashicorp/setup-terraform`. Never document or run the bare 
   with an entirely empty knowledge base, and Bedrock has no native scheduled sync. Something in
   the stack has to start the job, and on this repo's no-CLI deploy path it should also assert the
   result — see `blueprints/knowledgebase/docs/decisions.md`.
+- **`RetrieveAndGenerate` does not work on a managed knowledge base.** *"This operation is not
+  supported for managed knowledge bases"* — the operation the Bedrock docs lead with, against the
+  knowledge base type this repo deploys. Use `bedrock-agent-runtime retrieve`, which returns
+  passages and is what `blueprints/knowledgebase`'s verifier already calls; turning them into
+  prose belongs to the consuming chatbot. Verified against `aidlc-main-knowledgebase` on
+  2026-08-04. Worth knowing before a demo depends on it.
 
 ## Scaffolded but not built
 
