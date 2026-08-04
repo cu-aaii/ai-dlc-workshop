@@ -149,31 +149,59 @@ a model in the loop.
 ### U0 is a script, not a runbook — updated 2026-08-04
 
 Two research documents reshaped this unit, the second by **live testing** what the first could only reason
-about (`Entra CLI Automation - Research`, then `Teams Admin CLI Automation - Findings`).
+about. They have since been consolidated into one:
+`docs/teams-chatbot-docs/Teams Admin CLI Automation - Findings 2026-08-03.md`.
 
 **Everything in U0 is scriptable.** The only human step is **one device-code browser prompt**:
 
 | Step | Mechanism | Confirmed |
 | --- | --- | --- |
 | Entra app + secret | `az ad app create` / Graph | documented |
+| **Service principal** | **`az ad sp create`** | documented — **separate mandatory step, see gotcha 1** |
 | Azure Bot Service + MsTeams channel | `az bot create`, `az bot msteams create` | read-tested |
 | Messaging endpoint | `az bot update --endpoint` | — |
 | Manifest + icons + zip | plain files in git | **live, zero portal use** |
 | Publish to catalog | Graph `POST /appCatalogs/teamsApps` | **live, `201`** |
 | Scope to an Entra group | `Update-M365TeamsApp -Groups` | **live, round trip** |
 
-**Four gotchas worth building into the script from the start**, all discovered the hard way in that document:
+**Six gotchas worth building into the script from the start**, all discovered the hard way in that document:
 
-1. **`az rest` cannot do the catalog calls.** It authenticates as the "Azure CLI" first-party app, whose scope
+1. **`az ad app create` is not enough — `az ad sp create` is a separate mandatory step.** Registering the
+   application and creating its service principal are two distinct directory objects. The Azure Portal does
+   both when you click through the blade, so anyone who has only done this in the GUI will assume one command
+   suffices. Omit it and everything *looks* fine — the app exists, the secret is issued, `az bot create`
+   accepts the app ID — and the failure appears much later at the bot's **first outbound token request**, with
+   nothing pointing back at the missing object. Put both calls in the script from the first commit; this is the
+   single most likely way to lose an afternoon in U0.
+2. **`az rest` cannot do the catalog calls.** It authenticates as the "Azure CLI" first-party app, whose scope
    set is fixed by Microsoft and excludes `AppCatalog.*`. This is a **client-app** limitation, not a privilege
    gap — a global admin still gets `403`. Use the **Microsoft Graph Command Line Tools** public client
    (`14d82eec-204b-4c2f-b7e8-296a70dab67e`) with device-code flow, then plain `curl`.
-2. **`Get`/`Update-M365TeamsApp -Id` wants the *catalog* id, not the manifest id.** The manifest id fails with
+3. **`Get`/`Update-M365TeamsApp -Id` wants the *catalog* id, not the manifest id.** The manifest id fails with
    `NotAllowed: This app is not available for admin management`.
-3. **The Teams PowerShell docs' parameter metadata is wrong.** `-AppInstallType` and friends are a *separate*
+4. **The Teams PowerShell docs' parameter metadata is wrong.** `-AppInstallType` and friends are a *separate*
    parameter set; passing them alongside `-AppAssignmentType`/`-Groups` throws. Omit them when only touching
    availability.
-4. **The zip needs `manifest.json` + `color.png` + `outline.png` at the zip root** — no subfolder.
+5. **The zip needs `manifest.json` + `color.png` + `outline.png` at the zip root** — no subfolder.
+6. **Verify any first-party client ID against the directory before building on it.** The Teams PowerShell
+   client is `1fec8e78-bce4-4aaf-ab1b-5451cc387264`, verified empirically. A GUID that web search offers for
+   the same purpose, `5170baac-d33f-4ab5-bc04-6ac2a602c700`, **does not exist in the tenant at all** and was
+   most likely fabricated. Client IDs are exactly the kind of value that looks authoritative and is not.
+
+**The one human step is confirmed permanent, which is worth knowing before designing the script.** Do not
+build U0 expecting to remove the device-code prompt later. Availability scoping has no unattended path by any
+route: app-only 401s, Teams Administrator escalation changes nothing, and `Connect-MicrosoftTeams
+-AccessTokens` fails structurally because the module needs a third resource token and the parameter accepts
+exactly two. So the script should be written to make the one interactive login **obvious and pleasant** —
+prompt clearly, fail clearly if the token has expired mid-run, and be safely re-runnable from any point —
+rather than written as a temporary shape awaiting full automation. Idempotency matters more than it would if
+this were headed for CI.
+
+**One capability the research settled that U0 does not need**, recorded so nobody re-tests it: Setup Policies
+(the "Upload custom apps" sideloading grant) **are** app-only automatable, confirmed live. It is irrelevant
+here because publishing to the org catalog makes sideloading unnecessary. Its value is as evidence — it proves
+the wall is endpoint-specific rather than module-wide, which is what makes the remaining `New-TeamsApp`
+question worth an hour.
 
 **Also confirmed live**: tenant app settings show
 `isUserPersonalScopeResourceSpecificConsentEnabled: true`, which is partial evidence for admin question 13 —

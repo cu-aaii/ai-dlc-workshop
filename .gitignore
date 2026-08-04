@@ -27,3 +27,46 @@ venv/
 # Alternate data streams Windows attaches to downloaded files, which surface as separate
 # junk files on the WSL side. One accompanies every file saved from a browser.
 *:Zone.Identifier
+
+# ---------------------------------------------------------------------------------------
+# Credential material
+#
+# This repository is PUBLIC and secret scanning is disabled by an enforced org security
+# configuration (cu-aaii-org-config-1), which cannot be overridden per repository. Nothing
+# will stop a credential being pushed, so these patterns are the only mechanical guard.
+#
+# They are a backstop, NOT remediation. A credential that has already existed in a working
+# tree must be treated as needing rotation on its own schedule — ignoring the file that
+# holds it changes nothing about that.
+#
+# Secrets belong in AWS Secrets Manager. Blueprints are configured to *use* credentials
+# without ever containing them.
+
+# Private keys, certificates with keys, keystores
+*.pem
+*.pfx
+*.p12
+*.pkcs12
+*.key
+*.keystore
+*.jks
+id_rsa
+id_ed25519
+
+# Secret and credential dumps
+secrets.*
+*-secrets.*
+*.secrets
+credentials.json
+
+# Cloud CLI credential caches, if anyone ever runs a tool with HOME pointed at the repo
+.azure/
+.msal_token_cache.json
+
+# Research document holding a live Entra client secret, a test-user password and a Bot
+# Framework JWT. Ignored to prevent an accidental `git add .` from publishing them.
+#
+# This entry is a stopgap and should be removed, not kept: the intent is to rotate the
+# credentials, replace the values with placeholders, and commit the document, which has
+# real research value. Until then it stays out of the index.
+docs/teams-chatbot-docs/Research into in-tenant setup.md

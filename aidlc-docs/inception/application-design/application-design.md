@@ -158,8 +158,9 @@ Lambda function URL over API Gateway and were accepted at Requirements Analysis.
 
 ## 6a. Open design choice added 2026-08-04 — certificate or secret for outbound auth
 
-`docs/teams-chatbot-docs/Entra CLI Automation - Research 2026-08-03.md` raises a choice that affects
-`TokenProvider` and is better decided deliberately than inherited from the prototype.
+`docs/teams-chatbot-docs/Teams Admin CLI Automation - Findings 2026-08-03.md` (which absorbed the
+former `Entra CLI Automation - Research 2026-08-03.md`) raises a choice that affects `TokenProvider` and
+is better decided deliberately than inherited from the prototype.
 
 | | Client secret | Certificate |
 | --- | --- | --- |

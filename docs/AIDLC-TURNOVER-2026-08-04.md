@@ -226,17 +226,36 @@ account; multiple teams merge into one repo in parallel; nearly everything is a 
 
 ### Microsoft-side CLI (from `Teams Admin CLI Automation - Findings 2026-08-03.md`, live-tested)
 
+- **`az ad app create` does not create the service principal — `az ad sp create` is a separate mandatory
+  step.** The Azure Portal does both when you click through the app-registration blade, so the omission is
+  easy and the symptom is remote: the app exists, the secret is issued, `az bot create` accepts the app ID,
+  and then the bot's **first outbound token request** fails with nothing pointing back at the cause. Highest
+  time-loss risk in U0.
 - **`az rest` cannot make the App Catalog calls.** It authenticates as the "Azure CLI" first-party app, whose
   scopes are fixed by Microsoft and exclude `AppCatalog.*`. **A global admin still gets `403`** — it is a
   client-app limitation, not a privilege gap, and the error reads like a permissions problem. Use the
   **Microsoft Graph Command Line Tools** public client (`14d82eec-204b-4c2f-b7e8-296a70dab67e`) with
   device-code flow, then plain `curl`.
+- **Verify first-party client IDs against the directory before building on them.** Teams PowerShell is
+  `1fec8e78-bce4-4aaf-ab1b-5451cc387264` (verified). A GUID web search offers for the same purpose,
+  `5170baac-d33f-4ab5-bc04-6ac2a602c700`, **does not exist in the tenant** and was likely fabricated.
 - **`Get`/`Update-M365TeamsApp -Id` wants the *catalog* id**, not the manifest/external id.
 - **The Teams PowerShell docs' parameter metadata is wrong** — `-AppInstallType` and friends are a separate
   parameter set and throw if combined with `-AppAssignmentType`/`-Groups`.
 - **The app package zip needs `manifest.json` + `color.png` + `outline.png` at the zip ROOT**, no subfolder.
 - Catalog publish (`POST /appCatalogs/teamsApps`) and group scoping (`Update-M365TeamsApp -Groups`) are both
   **confirmed working live** with a delegated device-code token. Only the one browser consent is manual.
+- **That one browser consent is permanent for group scoping — do not design around removing it.** Settled
+  2026-08-04 by closing all three routes: app-only `401`s, Teams Administrator escalation changes nothing,
+  and `Connect-MicrosoftTeams -AccessTokens` fails structurally (module needs a third resource token,
+  `https://substrate.office.com`; the parameter accepts exactly two). **The refresh-token pattern that makes
+  publish viable in CI cannot be extended to scoping.**
+- **Setup Policies *are* app-only automatable** (confirmed live, full round trip). Useless here — publishing
+  to the catalog makes sideloading moot — but it proves the wall is **endpoint-specific**, so Microsoft's
+  app-only exclusion list predicts correctly in **both** directions and can be trusted for other cmdlets.
+- **The only open research question is `New-TeamsApp` under app-only auth.** Not on the exclusion list, never
+  exercised. If it works, catalog publish becomes fully unattended and §9 reopens. Cheap to test with the
+  existing certificate harness — the highest-value remaining hour on the Microsoft side.
 
 ### Gateway
 
@@ -339,9 +358,14 @@ registration**, not the one whose secret is exposed.
 
 ### Reference documents (inputs, not outputs)
 
-`docs/teams-chatbot-docs/` — five research documents. **The two newest are the most valuable**:
-`Entra CLI Automation - Research 2026-08-03.md` and `Teams Admin CLI Automation - Findings 2026-08-03.md`
-(the latter is **live-tested** and corrected two earlier conclusions).
+`docs/teams-chatbot-docs/` — four tracked research documents, plus one untracked (see §8).
+**`Teams Admin CLI Automation - Findings 2026-08-03.md` is by far the most valuable**: it is
+**live-tested**, it corrected several earlier conclusions, and it now **also contains the former
+`Entra CLI Automation - Research 2026-08-03.md`**, which was folded into it and deleted. Citations to
+that filename elsewhere in the AI-DLC artifacts have been repointed; if you find one that wasn't, the
+content is in the findings document. It absorbed a second round of live testing on 2026-08-04 — the
+`-AccessTokens`/Substrate dead end, Setup Policies confirmed app-only, push-install confirmed live, and
+the `az ad sp create` gotcha.
 `docs/Participant Brief - Invited Attendees (2).html` — workshop context, team model, blueprint list.
 `docs/teams bot exploration.json` — the n8n prototype export (checked: contains no secrets).
 

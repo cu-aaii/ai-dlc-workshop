@@ -109,7 +109,10 @@ environment**, single identity · **the team owns U0**. Ten remaining questions 
 
 ### Corrections from the Entra CLI research (2026-08-04)
 
-`docs/teams-chatbot-docs/Entra CLI Automation - Research 2026-08-03.md` corrected two recorded items:
+Recorded from `Entra CLI Automation - Research 2026-08-03.md`, which has since been **consolidated into
+`docs/teams-chatbot-docs/Teams Admin CLI Automation - Findings 2026-08-03.md`** and deleted. That
+findings document is now the single source for the Microsoft-side CLI picture; cite it, not the old
+filename. It corrected two recorded items:
 
 - **FR-7a added** — the manual Azure messaging-endpoint update is **not** necessary; `az bot update --endpoint`
   is automatable, so a post-deploy step pushes the stack output. Click-ops concession withdrawn.
@@ -120,6 +123,41 @@ environment**, single identity · **the team owns U0**. Ten remaining questions 
   colliding with Secrets-Manager-only. A script writing straight to Secrets Manager avoids it.
 - **R-3 revised** — a **certificate** instead of a client secret removes the silent-expiry risk; contained
   entirely within `TokenProvider`. Decision deferred to Infrastructure Design (`application-design.md` §6a).
+
+### Second round of Microsoft-side live testing (folded in 2026-08-04)
+
+A further round of testing was folded into
+`docs/teams-chatbot-docs/Teams Admin CLI Automation - Findings 2026-08-03.md`. **No recorded decision
+changes.** Three of the four findings harden decisions already made; the fourth is a build-time gotcha.
+
+- **Availability scoping is conclusively un-automatable — settled, not merely untested.** Three routes
+  closed: app-only certificate auth `401`s; escalating the service principal to the **Teams Administrator**
+  directory role changes nothing; and `Connect-MicrosoftTeams -AccessTokens` fails **structurally** because
+  the module needs a third resource token (`https://substrate.office.com`) and the parameter hard-validates
+  for exactly two. **Consequence: the refresh-token pattern cannot be extended to cover scoping later**, so
+  U0's one interactive login is a permanent boundary rather than a gap awaiting effort. This strengthens the
+  §9 out-of-scope decision and the choice to script U0 for a human to run.
+- **`az ad sp create` is a separate mandatory step** — the Portal creates the service principal implicitly,
+  the CLI does not. Omitting it fails at the bot's first outbound token call, far from the cause. Recorded as
+  U0 gotcha 1.
+- **Setup Policies are app-only automatable, confirmed live.** Irrelevant to this blueprint (publishing to
+  the catalog makes sideloading unnecessary) but evidentially important: it proves the wall is
+  **endpoint-specific**, not module-wide. It also means Microsoft's app-only exclusion list predicts
+  correctly in **both** directions, so it can be trusted for other cmdlets.
+- **Push-install for a user is confirmed live app-only** (`201`/`204`, zero human), upgraded from
+  documented-only. The team-scoped equivalent remains untested.
+
+**One open question left in the research**, and it is the only thing that would reopen §9:
+**`New-TeamsApp` under app-only auth.** Not on the exclusion list, never exercised. If it works, catalog
+publish becomes fully unattended. Evidence cuts both ways — the exclusion list predicts success, the Graph
+endpoint's refusal of Application permissions predicts failure, and the Substrate finding proves Teams
+PowerShell does not simply proxy Graph, so the Graph table may not govern it. Cheap to test with the
+existing certificate harness.
+
+**One factual error corrected in `requirements.md` §9**: it claimed the human step was "an OAuth property,
+not a Teams limitation." That is backwards — client-credentials auth works for every other row including
+two Teams PowerShell rows. It is specifically the catalog and Unified App Management endpoints that refuse
+app-only auth.
 
 ### Application Design decisions on record
 

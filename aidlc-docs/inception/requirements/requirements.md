@@ -67,7 +67,7 @@ transcribed by a human.
 
 **FR-7a. REVISED 2026-08-04 — the manual endpoint update is not necessary.** This requirement previously
 accepted that recreating the stack meant a human editing the messaging endpoint in Azure. Research in
-`docs/teams-chatbot-docs/Entra CLI Automation - Research 2026-08-03.md` establishes that
+`docs/teams-chatbot-docs/Teams Admin CLI Automation - Findings 2026-08-03.md` establishes that
 `az bot update --name <bot> --resource-group <rg> --endpoint <url>` is **fully automatable with a service
 principal**, so a post-deploy step SHOULD read the function URL from the stack output and push it to the bot
 resource. The stack output requirement above now has a programmatic consumer rather than a human one, and the
@@ -334,7 +334,8 @@ unqualified.**
 - Thread replies without `@mention` (RSC) — carries an untested install risk
 - Group chats without `@mention` — unresearched
 - **Manual provisioning of the Microsoft side — but for a sharper reason than originally recorded.**
-  Revised 2026-08-04 following `docs/teams-chatbot-docs/Entra CLI Automation - Research 2026-08-03.md`.
+  Revised 2026-08-04 following the Entra CLI research, since consolidated into
+  `docs/teams-chatbot-docs/Teams Admin CLI Automation - Findings 2026-08-03.md`.
   The original rationale ("Terraform out of scope for time") was weaker than the truth. The actual boundary:
 
   **REVISED AGAIN 2026-08-04** after `docs/teams-chatbot-docs/Teams Admin CLI Automation - Findings
@@ -345,18 +346,28 @@ unqualified.**
   | Step | Automatable? | Evidence |
   | --- | --- | --- |
   | Entra app registration + secret | **Yes**, app-only | documented |
-  | Azure Bot Service + MsTeams channel + endpoint | **Yes**, service principal | `az bot`, read-tested |
+  | **Service principal for that app** | **Yes**, app-only | `az ad sp create` — **a separate mandatory step**, see the note below |
+  | Azure Bot Service + MsTeams channel + endpoint | **Yes**, app-only | `az bot`, read-tested |
   | Teams app package (the zip) | **Yes** | **hand-authored live, zero Developer Portal use** |
-  | **Publish to the tenant catalog** | **Yes — CONFIRMED LIVE** | Graph `POST /appCatalogs/teamsApps`, zip body, `201 Created` |
-  | Delete from catalog | **Yes — confirmed live** | Graph `DELETE`, `204` |
-  | Tenant-wide app settings | **Yes — confirmed live** | Graph `GET`/`PATCH /teamwork/teamsAppSettings` |
-  | **Availability scoped to an Entra group** | **Yes — CONFIRMED LIVE** | Teams PowerShell `Update-M365TeamsApp -Groups`, full add/remove round trip |
-  | Push-install for users/teams | Yes, documented | Graph `POST .../installedApps` |
+  | **Publish to the tenant catalog** | **Yes — CONFIRMED LIVE**, delegated only | Graph `POST /appCatalogs/teamsApps`, zip body, `201 Created` |
+  | Delete from catalog | **Yes — confirmed live**, delegated only | Graph `DELETE`, `204` |
+  | Tenant-wide app settings | **Yes — confirmed live**, delegated only | Graph `GET`/`PATCH /teamwork/teamsAppSettings` |
+  | **Availability scoped to an Entra group** | **Yes — CONFIRMED LIVE**, delegated only, **and no unattended path exists** | Teams PowerShell `Update-M365TeamsApp -Groups`, full add/remove round trip |
+  | Push-install for a user | **Yes — confirmed live**, app-only | Graph `POST`/`DELETE /users/{id}/…/installedApps`, `201`/`204`, zero human |
+  | Push-install for a team | Yes, documented | Graph `POST /teams/{id}/installedApps` — not independently tested |
   | Approve a pending-review submission | Documented, not tested | Graph `PATCH` + `If-Match` etag |
-  | Grant sideloading (Setup Policy) | Teams PowerShell only, untested | no Graph equivalent |
+  | Grant sideloading (Setup Policy) | **Yes — confirmed live, app-only** | Teams PowerShell `New-`/`Grant-CsTeamsAppSetupPolicy`; no Graph equivalent but none needed |
 
-  **The only irreducibly human step is a one-time interactive OAuth consent** for whichever client is doing
-  the scripting — an OAuth property, not a Teams limitation. Everything after that is `curl` and `pwsh`.
+  **`az ad sp create` is a separate mandatory step and the easiest one to omit.** The Azure Portal creates
+  the service principal implicitly during app registration; the CLI and Graph do not. A provisioning script
+  that stops after `az ad app create` produces an application that cannot authenticate, and the failure
+  surfaces later at the bot's first outbound token call with nothing pointing back at the cause.
+
+  **The irreducibly human step is a one-time interactive OAuth consent** for whichever client is doing the
+  scripting. **This is a Teams limitation, not a generic OAuth property** — an earlier revision of this
+  document said the opposite and was wrong. Client-credentials auth needs no human at all and works for
+  every other row in the table above, including two Teams PowerShell rows; it is specifically the catalog
+  and Unified App Management endpoints that refuse it. Everything after the consent is `curl` and `pwsh`.
 
   **Two corrections to what this document previously recorded**, both in the favourable direction:
 
@@ -368,16 +379,41 @@ unqualified.**
      with a delegated token, and `-Groups` takes Entra group IDs with **live membership evaluation**, not a
      per-user snapshot. Confirmed live with a full add-then-remove round trip.
 
+  **A third finding, added 2026-08-04, and this one runs the other way — it hardens the decision rather
+  than softening it.** Availability scoping has **no unattended path at all**, and that is now settled
+  rather than merely untested. Three routes were tried and all three are closed: app-only certificate auth
+  401s on the cmdlet; escalating the service principal to the Teams Administrator directory role changes
+  nothing; and the one documented workaround — `Connect-MicrosoftTeams -AccessTokens`, handing the module
+  pre-minted *delegated* tokens — fails structurally, because the module needs a third resource token
+  (`https://substrate.office.com`) and the parameter hard-validates for exactly two. No Terraform provider
+  covers the feature either.
+
+  **Why this matters even though it does not change the v1 decision**: the refresh-token pattern that makes
+  catalog publish viable-if-unwise in CI **cannot be extended to cover scoping later**. So a future attempt
+  to lift the whole Microsoft chain into the pipeline would still stop at this step. It is a permanent
+  boundary until Microsoft changes something, not a gap awaiting effort.
+
   **Still true and still the reason this is out of scope for v1**: none of it is *per-deployment*. It is
   one-time-per-bot onboarding, and it needs a human at a browser once. Building it into the pipeline would
   mean smuggling a user identity into CI, which is a worse posture than a scripted runbook run by a person.
+  **Revisit on exactly two triggers**: Microsoft shipping Application permissions for
+  `appCatalogs/teamsApps`, or `New-TeamsApp` proving to work under app-only auth — the single open question
+  left in the research, and worth an hour because the exclusion list has now been shown to predict app-only
+  support correctly in both directions.
 
 - **A Terraform stage, specifically.** The automatable Microsoft surface is ~4 resources created **once**. A
   small idempotent script invoked from CodeBuild is a better fit than standing up Terraform with remote state
   — particularly because `azuread_application_password` writes the generated secret into Terraform **state**,
   which collides directly with "secrets live only in AWS Secrets Manager". The script approach generates the
-  secret and writes it straight to Secrets Manager without it ever landing in state. No Terraform provider
-  covers the catalog publish step in any case.
+  secret and writes it straight to Secrets Manager without it ever landing in state.
+
+  **No Terraform provider covers the two steps that need a human, and this is structural.** Provider
+  resources exist for every app-only row (`azuread_application`, `azuread_service_principal`,
+  `azurerm_bot_service_azure_bot`, `azurerm_bot_channel_ms_teams`, `azuread_group`,
+  `azuread_directory_role_assignment`), so Terraform would automate precisely the part a short script
+  automates trivially. The generic `microsoft/terraform-provider-msgraph` is what would otherwise plug the
+  gap at catalog publish and availability scoping, and it cannot: it supports **only app-only auth modes**,
+  which are exactly what those endpoints refuse. Provider maturity will not fix that.
 - Secret rotation
 - Automated tag validation — deferred pending D-3
 - `observability/`, `builder-mcp/`, and the production Cornell tenant
