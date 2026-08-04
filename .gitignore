@@ -45,6 +45,12 @@ aidlc-docs/
 # junk files on the WSL side. One accompanies every file saved from a browser.
 *:Zone.Identifier
 
+# The workshop participant brief, whatever it is called this time. Upstream ignores
+# PARTICIPANT_BRIEF.md; the copy here arrived from a browser under a different name, so the
+# existing rule missed it and left it untracked-but-visible -- which is how it would have been
+# swept back in by `git add .`.
+docs/Participant Brief*
+
 # ---------------------------------------------------------------------------------------
 # Credential material
 #
