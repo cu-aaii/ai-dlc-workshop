@@ -20,10 +20,7 @@ design, not by omission:
 
 - **No CloudFormation template.** `infra/` holds a README and nothing else.
 - **No `Dockerfile` target.** `src/handler.py` says it runs as the root Dockerfile's
-  `course-chatbot` target. The target name is right; **"root" is not** — `CLAUDE.md` states there is
-  no root `Dockerfile`, and each component keeps its own in its own directory with the Build action's
-  `CONTAINER_CONTEXT` pointing at it. So this one belongs at `blueprints/course-chatbot/Dockerfile`,
-  and it has not been written.
+  `course-chatbot` target; that target has not been written.
 - **No `pipeline/stacks.yml` entry and no pipeline actions**, so `tools/check` stays green.
 - **No `blueprint.yaml`.** Deliberate: the manifest is the contract `blueprint_search` returns,
   and a manifest naming a template that doesn't exist would advertise a blueprint whose

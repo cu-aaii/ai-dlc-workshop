@@ -2217,3 +2217,753 @@ one Lambda, Q4 how PR #21's answers reach this checkout.
   Tuesday, August 4.
 
 **GATE**: Part 2 generation not started. Awaiting four answers.
+
+---
+
+# Audit reconciliation — 2026-08-04
+
+**Why this section exists**: `core-workflow.md` requires that EVERY user input be logged with the
+complete raw text, never summarised, with an ISO 8601 timestamp. Between the four inputs logged above
+and this entry, **sixteen further inputs went unlogged** while the session drifted from Units
+Generation into hand-written implementation. This section reconciles the record.
+
+**On timestamps.** Individual times below are **approximate**, reconstructed from interaction order
+against three known anchors: `10:51 EDT` and `11:40 EDT` (wall-clock checks made during the session)
+and commit `0806656` at `11:38 EDT`. They are marked `~` where inferred. Fabricating precision here
+would be worse than admitting the gap — the value of this log is that it can be trusted.
+
+---
+
+## Units Generation gate — answers received
+
+**Timestamp**: ~2026-08-04T14:05:00Z (~10:05 EDT)
+
+**COMPLETE RAW USER RESPONSE**:
+
+```
+1C, 2A, 3. MUST use Agent Core, 4A
+```
+
+**Action**: Recorded into `units-generation-gate-questions.md`. Q3 answered in words rather than a
+letter; mapped to option A exactly and exclusively, raw text preserved. Ran the Step 7 contradiction
+analysis: no contradictions. Q3=A keeps two images so Q2 is not mooted; Q7/Q9 state design stands
+unchanged; FR-5 amended rather than deleted. One ambiguity resolved by documented assumption rather
+than a fifth question (where Track C's code sits relative to the pre-existing `src/handler.py`).
+
+---
+
+## Decision record D-b supplied by the user
+
+**Timestamp**: ~2026-08-04T15:20:00Z (~11:20 EDT)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+### D-b. One `Dockerfile` per component. The multi-target question dissolves. [DECIDED]
+
+`blueprints/course-chatbot/Dockerfile`, one target `course-chatbot`, `CONTAINER_CONTEXT` =
+`blueprints/course-chatbot`, built **on the AWS Lambda Python base image** — `requirements.txt`
+deliberately omits `boto3` because that image ships it, so the `uv` base that `builder-mcp` uses
+would break it (`course-chatbot/README.md` §"What the template has to supply").
+
+This is not a close call and it barely needed a decision:
+
+- `CLAUDE.md:30` — "one per component that ships an image, in that component's own directory, with
+  a **named target** — there is no root `Dockerfile`."
+- `CLAUDE.md:310-312` — the action sets `CONTAINER_CONTEXT` to the component directory and
+  `CONTAINER_TARGET` to the target, and the two must agree with where the component lives.
+- The one worked example, `BuilderMcpContainer` at `pipeline/pipeline.yml:678-696`, does exactly
+  that.
+
+**And D-c removes the question entirely**: Application Design Q11 specified two targets (`lambda`,
+`agent`) because there was a separate agent container on AgentCore. One Lambda means one image
+means one target. Q11 is superseded — not by the convention change, but by Q3.
+
+**Fix two stale prose claims in the same PR**, both of which assert a root Dockerfile that
+`CLAUDE.md` says does not exist:
+
+- `blueprints/course-chatbot/README.md:22` — "runs as the root Dockerfile's `course-chatbot`
+  target." The *target name* is right; "root" is wrong.
+- `pipeline/stacks.yml`, the `builder-mcp` description — "root Dockerfile target `builder-mcp`."
+  The file is at `packages/builder-mcp/Dockerfile`.
+```
+
+**Action**: Verified all five citations; every one held, including a stale claim at
+`pipeline/stacks.yml:55` that this stage's own review had missed. **D-b also corrected an error in
+the `unit-of-work.md` generated minutes earlier**, which had placed Dockerfiles in `src/frontdoor/`
+and `src/agent/` rather than at the component root.
+
+**Contradiction detected and NOT silently resolved**: D-b's conclusion holds either way, but its
+premise — D-c's "one Lambda" — is the opposite of gate answer 3 ("MUST use Agent Core"). Written up
+as Clarification Question 1 in `units-generation-clarification-questions.md` per
+`question-format-guide.md`, with no recommendation offered on the substance, since FR-21 records the
+AgentCore mandate as Team E's rather than Track C's. The two stale prose claims were fixed
+immediately, being independent of the conflict.
+
+---
+
+## Research directive: AgentCore and Strands
+
+**Timestamp**: ~2026-08-04T15:35:00Z (~11:35 EDT — see note; ordering is reliable, clock is not)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+Please research AgentCore right now. I think you need to understand AgentCore features and how it will integrate with strands.
+```
+
+**Action**: Researched against AWS documentation, `strandsagents.com` and the worked example already
+in this repository. Recorded in
+`aidlc-docs/inception/requirements/agentcore-strands-research-2026-08-04.md`. The directive was
+correct and the research falsified the premise the clarification question was built on:
+
+- **AgentCore Runtime does not require a container.** `AgentRuntimeArtifact` accepts
+  `CodeConfiguration` (a zip in S3) as well as `ContainerConfiguration`, both CloudFormation-native.
+  So the AgentCore mandate and "no container" were never the same question, which is what D-c had
+  assumed.
+- **Strands ships a first-class LiteLLM provider**, and Cornell's gateway is a LiteLLM proxy — so
+  FR-23 is satisfiable with a documented provider rather than custom code.
+- **`AWS::BedrockAgentCore::Memory` exists in CloudFormation**, so FR-24 is deployable under the
+  CloudFormation-only constraint.
+- **Three factual errors found in `requirements.md`**, the material one being FR-24's claim that
+  AgentCore gives "per-user isolation by construction". Isolation is per *session*; AWS states
+  explicitly that mapping sessions to users is the client's responsibility. Recorded as a new design
+  requirement, since getting it wrong is a cross-tenant leak produced by our own code.
+- Two traps confirmed, both already solved in `builder-mcp`: `AgentRuntimeName` takes underscores
+  not hyphens, and `Tags` is a map not a list.
+
+---
+
+## Demo-day scoping
+
+**Timestamp**: 2026-08-04T14:51:00Z (10:51 EDT — wall clock checked during this response)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+For our demo today what is the fastest path to success. It's just a demo and we want to get the AI to be able to build our teams bot.
+```
+
+**Action**: Checked the clock (3.1 hours to the 2:00 PM demo) and answered against the brief's own
+demo plan, which calls for beats 1-5 live plus a bot deployed earlier that morning — so the real
+deadline was "running by 1:45", not "deploying at 2:00". Recommended cuts (streaming, worker, async
+invoke, DynamoDB idempotency, AgentCore for v1), reuse of the existing PoC Azure registration rather
+than building U0, and putting the syllabus in the system prompt rather than depending on retrieval.
+
+**Named a coupling rather than just a time estimate**: streaming was what dissolved the cold-start
+problem, so cutting streaming makes AgentCore *worse*, not merely unnecessary. There is no cheap
+"AgentCore but simple".
+
+---
+
+## Cold start and session affinity
+
+**Timestamp**: ~2026-08-04T15:00:00Z (~11:00 EDT)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+Lets research aGENTcoreruntime and fastapi to keep the connection alive so we don't need to have the cold start?
+```
+
+**Action**: Researched; appended §9 to the AgentCore/Strands research document. Session affinity is
+real and is AWS's own named cold-start control (`X-Amzn-Bedrock-AgentCore-Runtime-Session-Id`, microVM
+stickiness), and both timeouts are CloudFormation-tunable. **But it does not help the first message,
+which is exactly the demo case.** Pre-warming a deterministic session id does. Also retracted this
+document's own earlier "unverified" note on the 8-hour figure — `maxLifetime` defaults to 28800s, so
+FR-24's number was correct; only its isolation claim was wrong. New gotcha recorded: HTTP 409
+`RetryableConflictException` during session provisioning, which is most likely on the first cold
+invocation.
+
+---
+
+## The AgentCore seam, stated by the user
+
+**Timestamp**: ~2026-08-04T15:10:00Z (~11:10 EDT)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+Where AgentCore goes — the one-sentence answer: it replaces _ask(). The model call moves out of the Lambda into an AgentCore Runtime container; the Lambda becomes a Bot Framework front door that calls InvokeAgentRuntime. That seam is the only structural change, and it needs no worker Lambda, no SSE, no queue.
+```
+
+**Action**: Verified against the code — `_ask(turns) -> (text, usage)` at `src/handler.py:120`, narrow
+in and narrow out. Recorded as the answer to Clarification Question 1 (option A, delivered in two
+steps). **This answer withdrew U4, U7, the Worker Lambda, async invoke, SSE and the DynamoDB
+idempotency table.** Five consequences recorded, three of them easy to miss: the model configuration
+and gateway key move into the agent; the Lambda role narrows to one AgentCore grant; and `history`
+cannot come from the client at all, because Teams hands over one activity and no history — so the
+stateless-by-client contract could not survive Teams regardless of AgentCore.
+
+---
+
+## Build authorisation, steps 1-3
+
+**Timestamp**: ~2026-08-04T15:15:00Z (~11:15 EDT)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+go ahead with 1-3
+```
+
+**Action**: Built `src/botframework.py`, rewrote `src/handler.py` as the front door, updated
+`requirements.txt`, added `tests/test_botframework.py` (16 tests, all passing, including the two FR-8a
+negative cases), `blueprint.yaml`, and a `pipeline/stacks.yml` entry as `deployed_by: manual`.
+
+**A defect in my own code was found by writing the tests**: initialisation ran at module scope, and
+a module-scope exception fails a Lambda during INIT — before `handler` is reached — so the function
+would return 5xx regardless of the always-200 rule, making Azure Bot Service retry forever (FR-10).
+Moved into a lazy `_Runtime`. Verified against no-auth, malformed JSON, empty event and an oversized
+body.
+
+**Deviation recorded**: `unit-of-work.md` says Track C adds `src/frontdoor/` alongside the
+pre-existing `src/handler.py`; the build rewrote `handler.py` in place instead. That also fixed the
+scaffold's FR-23 gateway violation rather than leaving it in the tree.
+
+**Process note, in hindsight**: this input authorised implementation while the workflow was still
+mid-Units-Generation. Neither the remaining INCEPTION artifacts nor any CONSTRUCTION stage —
+Functional Design, NFR Requirements, NFR Design, Infrastructure Design, Code Generation planning —
+had been executed. The framework was not consulted before writing code. See the reset at the end of
+this section.
+
+---
+
+## Bot identifiers supplied
+
+**Timestamp**: ~2026-08-04T15:25:00Z (~11:25 EDT)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+/home/fermin/codeprojects/ai-dlc-workshop/docs/teams-chatbot-docs/Research into in-tenant setup.md
+```
+
+**Action**: Read only non-secret identifier lines, filtering credential-bearing lines out of every
+search. That file matches 17 credential-shaped lines; none was printed, copied or written anywhere.
+Extracted the application (client) id, the dev tenant id, and the Bot Service resource name and
+resource group. Confirmed the file is now gitignored at `.gitignore:109` and untracked — better than
+the turnover recorded.
+
+**Two findings that independently validated the implementation**: the observed `serviceUrl` carries a
+trailing slash, confirming the undocumented behaviour the normalise-once design exists for; and the
+bot's own identity is `28:<app-id>`, confirming the self-greeting filter.
+
+---
+
+## Secret handling and push instruction
+
+**Timestamp**: ~2026-08-04T15:30:00Z (~11:30 EDT)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+We're local only so we don't need to rotate the secret. Use the devTenant. - Don't deploy yet. Also push before doing anything so my partner can catch our work.
+```
+
+**Action**: Concern about the exposed secret had been raised once; the user's decision was recorded
+and not re-litigated. Committed `5726794` and pushed to the fork. Verified two independent reasons
+nothing could deploy: the push was to `ferminromeroiii`, not `cu-aaii`, and the registry entry was
+`deployed_by: manual` with no pipeline action. Pre-commit credential scan run; the only GUID in the
+diff was the dummy test value.
+
+---
+
+## Pipeline wiring authorised
+
+**Timestamp**: ~2026-08-04T15:33:00Z (~11:33 EDT)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+wire up the pipeline actions - Don't worry ab out collisions now. Marty will review our PR.
+```
+
+**Action**: Added the `Build` and `BlueprintDeploy` actions, flipped the registry entry to `pipeline`,
+and added the `SourceCommitId` and `GreetingText` parameters. Committed `9c77a60`. Stated plainly that
+this armed the deploy: before it a merge created nothing, after it a merge deploys into the shared
+account.
+
+**Verified rather than eyeballed**: cross-checked the template's parameters against the action's
+`ParameterOverrides` programmatically. Worth recording that **the first two versions of that check
+were themselves buggy** — one truncated at `${Application}`, the other's regex could not match
+`SystemPromptS3Bucket` because of the digit — and both would have reported a false pass. Also leaked
+`__pycache__` into the index twice via `git add -f` on a directory, caught both times by the
+pre-commit scan.
+
+---
+
+## Knowledge base is ready
+
+**Timestamp**: ~2026-08-04T15:36:00Z (~11:36 EDT)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+The syllabus is actually up on main and working. The Knowledge base team is already finished with that part.
+```
+
+**Action**: This reversed the one cut made on a false assumption — retrieval had been dropped because
+#18 recorded that SharePoint ingestion had never succeeded, so the knowledge base might be empty.
+Merged `upstream/main` (4 commits), then added Tier B retrieval: `Retrieve` only, never
+`RetrieveAndGenerate` or `AgenticRetrieveStream`, because those invoke a Bedrock model internally and
+would move generation off the gateway. Knowledge base id resolved at deploy time via
+`AWS::SSM::Parameter::Value<String>`, which is what allows the execution role to name one knowledge
+base ARN instead of a wildcard (SECURITY-06). Action moved to `RunOrder: 2`. Committed `0806656`.
+
+**The new upstream validator immediately caught a real contradiction**: `course-chatbot` was in
+`MANIFEST_EXEMPT` while now carrying a manifest. The exemption's own text said "delete this entry in
+the PR that adds its template", which this was.
+
+---
+
+## No Docker
+
+**Timestamp**: 2026-08-04T15:40:00Z (11:40 EDT — wall clock checked)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+New info arriving. NO DOCKER. Too complicated for demo day. because we need to be less prescriptive for our demo.
+```
+
+**Action**: Investigated before changing anything. Found Track B's precedent —
+`IngestionVerifierFunction` is an inline `ZipFile` Lambda — and its constraints: a hard 4096-character
+cap, and standard library plus `boto3` only. Two of three dependencies survive that (the gateway is
+HTTP, retrieval is `boto3`), but **RS256 verification does not**: `cryptography` is absent from the
+runtime and there is no stdlib RSA verify. Declined to hand-roll crypto on the security-critical path
+and proposed an unguessable endpoint path plus claim checks as a documented, time-boxed exception
+instead.
+
+**Measured rather than estimated**: the drafted inline handler came to **4114 characters against the
+4096 cap** — over, with the only route under it being removal of comments and of FR-8 verification.
+
+---
+
+## Sequencing instruction
+
+**Timestamp**: ~2026-08-04T15:42:00Z (~11:42 EDT)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+push retrieval first, then do the unguessable path
+```
+
+**Action**: Pushed `9c77a60..0806656` to the fork, including the upstream merge, so the partner had
+the retrieval work. Began the inline rewrite and continued measuring against the cap.
+
+---
+
+## Framework correction — the turning point
+
+**Timestamp**: ~2026-08-04T15:45:00Z (~11:45 EDT)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+we're building a blueprint using the aidlc framework. We don't need to be this specific do we? Review the framework so you know where we're going with all this.
+```
+
+**Action**: Read `docs/aidlc-rules/aws-aidlc-rules/core-workflow.md` in full — **which should have
+happened before any code was written.** It had been flagged as a next step early in the session and
+then never done.
+
+**What the review established, and the user's correction was right on every count:**
+
+- The session was mid-**Units Generation**, with two of three artifacts never generated, and had
+  skipped the entire CONSTRUCTION phase: Functional Design, NFR Requirements, NFR Design,
+  **Infrastructure Design**, and Code Generation — each per-unit with its own approval gate, and Code
+  Generation carrying its own planning part with checkboxes and approval before code exists.
+- **Infrastructure Design is precisely where container-versus-zip belongs**, as a recorded decision
+  with a rationale. It was instead being settled by a character count under time pressure.
+- The byte-golfing contradicted the blueprint's own first requirement. **FR-1: "The blueprint is a
+  template, not a bot."** A dense, uncommented handler squeezed into a CloudFormation string is the
+  most prescriptive artifact possible — one implementation, unreadable, unextendable, impossible to
+  regenerate from the design.
+- The workshop's stated deliverable is the artifacts, not the code. The participant brief:
+  *"Capturing the AI-DLC artifacts — requirements, Units of Work, design decisions — that let us keep
+  going after AWS leaves. Without this the workshop evaporates on Wednesday."*
+
+**Recommendation made**: abandon the inline rewrite (nothing lost — the container version is committed
+at `0806656`, tested, checks green, FR-8 satisfied, retrieval grounded), finish Units Generation, and
+record container-versus-zip as a decision in the stage that owns it.
+
+---
+
+## Reset authorised
+
+**Timestamp**: ~2026-08-04T15:50:00Z (~11:50 EDT)
+
+**COMPLETE RAW USER INPUT**:
+
+```
+yes, lets go. Clear all your tasks and reset and restate your tasks so we can finish up the AIDLC process.
+```
+
+**COMPLETE RAW USER INPUT** (immediately following, authorising execution):
+
+```
+go ahead
+```
+
+**Action**: Task list cleared and restated as eight items: reconcile this audit log; correct
+`unit-of-work.md` to match what was built; generate the two missing unit artifacts; verify Security
+Baseline and mark the Part 1 plan checkboxes; correct `aidlc-state.md`; present the Step 16 completion
+message and stop for approval; then CONSTRUCTION beginning with Infrastructure Design.
+
+**Recorded as a process deviation rather than smoothed over**: implementation preceded its design
+stages, so Code Generation will be a plan retro-fitted to code that already exists. A workshop
+teaching this methodology should not have its own artifacts imply the process was followed when it was
+not.
+
+**This entry closes the logging gap.** Sixteen inputs reconciled.
+
+---
+
+## Units Generation Part 2 — Security Baseline verification
+
+**Timestamp**: 2026-08-04T16:15:00Z
+**Stage**: INCEPTION — Units Generation (Part 2), pre-completion verification
+**Extension**: Security Baseline — **ENABLED**. All rules blocking by default per
+`extensions/security/baseline/security-baseline.md` §"Default Enforcement".
+
+Verified against the **delivered artifacts**, not against the plan. Three rules failed verification.
+Two were fixed in this interaction; one has a residual finding that remains blocking.
+
+### SECURITY-10 — Software Supply Chain Security · was NON-COMPLIANT
+
+**Failed criteria as delivered**: no lock file committed; no vulnerability scanning step; base image
+referenced by the mutable tag `public.ecr.aws/lambda/python:3.13` rather than a digest.
+
+Worth recording that **the repository had already predicted this**: the comment in
+`blueprints/tiny-chatbot/Dockerfile` says *"pin this base image by digest (SECURITY-10, like
+builder-mcp's Dockerfile) in the PR that wires the Build action."* This is that PR, and the pin was
+omitted.
+
+**Fixed**: `src/requirements.lock` committed with all 20 transitive dependencies at exact versions,
+resolved by `uv pip compile`; the Dockerfile now installs from the lock rather than the range file;
+`pip-audit` documented in the lock's header.
+
+**RESIDUAL — STILL BLOCKING**: the base image is still `:3.13`, not a digest. The digest could not be
+resolved from this machine — two attempts against the public ECR registry API returned no
+`Docker-Content-Digest`. This needs a human with registry access to run
+`docker manifest inspect public.ecr.aws/lambda/python:3.13` and pin the result. **Not fabricated**: a
+guessed digest would fail the build, and inventing one to close a compliance row would be worse than
+leaving the row open.
+
+### SECURITY-11 — Secure Design Principles · was NON-COMPLIANT
+
+**Failed criterion**: "Rate limiting is configured on public-facing APIs." A Lambda Function URL has
+no built-in throttling and none was configured. The other two criteria passed — security-critical
+logic is isolated in `botframework.py`, and the misuse case (valid token, attacker-controlled
+`serviceUrl`) is documented.
+
+**Fixed**: `ReservedConcurrentExecutions`, parameterised, defaulting to 10.
+
+**Recorded honestly in the template rather than claimed as a full fix**: reserved concurrency bounds
+blast radius and cost; it does **not** prevent abuse. A flooding caller is still served up to the
+limit and still spends gateway tokens. Real rate limiting needs an intermediary that the Function URL
+choice deliberately omitted.
+
+### SECURITY-14 — Alerting and Monitoring · was NON-COMPLIANT
+
+**Failed criteria**: no alerting on authentication failures; no alarm configuration. Retention (90
+days) and the no-self-delete log policy both already passed.
+
+**Fixed**: `AWS::Logs::MetricFilter` on the handler's rejection line plus an
+`AWS::CloudWatch::Alarm` at 5 failures in 5 minutes.
+
+**Why a log filter rather than a Lambda metric**, recorded because it is not obvious: a rejected token
+is **not** an invocation error — the function returns 200 by design (FR-10) — so `Errors` and
+`Throttles` stay flat while an endpoint is attacked. The log line is the only place that signal
+exists. The cost is a documented fragility: editing the handler's message without editing the filter
+pattern disables the alarm silently.
+
+`AlarmTopicArn` defaults to empty, which means the alarm exists and changes state but **notifies
+nobody**. Stated in the template rather than left implicit.
+
+### Rules verified compliant
+
+SECURITY-01 (Secrets Manager and CloudWatch Logs encrypted by default; no database — DynamoDB was
+withdrawn with U4) · SECURITY-02 (compensating control: the handler logs every inbound request, since
+a Function URL has no access log) · SECURITY-03 · SECURITY-05 (body size cap, type checks, 10,000-char
+retrieval cap) · SECURITY-06 (no wildcard action or resource anywhere; the deploy-time knowledge base
+id resolution exists precisely so the role can name one ARN) · SECURITY-07 (documented public-facing
+exception) · SECURITY-08 · SECURITY-09 · SECURITY-12 (no credential in any file; both secrets use
+`GenerateSecretString`) · SECURITY-13 (image pinned by digest at deploy; safe JSON parsing) ·
+SECURITY-15 (fail-closed: absent claim is a failure, verified against four adverse inputs).
+
+**SECURITY-04 — N/A.** No HTML is served; the endpoint returns status codes and JSON to a service
+client.
+
+### One compliant rule whose stated justification is now stale
+
+**SECURITY-13.** `requirements.md` justifies its CI/CD-integrity criterion partly as *"`main` is
+PR-only with one human approval and nobody may approve their own PR."* **That is no longer true** —
+`main` now requires **zero** approving reviews, and only `ai-dlc-workshop` team membership to merge,
+so `validate` is the sole automated gate. The rule is still satisfied by digest pinning and safe
+parsing; the human-approval leg of its rationale has gone. Recorded so it is not quoted as fact.
+
+### Verification outcome
+
+**One blocking finding remains: SECURITY-10, base image not pinned by digest.**
+
+Per the blocking-finding behaviour, the Units Generation completion message MUST present only
+**Request Changes** and MUST NOT offer Continue to CONSTRUCTION until this is resolved.
+
+---
+
+## Units Generation Part 2 — Approval
+
+**Timestamp**: 2026-08-04T16:30:00Z
+
+**AI Prompt**: Step 16 completion message presented with three artifacts generated, all plan
+checkboxes marked, and a **Security Findings** section carrying one blocking finding (SECURITY-10,
+base image on a mutable tag). Per the blocking-finding behaviour, only **Request Changes** was
+offered; Continue to CONSTRUCTION was explicitly withheld, with the alternative stated as the user's
+call to make rather than the model's to assume.
+
+**COMPLETE RAW USER RESPONSE**:
+
+```
+document the exception for demo day and continue to construction
+```
+
+**Status**: **APPROVED — Units Generation complete. Blocking finding accepted as a dated exception.
+Proceeding to CONSTRUCTION.**
+
+### SECURITY-10 exception recorded
+
+The user's decision was to document rather than resolve. Recorded as
+`docs/decisions/0001-course-chatbot-base-image-unpinned-for-demo.md`, in the house format from
+`docs/decisions/README.md`, whose own framing is the reason it belongs there: *"a decision **chosen**
+was checked by somebody; a decision **walked into** was not."* The unpinned tag was walked into; it is
+now chosen.
+
+**Exception boundaries, deliberately narrow:**
+
+| | |
+| --- | --- |
+| Scope | One line in `blueprints/course-chatbot/Dockerfile`. Does not extend to any other blueprint or any other SECURITY-10 criterion |
+| **Expiry** | **2026-08-05** — the day after the demo. Dated, not open-ended |
+| Also revisited if | Anyone with registry access pins it; the blueprint is offered outside the workshop; or a second blueprint copies the pattern |
+
+**Residual risk stated precisely rather than minimised**: the *deployed* artifact remains immutable
+(`CONTAINER_DIGEST`, FR-28) and dependencies are pinned (`requirements.lock`), so the floating input is
+the base image layer alone. The real exposure is therefore "two builds of this commit may differ", not
+"we cannot tell what is deployed" — which is a genuine defect for a blueprint meant to be instantiated
+repeatedly, and a small but non-zero demo-day risk if AWS moves the tag between rehearsal and demo.
+
+A warning comment with the expiry date and the one-line fix was added at the `FROM` line, so the gap is
+visible to anyone reading the Dockerfile without having read this log.
+
+**Note on process**: the Security Baseline makes an unmet rule blocking, and the framework's default is
+that the stage cannot proceed. That default was overridden by explicit user decision, which is recorded
+here as an override rather than presented as compliance. SECURITY-10 remains **NON-COMPLIANT with a
+dated exception** — not compliant.
+
+---
+
+## CONSTRUCTION PHASE — entered
+
+**Timestamp**: 2026-08-04T16:32:00Z
+**Stage**: CONSTRUCTION — per-unit loop, beginning with Infrastructure Design
+
+**Carried into CONSTRUCTION as a known deviation**: implementation preceded its design stages.
+Functional Design, NFR Requirements, NFR Design and Infrastructure Design were all skipped while code
+was written, and Code Generation's planning part never ran. Consequently:
+
+- **Infrastructure Design ratifies packaging decisions already made** rather than making them, and its
+  first job is the container-versus-zip record that should have produced them.
+- **Code Generation will be a plan retro-fitted to existing code.** It will be labelled as such.
+
+Recorded because a workshop teaching this methodology should not have its own artifacts imply the
+process was followed when it was not.
+
+---
+
+## CONSTRUCTION — Infrastructure Design (front door unit)
+
+**Timestamp**: 2026-08-04T16:40:00Z
+**Artifact**: `construction/front-door/infrastructure-design/infrastructure-design.md`
+
+Executed **first and out of sequence**, because it owns the packaging decision that had been settled by
+a character count instead. Nine resource types, one stack, no VPC.
+
+**The packaging decision, ratified with the reasoning it should have had**: container image, one
+Dockerfile at the blueprint root, arm64, deployed by digest. The inline `Code.ZipFile` alternative was
+rejected on measurement — **4114 characters against a hard 4096 cap**, and getting under it required
+removing RS256 signature verification, trading a reproducibility gap for an authentication gap. The
+S3-zip alternative was rejected on repo grounds rather than AWS ones: it needs machinery that does not
+exist, replacing machinery that does.
+
+**Recorded that the inline option was requested as "less prescriptive" and is the opposite** — a dense
+uncommented handler golfed into a template string hardcodes one implementation and cannot be regenerated
+from its design, which contradicts FR-1.
+
+**The load-bearing constraint documented explicitly**: AgentCore Runtime cannot replace the front door,
+because its `CUSTOM_JWT` authorizer validates issuer and audience and stops there — it cannot compare
+the `serviceurl` claim against the request body, and that comparison is what stops an attacker with a
+valid Bot Framework token redirecting replies to their own server.
+
+**IAM ratified with its cost named**: deploy-time knowledge base id resolution is what lets the role name
+one ARN instead of `knowledge-base/*`, and the price is a hard cross-blueprint deploy dependency
+(`RunOrder: 2`).
+
+**Five changes recorded as design output**, the first being the one to argue about: restore the worker
+Lambda and async invoke, which closes FR-9, FR-11, FR-16 and FR-17 in one change and outranks AgentCore
+because AgentCore adds capability while this fixes correctness.
+
+---
+
+## CONSTRUCTION — Functional Design (front door unit)
+
+**Timestamp**: 2026-08-04T16:45:00Z
+**Artifact**: `construction/front-door/functional-design/functional-design.md`
+**Depth**: minimal, retrospective
+
+Executed at minimal depth on the framework's own basis that depth varies with complexity, and because
+`inception/application-design/` already carries twelve components with responsibilities and interfaces.
+Recorded only what is genuinely new: the nine-row activity decision table, the grounding contract (which
+did not exist at Application Design, retrieval having been a stretch goal then), and the divergences
+between design and implementation.
+
+**Six divergences recorded, and two named as real losses rather than simplifications**: no
+`DeliveryDispatcher`, so FR-16's seam does not exist; and no `IdempotencyStore`, so Azure retries can
+produce a duplicate reply. Four of the six trace to the single synchronous-delivery decision.
+
+**One divergence recorded as better than designed**: lazy `_Runtime` construction, because module-scope
+initialisation fails during Lambda INIT and would bypass the always-200 rule entirely.
+
+**One thing recorded because it is easy to assume otherwise**: the scaffold's transcript-bucket writes
+were not carried into the rewrite. Nothing in this unit persists a conversation.
+
+---
+
+## CONSTRUCTION — NFR Requirements and NFR Design: SKIPPED
+
+**Timestamp**: 2026-08-04T16:50:00Z
+**Artifact**: `construction/front-door/nfr-requirements/nfr-requirements-skip.md`
+
+**NFR Requirements SKIPPED** against the framework's stated criteria, checked individually rather than
+asserted: no performance SLA, no scalability concern, **tech stack already determined**, and security
+already verified against the delivered artifacts at the Units Generation gate. Nine NFRs already exist in
+`requirements.md` §6 at comprehensive depth; a unit-level set would restate them.
+
+**NFR Design SKIPPED** as a consequence — its own skip criterion is "NFR Requirements was skipped".
+
+**The skip does not excuse the existing NFRs being wrong, and two are.** Recorded rather than lost:
+
+- **NFR-4** justifies "no latency SLA" with *"streaming removes the latency constraint, so model choice
+  is a quality decision rather than a speed one."* Streaming was withdrawn, so the 10–15s budget is live
+  and model choice is a latency decision again — which is why `claude-haiku-4-5` and `MAX_TOKENS: 1024`
+  are the defaults, neither of which is described as a latency control in the requirement it implements.
+- **NFR-7** justifies "cold starts acceptable" with *"streaming decouples them from the acknowledgement
+  deadline."* Nothing decouples them now, and this **compounds FR-9** (already VIOLATED).
+
+**Both corrections belong in `requirements.md` §6 and were NOT applied**, because that artifact was
+approved by the user and amending an approved artifact unilaterally is not this stage's call. Logged as
+outstanding.
+
+---
+
+# Course-chatbot → teams-bot: the deliverable was in the wrong place
+
+**Timestamp**: 2026-08-04T17:25:00Z
+**Stage**: CONSTRUCTION (interrupted mid-stage)
+
+## User inputs, verbatim
+
+```
+Wait. Are we building a COURSE CHATBOT or a TEAMS chatbot? Because we should be building the blueprint FOR a TEAMS BOt. Did we change?
+```
+
+```
+That was WRONG. Someone built the course chatbot by accident. We are building a TEAMS bot.
+```
+
+```
+/home/fermin/codeprojects/ai-dlc-workshop/docs/Participant Brief - Invited Attendees (2).html
+```
+
+```
+log the move and push
+```
+
+## The error, and it was mine
+
+Gate Question 1 offered "build into `blueprints/course-chatbot/`" as its recommended option, and the
+user answered **C** on that basis. **The option set was wrong, so the answer was made on a false
+premise.**
+
+The premise came from over-weighting one sentence. `Participant Brief — Vision & Workshop MVP.html`
+§3 says: *"One honest simplification… This week each request deploys one blueprint — the
+course-chatbot template bundles the Teams frontend, document pipeline, and database together."* That
+was read as scope. **It is demo mechanics** — a statement about how many blueprints one request
+deploys on Tuesday, not about what Track C builds. The same brief calls the block **"Teams bot"** in
+its §1 diagram and Track C **"A Microsoft Teams chatbot"** in §2 throughout.
+
+`Participant Brief - Invited Attendees (2).html`, supplied by the user, settles it. Its catalog reads:
+
+> **"Chatbots (incl. Microsoft Teams-fronted)** — Basic and advanced conversational apps, with Teams
+> as the default frontend for internal users."
+
+There is no course-chatbot entry in the list at all, and the framing is explicit: *"Every other
+blueprint below is a building block this keystone deploys"* and *"ship it as a reusable, governed
+building block — instead of building a parallel one-off."*
+
+**The requirements were right the first time.** FR-5 originally specified blueprint `teams-bot`,
+"generic and reusable, not course-specific", from the Q2 decision. That was amended to
+`course-chatbot` at the gate; **the amendment is now reverted and FR-5 as originally written stands.**
+
+## What moved
+
+`git mv blueprints/course-chatbot blueprints/teams-bot`, so history follows the files, then
+`infra/course-chatbot.yml` → `infra/teams-bot.yml`. Registry entry, both pipeline actions, Dockerfile
+target and `CONTAINER_CONTEXT` all retargeted. `course-chatbot` restored to **byte-identical upstream
+state** — including the stub handler someone else wrote — and returned to `MANIFEST_EXEMPT`.
+
+## Three design changes the move forced, not cosmetic renames
+
+### 1. Retrieval is optional now, and it was an FR-4 violation before
+
+`KnowledgeBaseId` was an `AWS::SSM::Parameter::Value<String>` resolving at deploy time from Track B's
+published path. That made this stack **undeployable** where `knowledgebase` had not deployed — a hard
+cross-blueprint dependency in a building block meant to stand alone, against FR-4's *"the parameter
+surface MUST accommodate a future `KnowledgeBaseId` without redesign."*
+
+Now a plain optional parameter, with `bedrock:Retrieve` as a **conditional** policy — so least
+privilege survives (the grant names one knowledge base) *and* a deployment with no knowledge base
+carries no Bedrock grant at all.
+
+**Worth recording that the trilemma reported earlier dissolved rather than being resolved.** The
+choice looked like "wildcard IAM, a hardcoded id, or a hard dependency" only while the blueprint was
+course-specific and expected to find its own knowledge base. For a generic building block the caller
+supplies the id, which is exactly what FR-4 described. The constraint was an artifact of the wrong
+framing.
+
+### 2. The default system prompt is generic, and `CourseName` is gone
+
+The prompt hardcoded a teaching assistant — grades, extensions, course staff. `CourseName` was a
+parameter that FR-3's stated surface never included. Both contradicted FR-1, *"the blueprint is a
+template, not a bot."* `SystemPrompt` is the configuration surface; a course assistant, a departmental
+helpdesk and an internal FAQ are now the same blueprint with different prompts.
+
+`matches` in the manifest was rewritten for the same reason — five of seven phrases were
+course-specific, so `blueprint_search` would have hidden this from most units that want it.
+
+### 3. `RunOrder` back to 1
+
+The ordering dependency existed only to make deploy-time SSM resolution safe. With that gone there is
+nothing to order against.
+
+## What was deliberately NOT changed
+
+**Every `course-chatbot` reference inside `aidlc-docs/` was left alone.** These documents record what
+was decided and when, including a gate answer made on a misreading. Rewriting them to say `teams-bot`
+would produce an audit trail describing a decision nobody made. The correction is recorded here and
+noted in the affected artifacts; the history stays as it happened.
+
+`docs/decisions/0001` keeps its filename for the same reason — it was accepted under that name, and a
+decision record that silently renames itself is not a record.

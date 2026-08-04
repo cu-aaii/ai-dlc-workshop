@@ -93,14 +93,14 @@ useful to a mob, rather than as independently shippable increments.
 
 ## Plan
 
-- [ ] Generate `aidlc-docs/inception/application-design/unit-of-work.md` — unit definitions and
+- [x] Generate `aidlc-docs/inception/application-design/unit-of-work.md` — unit definitions and
       responsibilities, including code organisation strategy
-- [ ] Generate `aidlc-docs/inception/application-design/unit-of-work-dependency.md` — dependency matrix
-- [ ] Generate `aidlc-docs/inception/application-design/unit-of-work-story-map.md` — **requirement**-to-unit map
+- [x] Generate `aidlc-docs/inception/application-design/unit-of-work-dependency.md` — dependency matrix
+- [x] Generate `aidlc-docs/inception/application-design/unit-of-work-story-map.md` — **requirement**-to-unit map
       (see the note below)
-- [ ] Validate unit boundaries and dependencies
-- [ ] Ensure every functional requirement is assigned to a unit
-- [ ] Verify Security Baseline compliance across the decomposition before the completion message
+- [x] Validate unit boundaries and dependencies
+- [x] Ensure every functional requirement is assigned to a unit
+- [x] Verify Security Baseline compliance across the decomposition before the completion message
 
 **Note on the story map.** User Stories was skipped, so no stories exist. Rather than fabricate them or drop
 the artifact, `unit-of-work-story-map.md` will map the **33 functional requirements** from `requirements.md` to

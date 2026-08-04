@@ -1,6 +1,6 @@
 """Bot Framework plumbing: inbound trust, outbound tokens, and replies.
 
-Kept separate from ``handler`` and free of any course-chatbot import, so extracting it for a
+Kept separate from ``handler`` and free of any teams-bot import, so extracting it for a
 future Slack or web front end is a file move rather than a refactor. Security-critical logic
 is isolated here rather than scattered through the handler (SECURITY-11).
 
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -103,11 +104,31 @@ def validate_activity(auth_header: str | None, activity: dict[str, Any], bot_app
         raise ValidationError("serviceurl claim does not match the activity's serviceUrl")
 
 
+# An inbound activity id is attacker-controlled and reaches the log stream on the rejection path --
+# that is, BEFORE authentication has passed. Unbounded, it invites two things: forged log events via
+# embedded newlines, and false increments of the validation-failure metric filter, which matches on a
+# substring of a log line.
+#
+# Note the id is ALSO used to build the reply URL, and Bot Framework ids legitimately contain
+# characters like '|' -- so the sanitised form is a SEPARATE field. Sanitising the value used for the
+# API would silently break replies, which is a worse bug than the one being fixed.
+_ID_UNSAFE = re.compile(r"[^A-Za-z0-9._:|=-]")
+MAX_LOG_ID_CHARS = 64
+
+
+def safe_log_id(value: str) -> str:
+    """Bound and restrict an id for logging. Never use the result to address the Bot Framework API."""
+    return _ID_UNSAFE.sub("_", value or "")[:MAX_LOG_ID_CHARS] or "no-id"
+
+
 @dataclass
 class Activity:
     """The bits of a Bot Framework activity anything downstream is allowed to know about."""
 
     activity_id: str
+    # The same id, bounded and stripped of anything that could forge a log line. Use this for
+    # logging and for the reference shown to a user; use activity_id for URLs.
+    log_id: str
     activity_type: str
     conversation_id: str
     conversation_type: str
@@ -124,8 +145,10 @@ def parse_activity(activity: dict[str, Any]) -> Activity:
     conversation = activity.get("conversation") or {}
     sender = activity.get("from") or {}
     members_added = activity.get("membersAdded") or []
+    raw_id = str(activity.get("id") or "")
     return Activity(
-        activity_id=str(activity.get("id") or ""),
+        activity_id=raw_id,
+        log_id=safe_log_id(raw_id),
         activity_type=str(activity.get("type") or ""),
         conversation_id=str(conversation.get("id") or ""),
         # Absent in some personal-chat activities; personal is the safe default because it

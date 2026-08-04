@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'course-chatbot (Track C): a Microsoft Teams chatbot. Bot Framework activities arrive at a public Lambda Function URL, are validated against the Bot Framework JWKS, answered via Cornell''s LiteLLM gateway, and replied to through the Bot Framework API. Image built from blueprints/course-chatbot/Dockerfile (target course-chatbot, arm64). Step 2 replaces the in-Lambda model call with an AgentCore Runtime invoke -- see aidlc-docs/inception/plans/units-generation-clarification-questions.md.'
+Description: 'teams-bot (Track C): a Microsoft Teams chatbot. Bot Framework activities arrive at a public Lambda Function URL, are validated against the Bot Framework JWKS, answered via Cornell''s LiteLLM gateway, and replied to through the Bot Framework API. Image built from blueprints/teams-bot/Dockerfile (target teams-bot, arm64). Step 2 replaces the in-Lambda model call with an AgentCore Runtime invoke -- see aidlc-docs/inception/plans/units-generation-clarification-questions.md.'
 
 Parameters:
 
@@ -32,7 +32,7 @@ Parameters:
   BlueprintVersion:
     Default: '0.1.0'
     AllowedPattern: '[0-9]+\.[0-9]+\.[0-9]+'
-    Description: 'Version of the course-chatbot blueprint (cornell:blueprint-version)'
+    Description: 'Version of the teams-bot blueprint (cornell:blueprint-version)'
     Type: 'String'
 
   # Deploy Parameters
@@ -42,7 +42,7 @@ Parameters:
   # forbids leading, trailing and consecutive hyphens.
 
   DeploymentName:
-    Default: 'course-chatbot'
+    Default: 'teams-bot'
     AllowedPattern: '(?=[a-z0-9-]{2,20}$)[a-z0-9]+(-[a-z0-9]+)*'
     Description: 'Instance name for this deployment. Lowercase alphanumerics with single hyphens, 2-20 chars.'
     Type: 'String'
@@ -50,7 +50,7 @@ Parameters:
   ContainerImageUri:
     Default: ''
     AllowedPattern: '.{0,512}'
-    Description: 'Image for the function, normally the digest URI the pipeline Build stage exports (#{CourseChatbotContainer.CONTAINER_DIGEST}). Empty deploys no function, so the template still validates before its Build action is wired.'
+    Description: 'Image for the function, normally the digest URI the pipeline Build stage exports (#{TeamsBotContainer.CONTAINER_DIGEST}). Empty deploys no function, so the template still validates before its Build action is wired.'
     Type: 'String'
 
   # Bot Framework Parameters
@@ -85,12 +85,6 @@ Parameters:
     Description: 'Model id as the LiteLLM gateway names it (gateway naming, not Bedrock native ids).'
     Type: 'String'
 
-  CourseName:
-    Default: 'this course'
-    AllowedPattern: '.{1,128}'
-    Description: 'Course this bot answers for; goes into the system prompt.'
-    Type: 'String'
-
   # A CloudFormation parameter value caps at 4096 characters and an SSM standard parameter
   # at 4 KB, so a long syllabus-bearing prompt belongs in S3 with the key passed instead
   # (FR-3a). Empty means "use the built-in prompt".
@@ -110,37 +104,58 @@ Parameters:
   GreetingText:
     Default: ''
     AllowedPattern: '.{0,512}'
-    Description: 'Sent when a human joins the conversation. Empty falls back to a greeting derived from CourseName.'
+    Description: 'Sent when a human joins the conversation. Empty falls back to a generic greeting.'
     Type: 'String'
 
-  # Resolved at DEPLOY time from the id the knowledgebase blueprint publishes, rather than read
-  # at runtime. The value passed by the pipeline is the SSM parameter *name*; CloudFormation
-  # substitutes the parameter's value before the stack is created.
+  # OPTIONAL, and optional is the requirement (FR-4): "the parameter surface MUST accommodate a
+  # future KnowledgeBaseId without redesign." A Teams bot blueprint must deploy with no knowledge
+  # base at all -- retrieval is a capability tier, not a prerequisite.
   #
-  # Deploy-time resolution is what makes least privilege possible: the execution role's
-  # bedrock:Retrieve grant below names this one knowledge base's ARN. Reading the id at runtime
-  # instead would leave the role needing knowledge-base/* -- a wildcard resource, which
-  # SECURITY-06 forbids.
+  # This was previously an AWS::SSM::Parameter::Value<String> pointed at the knowledgebase
+  # blueprint's published path. That resolved at deploy time, which bought a precisely-scoped IAM
+  # grant but made this stack UNDEPLOYABLE without that blueprint -- a hard cross-blueprint
+  # dependency in a building block meant to stand alone.
   #
-  # It also sidesteps the defect that makes builder-supplied `inputs` arrive empty
-  # (#15 finding 2): the pipeline passes a path derived from Application and Environment, not a
-  # value a builder had to know.
-  #
-  # Consequence, stated plainly: this stack cannot deploy unless the knowledgebase blueprint has
-  # deployed and written that parameter. The CourseChatbotCloudFormation action runs at RunOrder
-  # 2 for exactly that reason. A missing parameter fails the deploy with a resolution error,
-  # which is the right failure -- the alternative is a bot that answers about a real Cornell
-  # course with nothing behind it.
-  KnowledgeBaseIdParameter:
-    Default: '/aidlc/main/knowledgebase/knowledge-base-id'
-    Description: 'Name of the SSM parameter holding the knowledge base id, published by the knowledgebase blueprint.'
-    Type: 'AWS::SSM::Parameter::Value<String>'
+  # Plain string keeps least privilege (the grant below is conditional and names this exact id) and
+  # keeps the blueprint independent. The cost is that a caller must supply the id rather than having
+  # it resolved for them:
+  #   aws ssm get-parameter --name /<app>/<env>/knowledgebase/knowledge-base-id \
+  #     --query Parameter.Value --output text
+  # Empty means no retrieval: the bot answers from its system prompt alone and says so.
+  KnowledgeBaseId:
+    Default: ''
+    AllowedPattern: '[A-Z0-9]{0,32}'
+    Description: 'Optional Bedrock knowledge base id to ground answers in. Empty disables retrieval entirely.'
+    Type: 'String'
 
   LogRetentionDays:
     Default: 90
     AllowedValues: [90, 180, 365]
     Description: 'CloudWatch retention. SECURITY-14 requires at least 90 days.'
     Type: 'Number'
+
+  # SECURITY-11 requires rate limiting on public-facing endpoints. A Lambda Function URL has no
+  # built-in throttling, so reserved concurrency is the only lever available in the stack.
+  #
+  # Recorded honestly: this bounds blast radius and cost, it does NOT prevent abuse. A caller who
+  # floods the endpoint still gets served up to this many concurrent invocations and still spends
+  # gateway tokens; what it prevents is one bot consuming the account's whole concurrency pool.
+  # Real rate limiting needs an intermediary the Function URL choice deliberately omitted.
+  ReservedConcurrency:
+    Default: 10
+    MinValue: 1
+    MaxValue: 100
+    Description: 'Maximum concurrent executions. Blast-radius control, not abuse prevention (SECURITY-11).'
+    Type: 'Number'
+
+  # SECURITY-14 requires alerting on repeated authentication failures. Empty means the alarm still
+  # exists and still changes state -- so it is visible in the console and to track E's dashboard --
+  # but notifies nobody. Point it at the notify-topic blueprint's topic to make it reach a human.
+  AlarmTopicArn:
+    Default: ''
+    AllowedPattern: '.{0,256}'
+    Description: 'Optional SNS topic for the inbound-validation-failure alarm. Empty means the alarm notifies nobody.'
+    Type: 'String'
 
   # Pipeline Provided Parameters
 
@@ -154,6 +169,8 @@ Conditions:
 
   HasImage: !Not [!Equals [!Ref 'ContainerImageUri', '']]
   HasPromptBucket: !Not [!Equals [!Ref 'SystemPromptS3Bucket', '']]
+  HasAlarmTopic: !Not [!Equals [!Ref 'AlarmTopicArn', '']]
+  HasKnowledgeBase: !Not [!Equals [!Ref 'KnowledgeBaseId', '']]
 
 Resources:
 
@@ -183,7 +200,7 @@ Resources:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
         - Key: 'cornell:blueprint'
-          Value: 'course-chatbot'
+          Value: 'teams-bot'
         - Key: 'cornell:blueprint-version'
           Value: !Ref 'BlueprintVersion'
         - Key: 'cornell:deployment-id'
@@ -203,7 +220,7 @@ Resources:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
         - Key: 'cornell:blueprint'
-          Value: 'course-chatbot'
+          Value: 'teams-bot'
         - Key: 'cornell:blueprint-version'
           Value: !Ref 'BlueprintVersion'
         - Key: 'cornell:deployment-id'
@@ -213,18 +230,6 @@ Resources:
   #
   # AWS::SSM::Parameter takes Tags as a MAP, not the usual list of Key/Value pairs.
 
-  CourseNameParameter:
-    Type: 'AWS::SSM::Parameter'
-    Properties:
-      Name: !Sub '/${Application}/${Environment}/${DeploymentName}/course-name'
-      Type: 'String'
-      Value: !Ref 'CourseName'
-      Description: 'Course this bot answers for. Read at cold start.'
-      Tags:
-        'cornell:owner': !Ref 'Owner'
-        'cornell:blueprint': 'course-chatbot'
-        'cornell:blueprint-version': !Ref 'BlueprintVersion'
-        'cornell:deployment-id': !Sub '${Application}-${Environment}-${DeploymentName}'
 
   ModelIdParameter:
     Type: 'AWS::SSM::Parameter'
@@ -235,7 +240,7 @@ Resources:
       Description: 'Gateway model id. Read at cold start.'
       Tags:
         'cornell:owner': !Ref 'Owner'
-        'cornell:blueprint': 'course-chatbot'
+        'cornell:blueprint': 'teams-bot'
         'cornell:blueprint-version': !Ref 'BlueprintVersion'
         'cornell:deployment-id': !Sub '${Application}-${Environment}-${DeploymentName}'
 
@@ -253,7 +258,7 @@ Resources:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
         - Key: 'cornell:blueprint'
-          Value: 'course-chatbot'
+          Value: 'teams-bot'
         - Key: 'cornell:blueprint-version'
           Value: !Ref 'BlueprintVersion'
         - Key: 'cornell:deployment-id'
@@ -302,23 +307,11 @@ Resources:
               - Effect: 'Allow'
                 Action: 'ssm:GetParameter'
                 Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Application}/${Environment}/${DeploymentName}/*'
-        # Retrieve, and ONLY Retrieve. Not RetrieveAndGenerate and not
-        # AgenticRetrieveStream: those invoke a Bedrock foundation model internally, which would
-        # put generation outside Cornell's LiteLLM gateway and break the Q26 routing mandate.
-        # Retrieve makes no model call at all -- it returns passages, and every token of
-        # generation still goes through the gateway.
-        - PolicyName: 'knowledge-base'
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: 'Allow'
-                Action: 'bedrock:Retrieve'
-                Resource: !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${KnowledgeBaseIdParameter}'
       Tags:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
         - Key: 'cornell:blueprint'
-          Value: 'course-chatbot'
+          Value: 'teams-bot'
         - Key: 'cornell:blueprint-version'
           Value: !Ref 'BlueprintVersion'
         - Key: 'cornell:deployment-id'
@@ -326,6 +319,24 @@ Resources:
 
   # A separate managed policy so the prompt-bucket grant appears only when a bucket is
   # supplied -- an unconditional statement would need a wildcard resource when empty.
+
+  # Conditional, so a deployment with no knowledge base carries no Bedrock grant at all rather
+  # than a wildcard one. Retrieve and ONLY Retrieve: RetrieveAndGenerate and AgenticRetrieveStream
+  # both invoke a Bedrock foundation model internally, which would put generation outside Cornell's
+  # LiteLLM gateway and break the routing mandate. Retrieve makes no model call.
+
+  KnowledgeBasePolicy:
+    Type: 'AWS::IAM::RolePolicy'
+    Condition: 'HasKnowledgeBase'
+    Properties:
+      PolicyName: 'knowledge-base'
+      RoleName: !Ref 'FrontDoorRole'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Action: 'bedrock:Retrieve'
+            Resource: !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${KnowledgeBaseId}'
 
   PromptBucketPolicy:
     Type: 'AWS::IAM::RolePolicy'
@@ -364,6 +375,7 @@ Resources:
       Architectures: ['arm64']
       MemorySize: 1024
       Timeout: 60
+      ReservedConcurrentExecutions: !Ref 'ReservedConcurrency'
       LoggingConfig:
         LogGroup: !Ref 'FrontDoorLogGroup'
       Environment:
@@ -376,9 +388,8 @@ Resources:
           BOT_CLIENT_SECRET_ARN: !Ref 'BotClientSecret'
           GATEWAY_API_KEY_ARN: !Ref 'GatewayApiKeySecret'
           GATEWAY_BASE_URL: 'https://api.ai.it.cornell.edu'
-          COURSE_NAME_PARAM: !Ref 'CourseNameParameter'
           MODEL_ID_PARAM: !Ref 'ModelIdParameter'
-          KNOWLEDGE_BASE_ID: !Ref 'KnowledgeBaseIdParameter'
+          KNOWLEDGE_BASE_ID: !Ref 'KnowledgeBaseId'
           SYSTEM_PROMPT_S3_BUCKET: !Ref 'SystemPromptS3Bucket'
           SYSTEM_PROMPT_S3_KEY: !Ref 'SystemPromptS3Key'
           DEPLOYMENT_ID: !Sub '${Application}-${Environment}-${DeploymentName}'
@@ -386,7 +397,7 @@ Resources:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
         - Key: 'cornell:blueprint'
-          Value: 'course-chatbot'
+          Value: 'teams-bot'
         - Key: 'cornell:blueprint-version'
           Value: !Ref 'BlueprintVersion'
         - Key: 'cornell:deployment-id'
@@ -413,6 +424,53 @@ Resources:
       Action: 'lambda:InvokeFunctionUrl'
       Principal: '*'
       FunctionUrlAuthType: 'NONE'
+
+  # --- Alerting on rejected inbound activities (SECURITY-14) -----------------------------
+  #
+  # The metric is derived from the handler's own log line rather than from a Lambda metric,
+  # because "the token was rejected" is not an invocation error -- the function returns 200 by
+  # design (FR-10), so Errors and Throttles both stay flat while an attacker hammers it. A log
+  # filter is the only place that signal exists.
+  #
+  # The pattern matches exactly one log line in the handler -- the ValidationError branch, which
+  # emits "rejected activity: correlation=... type=... reason=...". Note "accepted activity:" is
+  # the neighbouring success line and deliberately does not match.
+  #
+  # This couples an alarm to a log string, which is fragile in one specific way: changing the
+  # handler's message without changing this pattern disables the alarm **silently** -- no error,
+  # no failed deploy, just a metric that never increments again. If that line is edited, edit
+  # this too.
+
+  ValidationFailureMetricFilter:
+    Type: 'AWS::Logs::MetricFilter'
+    Properties:
+      LogGroupName: !Ref 'FrontDoorLogGroup'
+      FilterPattern: '"rejected activity"'
+      MetricTransformations:
+        - MetricNamespace: !Sub '${Application}/${Environment}/teams-bot'
+          MetricName: 'InboundValidationFailures'
+          MetricValue: '1'
+          DefaultValue: 0
+
+  ValidationFailureAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: !Sub '${Application}-${Environment}-${DeploymentName}-validation-failures'
+      AlarmDescription: 'Repeated rejected inbound activities: forged or misdirected Bot Framework requests, or a broken bot registration.'
+      Namespace: !Sub '${Application}/${Environment}/teams-bot'
+      MetricName: 'InboundValidationFailures'
+      Statistic: 'Sum'
+      Period: 300
+      EvaluationPeriods: 1
+      # Five in five minutes. A single rejection is normal noise on a public endpoint -- an
+      # expired token, a stray scanner. A sustained rate is the thing worth waking up for.
+      Threshold: 5
+      ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+      TreatMissingData: 'notBreaching'
+      AlarmActions: !If
+        - 'HasAlarmTopic'
+        - [!Ref 'AlarmTopicArn']
+        - !Ref 'AWS::NoValue'
 
 Outputs:
 

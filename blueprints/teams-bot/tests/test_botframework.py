@@ -12,7 +12,7 @@ Bot Framework fixtures. That isolation is deliberate.
 
 Run:
     uv run --python 3.13 --with 'PyJWT[crypto]>=2.8,<3' --with pytest \
-        pytest blueprints/course-chatbot/tests -q
+        pytest blueprints/teams-bot/tests -q
 """
 
 from __future__ import annotations
@@ -176,3 +176,44 @@ def test_channel_conversation_id_format_is_preserved():
     )
     assert activity.conversation_id == "19:abc@thread.tacv2"
     assert activity.conversation_type == "channel"
+
+
+# --- log-id bounding: the activity id is attacker-controlled BEFORE auth ------------------
+#
+# Found by a reviewer reading handler.py rather than by design: the rejection log line carries
+# the inbound activity id, and that line is emitted before authentication has passed. So an
+# unauthenticated caller chooses a string that lands in our log stream.
+
+
+def test_newlines_cannot_forge_a_log_line():
+    """An embedded newline plus a plausible prefix is a forged log event."""
+    forged = "1\nrejected activity: correlation=innocent type=message reason=fine"
+    assert "\n" not in bf.safe_log_id(forged)
+
+
+def test_log_id_is_length_bounded():
+    assert len(bf.safe_log_id("a" * 5000)) == bf.MAX_LOG_ID_CHARS
+
+
+def test_log_id_never_empty():
+    """An empty id must not produce an empty field in a log line."""
+    assert bf.safe_log_id("") == "no-id"
+
+
+def test_log_id_preserves_real_bot_framework_ids():
+    """Real ids contain ':', '|' and '='. Mangling them would make logs untraceable."""
+    for real in ("1754321234567", "f:1234567890|0000", "a1b2-c3d4.e5", "id=abc:1"):
+        assert bf.safe_log_id(real) == real
+
+
+def test_activity_id_is_left_raw_for_the_api():
+    """The URL-bound id must NOT be sanitised -- '|' is legal and replies would 404."""
+    a = bf.parse_activity({"id": "f:123|0000", "type": "message"})
+    assert a.activity_id == "f:123|0000"
+    assert a.log_id == "f:123|0000"
+
+
+def test_unsafe_id_is_sanitised_for_logs_but_kept_raw_for_the_api():
+    a = bf.parse_activity({"id": "x\ny\rz", "type": "message"})
+    assert a.activity_id == "x\ny\rz"
+    assert "\n" not in a.log_id and "\r" not in a.log_id

@@ -99,6 +99,15 @@ MANIFEST_EXEMPT = {
         'CloudFormation template for a manifest to point at. Listing it in the catalog would '
         'offer builders a deployment that deployment_create cannot render an action for.'
     ),
+    'course-chatbot': (
+        'Scaffold that deploys nothing -- a Lambda handler and READMEs only, with no template, no '
+        'image target, no registry entry and no pipeline action. Withheld from the catalog on '
+        'purpose so the Builder cannot offer a blueprint that cannot deploy; see '
+        'blueprints/README.md. Track C\'s Teams bot moved out to blueprints/teams-bot/, which is '
+        'the reusable building block the participant brief names ("Chatbots (incl. Microsoft '
+        'Teams-fronted)"); this directory is left as it was found. Delete this entry in the PR '
+        'that adds its template.'
+    ),
 }
 
 # The template's BlueprintVersion default, which the manifest's metadata.version must match

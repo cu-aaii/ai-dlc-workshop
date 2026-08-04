@@ -1,0 +1,77 @@
+# Blueprint manifest -- the contract the Cornell Builder MCP reads (product proposal §04).
+# Not a CloudFormation template: it declares no template format version, so validate_stacks.py
+# and cfn-lint ignore it by design (that check is a text scan, so even naming the marker key
+# here would trip it). The CFN template it points at is registered in pipeline/stacks.yml.
+apiVersion: builder.cornell.edu/v1
+kind: Blueprint
+metadata:
+  name: teams-bot
+  version: 0.1.0        # keep in lockstep with BlueprintVersion default in the template
+  maintainer: ai-sei@cornell.edu
+  maturity: experimental
+# The participant brief's catalog entry for this building block is "Chatbots (incl. Microsoft
+# Teams-fronted) -- basic and advanced conversational apps, with Teams as the default frontend
+# for internal users." This is that block.
+summary: >-
+  A conversational app fronted on Microsoft Teams, for internal Cornell users. Bot Framework
+  activities arrive at a public Lambda Function URL, are validated against the Bot Framework
+  JWKS, answered through Cornell's LiteLLM gateway, and replied to in the chat. What any given
+  deployment answers questions *about* is set by its system prompt, so the same blueprint serves
+  a course assistant, a departmental helpdesk or an internal FAQ. Optionally grounds answers in a
+  Bedrock knowledge base; without one it answers from its prompt and says when it does not know.
+# Written the way a person asks, since blueprint_search matches on intent. Deliberately spans the
+# generic cases as well as the course one -- this is a reusable building block, and a catalog that
+# only surfaced it for "course" would hide it from most of the units that want it.
+matches:
+  - "a chatbot in Microsoft Teams"
+  - "teams bot"
+  - "an internal chatbot for my department"
+  - "answer my team's questions in Teams"
+  - "a helpdesk bot for Teams"
+  - "an FAQ bot our staff can message"
+  - "I want a chatbot my students can ask questions about my course material"
+  - "a conversational app with Teams as the frontend"
+inputs:
+  owner_netid:
+    type: string
+    required: true
+    description: NetID of the person who owns the deployment (cornell:owner)
+# SystemPrompt, ModelId, GreetingText, BotAppId, BotTenantId and KnowledgeBaseId are all template
+# parameters and none is a builder input, because deployment_create forwards only Owner and the
+# pipeline_parameters below into ParameterOverrides -- a value declared as an input is collected
+# from the builder and then dropped, which is worse than not asking (#15 finding 2).
+#
+# Two of them could not be builder inputs anyway: BotAppId and BotTenantId identify a Microsoft
+# registration, which is one-time-per-bot onboarding by someone with Entra access, not
+# per-deployment configuration a builder could supply.
+template: blueprints/teams-bot/infra/teams-bot.yml
+# CodePipeline-level parameters, resolved by the pipeline at deploy time (not by the MCP). Mirror
+# these onto the TeamsBotCloudFormation action's ParameterOverrides, or an action rendered from
+# this manifest deploys a different stack than the pipeline does. BlueprintVersion is duplicated
+# from the template default on purpose: bump both in the same PR, or the
+# cornell:blueprint-version tag will lie.
+pipeline_parameters:
+  BlueprintVersion: "0.1.0"
+  SourceCommitId: "#{GitRepository.CommitId}"
+# Not a singleton: DeploymentName is a real parameter, so several bots can coexist per
+# environment. The practical limit is Microsoft-side -- each bot needs its own Azure registration.
+singleton: false
+cost:
+  # Lambda and Secrets Manager only. Model spend lands on the LiteLLM gateway key rather than on
+  # this AWS account, so it does not appear in this account's cost dashboard at all -- worth
+  # knowing before anyone reads a low number here as the total cost of running a bot.
+  baseline_monthly_usd: 1
+  scales_with:
+    - "messages answered (gateway tokens, billed outside this account)"
+    - "Lambda invocations and duration"
+# Questions and answers transit the LiteLLM gateway. Medium-risk data is approved to and from that
+# gateway, which is what makes this classification acceptable; the same traffic sent directly to a
+# model provider would not be.
+data_classification: [internal]
+# Backup/recovery contract (see versioning-releases-and-recovery-options.md):
+# stateless | derived | authoritative.
+#
+# Nothing durable: conversation history is not retained, so a redeploy loses no data. The two
+# secrets are Retain-on-delete and hold values injected out of band, so they survive stack deletion
+# by design and are not state this blueprint owns.
+state: []

@@ -4,7 +4,43 @@
 
 - **Project Type**: Brownfield
 - **Start Date**: 2026-08-03T18:06:09Z
-- **Current Stage**: INCEPTION - Units Generation Part 1 **(plan created, awaiting answers)**
+- **Current Stage**: INCEPTION - Units Generation Part 2 **COMPLETE — at the approval gate, with one
+  blocking security finding**
+
+> ## 📍 Read first: this blueprint is `blueprints/teams-bot/`
+>
+> Moved there 2026-08-04 from `blueprints/course-chatbot/`, which was the wrong home. The participant
+> brief's catalog names this building block **"Chatbots (incl. Microsoft Teams-fronted) — basic and
+> advanced conversational apps, with Teams as the default frontend for internal users."** Gate
+> Question 1 offered `course-chatbot` as its recommended option on a misreading of the Vision brief
+> §3, whose "one request deploys one blueprint" line is about demo mechanics rather than scope.
+>
+> **FR-5 was right originally and its amendment is reverted.** `course-chatbot` is restored to
+> byte-identical upstream state and is not Track C's.
+>
+> Documents under `aidlc-docs/` still say `course-chatbot` throughout. That is deliberate — they
+> record what was decided and when, and rewriting them would describe decisions nobody made. Read
+> those paths as `blueprints/teams-bot/`.
+
+> ## ⚠️ Also read: implementation exists, and it preceded its design stages
+>
+> Between the Units Generation gate answers and this update, a working blueprint was **built** —
+> template, container image, Bot Framework front door, 16 tests, retrieval, and both pipeline actions,
+> committed at `5726794`, `9c77a60` and `0806656` and pushed to the fork.
+>
+> **That work skipped the entire CONSTRUCTION phase.** Functional Design, NFR Requirements, NFR Design,
+> Infrastructure Design and Code Generation — each with its own approval gate, and Code Generation with
+> its own planning part — were none of them executed. `core-workflow.md` was not read until after the
+> code was written.
+>
+> This is recorded rather than smoothed over because a workshop teaching this methodology should not
+> have its own artifacts imply the process was followed when it was not. The practical consequence:
+> **Code Generation will be a plan retro-fitted to code that already exists**, and Infrastructure Design
+> has to ratify packaging decisions already made rather than make them.
+>
+> What the code is: a grounded, personal-chat-only Teams bot. What it is not: `unit-of-work.md`'s ten
+> units. Four were withdrawn or deferred — see its **Amendment — delivery status** section, and the
+> `VIOLATED` row for FR-9 in `unit-of-work-story-map.md`.
 
 ## Execution Plan Summary
 
@@ -63,16 +99,29 @@ knowledge of them.
       requirements). User may still request it.
 - [x] Workflow Planning
 - [x] Application Design — **COMPLETE** (5 artifacts; Security Baseline verified, no blocking findings)
-- [ ] Units Generation — **EXECUTE** (next)
+- [x] Units Generation — **COMPLETE**. Part 1 approved; Part 2 generated all three artifacts
+      2026-08-04. **At the approval gate with one blocking security finding (SECURITY-10)**
 
-### 🟢 CONSTRUCTION PHASE
+### 🟢 CONSTRUCTION PHASE — entered 2026-08-04
 
-- [ ] Functional Design — **EXECUTE**
-- [ ] NFR Requirements — **EXECUTE**
-- [ ] NFR Design — **EXECUTE**
-- [ ] Infrastructure Design — **EXECUTE**
-- [ ] Code Generation — **EXECUTE**
-- [ ] Build and Test — **EXECUTE**
+**Unit under construction**: the front door (delivered U1+U2+U3+U5+retrieval). The AgentCore step is a
+separate unit and is not started.
+
+**All four design stages were skipped while the code was written**, so they run out of order and
+retrospectively. Marked below for what they are rather than back-dated:
+
+- [ ] Infrastructure Design — **EXECUTE FIRST**, out of sequence. It owns the container-versus-zip
+      record, which is the decision that was instead settled by a character count
+- [ ] Functional Design — **RETROSPECTIVE**, depth to be assessed. The framework's own principle is
+      "only execute stages that add value"; most of the logic is already described in `components.md`
+- [ ] NFR Requirements — **PARTLY SUPERSEDED.** `requirements.md` §6 already carries nine NFRs, two of
+      whose justifications the synchronous decision voided (NFR-4, NFR-7). That re-assessment is the
+      real work here, not a fresh set
+- [ ] NFR Design — **EXECUTE** if NFR Requirements produces anything not already in the template
+- [ ] Code Generation — **RETRO-FIT.** A plan written against code that already exists, labelled as
+      such. Not a pretence that the plan came first
+- [ ] Build and Test — **EXECUTE.** The one stage with no retrospective problem: 16 tests exist,
+      `tools/check` is green, and what is missing (an end-to-end test through Teams) is genuinely next
 
 ### 🟡 OPERATIONS PHASE
 
@@ -115,10 +164,44 @@ blockers were found that change what the unit artifacts say.
 | Q3 vs the AgentCore mandate | **OPEN** — gate question 3. Determines whether `U6` exists; choosing one Lambda reopens Q9. |
 | PR #21's ten answers | **OPEN** — gate question 4. PR still open, so the file is not in this checkout. |
 
-- **Next action**: answer
-  **`aidlc-docs/inception/plans/units-generation-gate-questions.md`** (four questions, `[Answer]:`
-  tags). Then check for contradictions — question 2 can be mooted by question 3 — and generate the
-  three unit artifacts.
+- ~~**Next action**: answer `units-generation-gate-questions.md`~~ — **DONE.** Answered 1C / 2A / 3A
+  ("MUST use Agent Core") / 4A, validated for contradictions, none found. A later contradiction between
+  gate answer 3 and a supplied decision record was resolved through
+  `units-generation-clarification-questions.md`: **AgentCore stands, delivered in two steps**, with
+  `_ask()` as the seam.
+- ~~generate the three unit artifacts~~ — **DONE.** All three exist:
+  `application-design/unit-of-work.md`, `unit-of-work-dependency.md`, `unit-of-work-story-map.md`.
+  Every checkbox in `plans/unit-of-work-plan.md` is `[x]`.
+
+### ✅ Units Generation APPROVED 2026-08-04 — CONSTRUCTION entered
+
+Approved with the blocking finding **accepted as a dated exception**, by explicit user decision:
+*"document the exception for demo day and continue to construction."*
+
+**SECURITY-10 remains NON-COMPLIANT with a dated exception — not compliant.** Recorded as
+`docs/decisions/0001-course-chatbot-base-image-unpinned-for-demo.md`.
+
+| | |
+| --- | --- |
+| **The finding** | The Lambda base image is `public.ecr.aws/lambda/python:3.13` — a **mutable tag**, not a digest. `blueprints/tiny-chatbot/Dockerfile` predicted exactly this: *"pin this base image by digest … in the PR that wires the Build action."* |
+| **Scope** | One line in one Dockerfile. Not other blueprints, not other SECURITY-10 criteria |
+| **Expiry** | **2026-08-05.** Also revisited if anyone pins it, if the blueprint is offered outside the workshop, or if a second blueprint copies the pattern |
+| **Residual risk** | The *deployed* artifact is still immutable (`CONTAINER_DIGEST`) and dependencies are pinned (`requirements.lock`), so the floating input is the base layer alone. Exposure is "two builds of this commit may differ", not "we cannot tell what is deployed" |
+| **The fix** | `docker manifest inspect public.ecr.aws/lambda/python:3.13`, then append `@sha256:…`. A warning comment at the `FROM` line carries the date and the command |
+
+**Two findings from the same verification were fixed in place**: SECURITY-11 (reserved concurrency —
+blast-radius control, explicitly *not* abuse prevention) and SECURITY-14 (metric filter plus alarm on
+rejected activities, derived from the log line because a rejected token is not an invocation error).
+
+### Outstanding beyond the security finding
+
+| Item | Blocks |
+| --- | --- |
+| Inject both secret values (`bot-client-secret`, `gateway-api-key`) | The bot answering anything. Deploys green, then `401`s |
+| `az bot update --endpoint` against `jcb-ai-test-azure-bot` / `jcb-it-webcloud` — **Cornell** tenant, while the app registration is **dev** tenant | Teams reaching the bot at all |
+| Set a real `CourseName`, and the syllabus prompt if wanted | Answer quality; retrieval already grounds it |
+| PR to `cu-aaii/main` not yet open (FR-32) | Any deployment. Cross-fork; a team member merges |
+| First merge will **not** deploy this stack | Expect it; start a second execution |
 - **Cleared since Part 1**: `terraform` **1.15.8** installed locally (matches the CI pin), so
   `tools/check` now passes end to end. No new upstream drift — 0 behind, 11 ahead of `upstream/main`.
 - **Carry into Part 2**: `.gitignore:38` (`aidlc-docs/`, unanchored) silently swallows new artifacts.

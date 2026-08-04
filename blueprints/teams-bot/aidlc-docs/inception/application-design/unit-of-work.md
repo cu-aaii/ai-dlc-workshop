@@ -47,6 +47,58 @@ This is also what makes the channel-agnostic Agent decision pay off twice: it is
 
 ---
 
+## Correction — 2026-08-04, later: the deliverable moved to `blueprints/teams-bot/`
+
+**Read this before the amendment below, which it partly reverses.** Gate Question 1's option set was
+wrong, so the answer given on it was too. The participant brief's catalog names the building block
+**"Chatbots (incl. Microsoft Teams-fronted)"**; the `course-chatbot` bundling in the Vision brief §3
+is a statement about demo mechanics, not about what Track C builds.
+
+| Recorded below | Now |
+| --- | --- |
+| **FR-5 amended** to `course-chatbot` | **Amendment REVERTED.** FR-5 as originally written stands: blueprint `teams-bot`, stack `aidlc-main-teams-bot`, template `blueprints/teams-bot/infra/teams-bot.yml`. The requirement was right the first time |
+| "the extraction to a reusable `teams-bot` block" as a roadmap item | **Not a roadmap item — done.** That is what this blueprint is |
+| Retrieval delivered with a deploy-time knowledge base dependency | **Optional**, as FR-4 always required. A generic building block cannot require a course knowledge base to exist |
+| Default prompt and `CourseName` | Removed. `SystemPrompt` is the configuration surface (FR-1, FR-3) |
+
+**Every path written `blueprints/course-chatbot/...` below should be read as
+`blueprints/teams-bot/...`.** The text is left as written on purpose: it records what was decided when,
+and rewriting it would describe a decision nobody made. `course-chatbot` is restored to its upstream
+state and is not Track C's.
+
+## Amendment — delivery status, 2026-08-04
+
+**Read this before the unit definitions below.** Three of the ten units were delivered, four were
+withdrawn or deferred by a decision taken after this document was written, and one changed scope. The
+unit definitions further down are left as written; this table is what is true.
+
+The decision that caused it: the agent runs on AgentCore, **delivered in two steps**, with step 1 a
+single synchronous Lambda calling the gateway directly. Recorded in
+`../plans/units-generation-clarification-questions.md`. Synchronous delivery fits inside the Teams
+10–15 second budget, which removes the reason the worker, the queue and streaming existed.
+
+| Unit | Status | Note |
+| --- | --- | --- |
+| **U0** Microsoft identity chain | **Not built** | Reuses the existing PoC Azure Bot registration in the dev tenant instead. `azurerm` is still blocked on an Azure subscription RBAC assignment, so nothing here changed that |
+| **U1** Build capability | **Delivered** | One `Dockerfile`, one `Build` action on `ArmContainerBuildProject`, image pinned by digest. Collapsed to "add an action modelled on `builder-mcp`" once R-1 was retired |
+| **U2** Blueprint skeleton | **Delivered** | Template, `stacks.yml` entry, `BlueprintDeploy` action, `blueprint.yaml`. All four tags, deterministic `FunctionName`, 90-day retention, no wildcards in the role |
+| **U3** Inbound trust | **Delivered** | `botframework.py` plus 16 tests. The two FR-8a `serviceurl` cases pass — the control the prototype had present-but-broken |
+| **U4** Idempotency and hand-off | **WITHDRAWN** | No worker and no async invoke means only one duplicate source remains (Azure retries), not two. **This is a real reduction in safety, not a simplification**: a slow first reply can still produce a duplicate answer. Accepted for a demo; the DynamoDB guard returns with the worker |
+| **U5** First reply | **Delivered** | `conversationUpdate` greeting, typing indicator, single reply, token provider |
+| **U6** Agent runtime | **DEFERRED to step 2** | The mandate stands; `_ask()` is the seam. Research established it needs no container — `AgentRuntimeArtifact` takes `CodeConfiguration` too |
+| **U7** Streaming delivery | **WITHDRAWN** | With it goes the delivery dispatcher, so **FR-16's seam does not exist in the delivered code**. Adding group/channel scopes later is therefore a change to the reply path, which is exactly what the seam was designed to avoid |
+| **U8** Scope expansion | **Not built** | Personal chat only |
+| **U9** Hardening | **Partial** | 90-day retention delivered inline (U2). Alarm, reserved concurrency, dependency scanning and the lockfile **not** delivered — see the SECURITY-10 and SECURITY-11 rows in the compliance table |
+| **new** Retrieval (Tier B) | **Delivered, unplanned** | Was a stretch goal on the assumption the knowledge base might be empty (#18). Track B finished the S3 path, so grounding is real. `Retrieve` only, id resolved at deploy time so the role names one ARN |
+
+**The honest summary**: what shipped is roughly U1–U3 plus U5 plus retrieval — a grounded,
+personal-chat-only Teams bot with real inbound trust — and it is **less** than this document plans in
+two ways worth stating out loud: no idempotency guard against a slow reply, and no delivery seam.
+
+**Two units gained rather than lost from being deferred.** U6 is cheaper than planned because AgentCore
+needs no container, and U0 is cheaper because sideloading removed the interactive login. Neither was
+known when the ten units were written.
+
 ## Decomposition principle — risk retirement, with one large revision
 
 Units are ordered so each retires the largest remaining risk. **The single largest risk that justified
@@ -93,53 +145,69 @@ organisation as *"Greenfield only"* — this project is **Brownfield**, but the 
 and shared with two other tracks, so the layout is a real decision rather than an inherited one. It is
 recorded for that reason.
 
+**Corrected 2026-08-04 to what was actually built.** The layout below is the delivered one; the
+previous version of this section placed Dockerfiles under `src/frontdoor/` and `src/agent/`, which is
+wrong — the convention is one per component at the *component root*, as `packages/builder-mcp/Dockerfile`
+and `blueprints/tiny-chatbot/Dockerfile` both do.
+
 ```
 blueprints/course-chatbot/
+  Dockerfile                    ONE named target: course-chatbot.
+                                CONTAINER_CONTEXT = blueprints/course-chatbot
+  blueprint.yaml                the Builder MCP manifest
   infra/
-    course-chatbot.yml          Track C's CloudFormation: Lambdas, function URL, DynamoDB,
-                                AgentCore Runtime + Endpoint + Memory, roles, SSM, log groups
-    azure/                      Track C's Terraform (azuread only — see U0)
-      main.tf  versions.tf  .terraform.lock.hcl
+    course-chatbot.yml          the stack: Lambda, function URL, two secrets, SSM, log group, role
+    azure/                      Terraform for the Microsoft side — still a README only, NOT BUILT
   src/
-    handler.py                  PRE-EXISTING scaffold stub. Not Track C's. See the note below
-    frontdoor/                  entry point A — Lambda handler
-      Dockerfile                target: course-chatbot-lambda
-    worker/                     entry point B — async-invoked Lambda handler
-    agent/                      FastAPI app for AgentCore Runtime
-      Dockerfile                target: course-chatbot-agent
-    shared/                     imported by frontdoor, worker and agent
-  teams-app/
-    manifest.json  color.png  outline.png
-  scripts/                      Microsoft-side provisioning that Terraform cannot reach
-  pyproject.toml
-  uv.lock                       required by uv sync --frozen (SECURITY-10)
-  blueprint.yaml                the Builder MCP manifest — added in the same PR as the template
+    handler.py                  the Bot Framework front door (rewritten in place, see below)
+    botframework.py             inbound trust, outbound tokens, replies. No blueprint imports
+    requirements.txt            anthropic + PyJWT[crypto]; boto3 comes from the base image
+  tests/
+    test_botframework.py        16 tests, including the two FR-8a negative cases
+  teams-app/                    NOT BUILT — manifest and icons
+  scripts/                      NOT BUILT — Microsoft-side provisioning
 ```
 
-**Two images, two Dockerfiles, two contexts.** `src/frontdoor/Dockerfile` builds the Lambda image that
-*both* Lambdas run — Front Door and Worker share one image with different handlers, which is unchanged
-from Application Design. `src/worker/` therefore has no Dockerfile of its own; it is a second entry
-point into the same image, and the `CONTAINER_CONTEXT` for that build is `blueprints/course-chatbot/src`
-so both packages and `shared/` are in scope. `src/agent/Dockerfile` builds the arm64 AgentCore image.
+**One image, one Dockerfile, one target.** Not because the convention changed but because the agent
+was deferred: with the model call still inside the Lambda there is exactly one component that ships an
+image. The second target returns with the AgentCore step, in its own directory rather than as a second
+target in this file.
+
+**Built on `public.ecr.aws/lambda/python:3.13`, not the `uv` image `builder-mcp` uses.**
+`requirements.txt` deliberately omits `boto3` because the Lambda base image ships it; switching bases
+would break that assumption silently.
+
+**No `pyproject.toml` or `uv.lock`.** The Lambda base image installs from `requirements.txt` with
+`pip`, so `uv sync --frozen` — which is what made a lockfile mandatory under SECURITY-10 — is not in
+play. **This is an open SECURITY-10 gap, not a resolved one**: dependencies are a floating range, so two
+builds of the same commit can resolve differently. It returns as a real requirement the moment the
+AgentCore image lands, since that one does use `uv`.
 
 **`CONTAINER_CONTEXT` and the target must agree with where the component actually lives.** A stale
 context fails the build with a missing-path error that says nothing about the move that caused it.
 
-### The pre-existing `src/handler.py`
+### The pre-existing `src/handler.py` — **superseded 2026-08-04**
 
-Ernest's scaffold stub. It constructs `AnthropicBedrock`/`AnthropicBedrockMantle` and reaches Bedrock
-with the execution role, which **violates FR-23** — all model traffic must route through Cornell's
-LiteLLM gateway.
+**What this section originally said**: Ernest's scaffold stub constructs
+`AnthropicBedrock`/`AnthropicBedrockMantle` and reaches Bedrock with the execution role, which
+**violates FR-23**; Track C would add alongside it and not depend on removing it, since deleting another
+track's file on demo day was not a risk worth taking for tidiness.
 
-**Track C adds alongside it and does not depend on removing it.** Recorded as a finding against the
-scaffold, not adopted as Track C debt:
+**What actually happened**: `handler.py` was **rewritten in place** as the Bot Framework front door.
+The reasoning that survives is unchanged — Track B has moved to `blueprints/knowledgebase/`, so this was
+very likely already dead code — but the outcome is different in one way that matters and one that does
+not:
 
-- Track B, whom the blueprint README nominally assigns `src/`, has moved to
-  `blueprints/knowledgebase/`, so it may already be dead code.
-- Deleting another track's file on demo day is not a risk worth taking for tidiness, and retirement is
-  Track B's and Track D's call.
-- **No Track C unit reads, imports or extends it.** If it survives to deployment it must not be given a
-  Lambda function or an execution-role Bedrock grant, or FR-23 is violated by something Track C shipped.
+- **It matters that the FR-23 violation is now gone from the tree** rather than sitting there as a
+  documented finding waiting for someone to wire a Lambda to it. That was the residual risk the
+  add-alongside plan accepted; rewriting removed it.
+- **It does not matter that a second entry point was avoided.** Adding `src/frontdoor/` would have
+  worked equally well; in-place was simply fewer files under time pressure.
+
+**Recorded as a deviation from this document rather than presented as the plan**: the original decision
+was deliberately conservative about touching another track's file, and it was overridden for speed, not
+because the reasoning was wrong. If Track B or Track D wanted that stub retained, the reversal is a
+`git show 5726794` away.
 
 ---
 
