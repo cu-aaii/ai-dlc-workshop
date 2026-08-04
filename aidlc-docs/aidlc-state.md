@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - U-02 Functional Design (plan + 9 questions, awaiting answers)
+- **Current Stage**: **CONSTRUCTION** - U-02 Functional Design complete, awaiting approval
 - **Build and Test U-01 Approved**: 2026-08-03 — "Approve". **U-01 COMPLETE END TO END.**
 - **Code Generation U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
 - **NFR Design U-01 Approved**: 2026-08-03 — user response "approve and proceed"
@@ -257,6 +257,39 @@ breaking `group_by_tag`'s ordering made P5 fail, which a copied oracle could not
 which hung and left a file mutated mid-run; recovered via `git checkout --` and verified against HEAD.
 Recorded because "all passed" and "never ran" look identical from a distance.
 
+## Functional Design U-02 — outputs
+`construction/u-02-dashboard-platform/functional-design/` — `domain-entities.md`, `business-rules.md`,
+`business-logic-model.md`, **`frontend-components.md`** (first appearance; U-01 had no UI).
+
+Q1-Q9 all **A**: 50-page bound · 1h interval → 3h stale · WAF CIDRs as a no-default parameter ·
+`useState` per view, no router/store/data-lib · **no colour encoding of group identity** ·
+`/api/inventory` + copy-URL · alarm on first failure, staleness at 3× · revert-to-rollback, all-at-once ·
+runbook in the README.
+
+**U-02 introduces no domain entities** — U-01 owns them all. It adds plumbing types only.
+**All four inherited obligations discharged by a named rule**: 1→AR-03 (the `INVALID`→503 sixth row),
+2→AR-05 (counts in *every* response), 3→CR-04 (C-01 logs the ARN, never a tag value), 4→DR-03+DR-04.
+
+### 🔍 Three findings from the analysis, two of them gaps in my own questions
+1. **The staleness alarm needs `TreatMissingData: breaching`** (OR-02). A collector that never *runs*
+   emits no metric and no error, so the failure alarm stays green — nothing failed, nothing ran. Default
+   `missing` would park the alarm in `INSUFFICIENT_DATA`, which looks green forever. This is the only
+   alarm covering that case.
+2. **GAP IN MY Q3: IPv6.** WAF IPSets are **per-address-family**; one set cannot hold IPv4 and IPv6. An
+   IPv4-only allowlist silently locks out IPv6-only clients — the exact outage-looking failure Q3 was
+   written to prevent, reintroduced through the question's blind spot. → Infrastructure Design.
+3. **The alarm destination already exists.** `blueprints/notify-topic/` is registered
+   `deployed_by: pipeline` and actively deployed; its `TopicArn` output is documented as "ARN to publish
+   to, **or to hand to another stack that needs to publish here**". C-09 reuses it (OR-05) rather than
+   creating a second topic. Caveat: **no `Export:`**, so `Fn::ImportValue` is unavailable → mechanism to
+   Infrastructure Design.
+
+### ⚠️ Q5 = A diverges from another team's file — needs relaying, not rewriting
+`blueprints/dashboard/docs/design-language.md` (written by others, ahead of the template) specifies a
+two-accent series with "Other" for charts. Q5 = A goes further: no colour encoding of group identity at
+all. That is **more conservative than the contract requires, not a violation** — but the file is not ours
+to silently rewrite. Its authors should decide whether the addendum changes or Q5 = A does.
+
 ### ⚠️ Flagged for the user, not decided
 
 ### Amendment A3 — layout superseded by `src/` conformance (2026-08-03)
@@ -391,6 +424,39 @@ breaking `group_by_tag`'s ordering made P5 fail, which a copied oracle could not
 which hung and left a file mutated mid-run; recovered via `git checkout --` and verified against HEAD.
 Recorded because "all passed" and "never ran" look identical from a distance.
 
+## Functional Design U-02 — outputs
+`construction/u-02-dashboard-platform/functional-design/` — `domain-entities.md`, `business-rules.md`,
+`business-logic-model.md`, **`frontend-components.md`** (first appearance; U-01 had no UI).
+
+Q1-Q9 all **A**: 50-page bound · 1h interval → 3h stale · WAF CIDRs as a no-default parameter ·
+`useState` per view, no router/store/data-lib · **no colour encoding of group identity** ·
+`/api/inventory` + copy-URL · alarm on first failure, staleness at 3× · revert-to-rollback, all-at-once ·
+runbook in the README.
+
+**U-02 introduces no domain entities** — U-01 owns them all. It adds plumbing types only.
+**All four inherited obligations discharged by a named rule**: 1→AR-03 (the `INVALID`→503 sixth row),
+2→AR-05 (counts in *every* response), 3→CR-04 (C-01 logs the ARN, never a tag value), 4→DR-03+DR-04.
+
+### 🔍 Three findings from the analysis, two of them gaps in my own questions
+1. **The staleness alarm needs `TreatMissingData: breaching`** (OR-02). A collector that never *runs*
+   emits no metric and no error, so the failure alarm stays green — nothing failed, nothing ran. Default
+   `missing` would park the alarm in `INSUFFICIENT_DATA`, which looks green forever. This is the only
+   alarm covering that case.
+2. **GAP IN MY Q3: IPv6.** WAF IPSets are **per-address-family**; one set cannot hold IPv4 and IPv6. An
+   IPv4-only allowlist silently locks out IPv6-only clients — the exact outage-looking failure Q3 was
+   written to prevent, reintroduced through the question's blind spot. → Infrastructure Design.
+3. **The alarm destination already exists.** `blueprints/notify-topic/` is registered
+   `deployed_by: pipeline` and actively deployed; its `TopicArn` output is documented as "ARN to publish
+   to, **or to hand to another stack that needs to publish here**". C-09 reuses it (OR-05) rather than
+   creating a second topic. Caveat: **no `Export:`**, so `Fn::ImportValue` is unavailable → mechanism to
+   Infrastructure Design.
+
+### ⚠️ Q5 = A diverges from another team's file — needs relaying, not rewriting
+`blueprints/dashboard/docs/design-language.md` (written by others, ahead of the template) specifies a
+two-accent series with "Other" for charts. Q5 = A goes further: no colour encoding of group identity at
+all. That is **more conservative than the contract requires, not a violation** — but the file is not ours
+to silently rewrite. Its authors should decide whether the addendum changes or Q5 = A does.
+
 ### ⚠️ Flagged for the user, not decided
 `CLAUDE.md` now says `docs/aidlc/` is "this repo's own AI-DLC record," and builder-mcp's record was
 relocated to `docs/aidlc/builder-mcp/`. By that convention this blueprint's record belongs at
@@ -413,9 +479,9 @@ cleanup — deliberately not done.
 ### 🟢 CONSTRUCTION PHASE
 - [ ] Functional Design — **U-01 complete (awaiting approval)**; U-02 pass follows
       - [x] U-01 Domain Core — 3 artifacts, BR-01..BR-08, **10 PBT properties** (PBT-01 satisfied) — **APPROVED 2026-08-03**
-      - [ ] U-02 Dashboard Platform — **IN PROGRESS**, 9 questions issued. Runs as **one pass over the
-            whole unit** (user decision 2026-08-03), incl. mandatory `frontend-components.md` for C-06,
-            and discharging all four inherited obligations plus RESILIENCY-04/-15
+      - [x] U-02 Dashboard Platform — **complete (awaiting approval)**. 4 artifacts incl. mandatory
+            `frontend-components.md`. 30 rules CR/SR/AR/ER/OR/DR. **All four inherited obligations
+            discharged by a named rule**; RESILIENCY-04 → DR-03, RESILIENCY-15 → DR-04
 - [ ] NFR Requirements — **U-01 complete (awaiting approval)**; U-02 pass follows
       - [x] U-01 — 26 requirements (**15 automated, 11 review-only**), 7 tech-stack decisions — **APPROVED 2026-08-03**
       - [ ] U-02
