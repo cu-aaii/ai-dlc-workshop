@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cornell Builder MCP — Progress</title>
+<style>
+/* ============================================================
+   Palette harvested from packages/builder-mcp/docs/tool-verification.html
+   ============================================================ */
+:root{
+  --red:#b31b1b; --red-dk:#8c1515; --red-soft:#f7e9e9;
+  --ink:#222; --ink-2:#3a3a3a; --mut:#666; --mut-2:#8a8580;
+  --line:#e5e2dd; --bg:#faf9f7; --card:#fff;
+  --cream:#fdf6ec; --cream-line:#efe2c8; --code:#f4f2ef;
+  --green-bg:#e6f4e6; --green-fg:#1b6e1b;
+  --amber-bg:#fdf0d9; --amber-fg:#8a5a00;
+  --grey-bg:#eeece8; --grey-fg:#5a5550;
+  --shadow:0 1px 2px rgba(30,20,10,.05), 0 8px 26px rgba(30,20,10,.07);
+  --shadow-lg:0 2px 6px rgba(30,20,10,.07), 0 22px 50px rgba(30,20,10,.12);
+  --sans:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+  --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+  --mono:"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.55 var(--sans); overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------- deck shell ---------- */
+#deck{position:fixed; inset:0;}
+.slide{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  padding:clamp(20px,3.2vh,44px) clamp(20px,4.2vw,72px) 68px;
+  overflow-y:auto; overflow-x:hidden;
+  opacity:0; visibility:hidden; pointer-events:none;
+  transform:translateX(38px) scale(.992);
+  transition:opacity .42s ease, transform .5s cubic-bezier(.22,.8,.3,1), visibility 0s .5s;
+}
+.slide.active{opacity:1; visibility:visible; pointer-events:auto; transform:none; transition:opacity .42s ease, transform .5s cubic-bezier(.22,.8,.3,1), visibility 0s;}
+.slide.prev{transform:translateX(-38px) scale(.992);}
+.inner{width:100%; max-width:1280px; margin:0 auto;}
+
+/* ---------- reveal ---------- */
+[data-r]{opacity:0; transform:translateY(14px); transition:opacity .5s ease, transform .55s cubic-bezier(.22,.8,.3,1);}
+.slide.active [data-r]{opacity:1; transform:none;}
+
+/* ---------- type ---------- */
+.kicker{
+  font-size:clamp(10.5px,1.05vw,12.5px); font-weight:700; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--red); margin:0 0 10px;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+}
+.kicker::before{content:""; width:26px; height:3px; background:var(--red); border-radius:2px; flex:none;}
+h1{font:700 clamp(30px,5.1vw,62px)/1.06 var(--serif); margin:0 0 14px; letter-spacing:-.015em;}
+h2{font:700 clamp(22px,3.05vw,40px)/1.12 var(--serif); margin:0 0 8px; letter-spacing:-.012em;}
+h3{font:700 clamp(14px,1.35vw,17.5px)/1.3 var(--sans); margin:0 0 6px;}
+.sub{font-size:clamp(14px,1.42vw,19px); color:var(--mut); margin:0 0 clamp(14px,2.2vh,26px); max-width:78ch; line-height:1.5;}
+p{margin:0 0 10px;}
+.small{font-size:clamp(12px,1.06vw,13.5px); color:var(--mut); line-height:1.5;}
+.tiny{font-size:11.5px; color:var(--mut-2); line-height:1.45;}
+strong{color:var(--ink); font-weight:700;}
+em.q{font-style:italic; color:var(--ink-2);}
+
+/* ---------- cards ---------- */
+.card{
+  background:var(--card); border:1px solid var(--line); border-radius:12px;
+  padding:clamp(13px,1.5vw,20px); box-shadow:var(--shadow);
+  transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+.card.hov:hover{transform:translateY(-3px); box-shadow:var(--shadow-lg); border-color:#d8d2c9;}
+.card.accent{border-left:4px solid var(--red);}
+.card.cream{background:var(--cream); border-color:var(--cream-line);}
+.grid{display:grid; gap:clamp(10px,1.15vw,16px);}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr));}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr));}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr));}
+.g5{grid-template-columns:repeat(5,minmax(0,1fr));}
+.g21{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);}
+.g12{grid-template-columns:minmax(0,300px) minmax(0,1fr);}
+
+/* ---------- badges / links ---------- */
+.badge{display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.05em;
+  border-radius:99px; padding:3px 9px; vertical-align:middle; white-space:nowrap;}
+.green{background:var(--green-bg); color:var(--green-fg);}
+.amber{background:var(--amber-bg); color:var(--amber-fg);}
+.greyb{background:var(--grey-bg); color:var(--grey-fg);}
+.redb{background:var(--red-soft); color:var(--red-dk);}
+.est{background:var(--amber-bg); color:var(--amber-fg); border:1px dashed #d9ab5e;}
+a{color:var(--red-dk);}
+a.fl{
+  font:600 .93em/1.35 var(--mono); color:var(--red-dk); background:var(--code);
+  border:1px solid var(--line); border-bottom-color:#d6d1c9; border-radius:5px;
+  padding:1px 6px; text-decoration:none; white-space:nowrap;
+  transition:background .16s ease, color .16s ease, border-color .16s ease;
+}
+a.fl:hover{background:var(--red); color:#fff; border-color:var(--red);}
+a.fl.dir::after{content:"/"; opacity:.55;}
+a.fl .nb{
+  display:inline-block; font:700 9px/1 var(--sans); letter-spacing:.06em;
+  background:var(--amber-bg); color:var(--amber-fg); border-radius:99px;
+  padding:2px 5px; margin-left:5px; vertical-align:1px; border:1px solid #e6c98d;
+}
+a.fl:hover .nb{background:#fff; color:var(--red-dk); border-color:#fff;}
+code{font-family:var(--mono); font-size:.9em; background:var(--code); border:1px solid var(--line); border-radius:4px; padding:1px 5px;}
+
+/* ---------- stat tiles ---------- */
+.stat{text-align:center; padding:clamp(10px,1.3vw,18px) 10px;}
+.stat .num{display:block; font:700 clamp(26px,3.7vw,50px)/1 var(--serif); color:var(--red); letter-spacing:-.02em;}
+.stat .lab{display:block; margin-top:6px; font-size:clamp(10.5px,.98vw,12.5px); color:var(--mut); letter-spacing:.05em; text-transform:uppercase; font-weight:600;}
+
+/* ---------- flow ---------- */
+.flow{display:grid; grid-template-columns:1fr auto 1fr auto 1fr; align-items:stretch; gap:clamp(6px,.9vw,14px);}
+.flow .arw{align-self:center; font-size:clamp(17px,2vw,26px); color:var(--red); opacity:.55;}
+.step-n{display:inline-flex; width:26px; height:26px; border-radius:50%; background:var(--red); color:#fff;
+  font:700 13px/26px var(--sans); align-items:center; justify-content:center; margin-bottom:8px;}
+
+/* ---------- lists ---------- */
+ul.tick{list-style:none; padding:0; margin:0;}
+ul.tick li{position:relative; padding-left:22px; margin-bottom:8px; font-size:clamp(12.5px,1.13vw,15px); line-height:1.5;}
+ul.tick li::before{content:"✓"; position:absolute; left:0; top:0; color:var(--green-fg); font-weight:700;}
+ul.cross li::before{content:"✕"; color:var(--red);}
+ul.dot li::before{content:"▸"; color:var(--red); opacity:.7;}
+
+/* ============================================================
+   WIDGET 1 — journey scrubber
+   ============================================================ */
+.scrub{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:clamp(13px,1.6vw,22px); box-shadow:var(--shadow);}
+.scrub-head{display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:12px;}
+.scrub-step{font:700 clamp(15px,1.75vw,23px)/1.2 var(--serif); color:var(--ink);}
+.rail{position:relative; margin:6px 2px 18px;}
+.rail input[type=range]{width:100%; margin:0; accent-color:var(--red); height:22px; cursor:pointer;}
+.dots{display:flex; justify-content:space-between; margin-top:2px;}
+.dots button{
+  border:0; background:none; padding:4px 2px; cursor:pointer; flex:1;
+  font:600 10px/1.2 var(--sans); color:var(--mut-2); letter-spacing:.03em; text-align:center;
+  transition:color .18s ease;
+}
+.dots button .pip{display:block; width:9px; height:9px; border-radius:50%; background:#d9d4cc; margin:0 auto 5px; transition:all .22s ease;}
+.dots button.on{color:var(--red);}
+.dots button.on .pip{background:var(--red); transform:scale(1.5); box-shadow:0 0 0 4px var(--red-soft);}
+.dots button.done .pip{background:#e0b3b3;}
+.lanes{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:clamp(10px,1.2vw,16px);}
+.lane{border-radius:10px; padding:clamp(12px,1.35vw,18px); border:1px solid var(--line); background:var(--code); min-height:150px;}
+.lane.b{background:var(--cream); border-color:var(--cream-line);}
+.lane h4{margin:0 0 10px; font:700 11.5px/1 var(--sans); letter-spacing:.13em; text-transform:uppercase; color:var(--mut);}
+.lane.b h4{color:var(--red);}
+.lane .body{font-size:clamp(12.5px,1.16vw,15.5px); line-height:1.5; min-height:66px;}
+.lane .clock{margin-top:12px; padding-top:10px; border-top:1px dashed #ded8ce; font:700 clamp(13px,1.3vw,17px)/1.2 var(--sans); color:var(--ink);}
+.lane .clock span{font-weight:400; color:var(--mut); font-size:12px;}
+.fade-swap{animation:swap .34s ease;}
+@keyframes swap{from{opacity:0; transform:translateY(7px);} to{opacity:1; transform:none;}}
+
+/* ============================================================
+   WIDGET 2 — tool explorer
+   ============================================================ */
+.tx-filters{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;}
+.chipf{
+  border:1px solid var(--line); background:var(--card); color:var(--mut);
+  font:600 12px/1 var(--sans); padding:8px 14px; border-radius:99px; cursor:pointer;
+  transition:all .18s ease;
+}
+.chipf:hover{border-color:var(--red); color:var(--red-dk);}
+.chipf.on{background:var(--red); border-color:var(--red); color:#fff;}
+.tx{display:grid; grid-template-columns:minmax(0,320px) minmax(0,1fr); gap:clamp(10px,1.2vw,18px);}
+.tx-list{display:flex; flex-direction:column; gap:7px; max-height:52vh; overflow-y:auto; padding-right:4px;}
+.tx-item{
+  text-align:left; border:1px solid var(--line); background:var(--card); border-radius:9px;
+  padding:10px 13px; cursor:pointer; display:flex; align-items:center; gap:10px;
+  transition:all .18s ease; font-family:var(--sans);
+}
+.tx-item:hover{border-color:#d3ccc2; transform:translateX(3px);}
+.tx-item.on{border-color:var(--red); background:var(--red-soft); box-shadow:inset 3px 0 0 var(--red);}
+.tx-item .ico{font-size:16px; flex:none;}
+.tx-item .nm{font:600 13px/1.25 var(--mono); color:var(--ink); flex:1;}
+.tx-item.hide{display:none;}
+.tx-detail{background:var(--card); border:1px solid var(--line); border-radius:11px; padding:clamp(14px,1.7vw,24px); box-shadow:var(--shadow);}
+.tx-detail .obj{font:700 clamp(15px,1.65vw,22px)/1.3 var(--serif); margin:6px 0 10px;}
+.tx-detail .why{font-size:clamp(12.5px,1.13vw,15px); color:var(--ink-2); line-height:1.55;}
+.tx-detail .gov{margin-top:14px; padding:11px 14px; background:var(--cream); border:1px solid var(--cream-line); border-radius:8px; font-size:12.5px; color:var(--ink-2);}
+
+/* ============================================================
+   WIDGET 3 — AI-DLC maturity scorecard
+   ============================================================ */
+.sc-top{display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:12px;}
+.meter{height:12px; border-radius:99px; background:var(--grey-bg); overflow:hidden; display:flex; min-width:220px; flex:1; max-width:460px;}
+.meter i{display:block; height:100%; transition:width .55s cubic-bezier(.22,.8,.3,1);}
+.meter .m-s{background:var(--green-fg);} .meter .m-p{background:#d99b2a;} .meter .m-t{background:#c07a7a;}
+.sc-grid{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:clamp(8px,1vw,14px);}
+.sc-card{
+  text-align:left; border:1px solid var(--line); background:var(--card); border-radius:11px;
+  padding:clamp(11px,1.2vw,16px); cursor:pointer; font-family:var(--sans);
+  display:flex; flex-direction:column; gap:8px; box-shadow:var(--shadow);
+  transition:all .22s cubic-bezier(.22,.8,.3,1);
+}
+.sc-card:hover{transform:translateY(-4px); box-shadow:var(--shadow-lg);}
+.sc-card.on{border-color:var(--red); box-shadow:0 0 0 2px var(--red-soft), var(--shadow-lg);}
+.sc-card.dim{opacity:.32; filter:saturate(.25);}
+.sc-card .stg{font:700 clamp(12px,1.16vw,15px)/1.25 var(--sans); color:var(--ink);}
+.sc-card .num{font:700 11px/1 var(--mono); color:var(--mut-2); letter-spacing:.1em;}
+.bars{display:flex; gap:3px;}
+.bars i{height:6px; flex:1; border-radius:2px; background:var(--grey-bg);}
+.bars.s i:nth-child(-n+3){background:var(--green-fg);}
+.bars.p i:nth-child(-n+2){background:#d99b2a;}
+.bars.t i:nth-child(-n+1){background:#c07a7a;}
+.sc-detail{margin-top:clamp(10px,1.3vw,16px); background:var(--card); border:1px solid var(--line); border-left:4px solid var(--red); border-radius:10px; padding:clamp(13px,1.5vw,20px); box-shadow:var(--shadow);}
+.sc-detail h3{margin-bottom:4px;}
+.sc-detail .verdict{font-size:clamp(13px,1.2vw,16px); line-height:1.55; color:var(--ink-2); margin:8px 0 10px;}
+
+/* ---------- surfaces ---------- */
+.srv{position:relative; text-align:center; padding-top:clamp(14px,1.7vw,22px);}
+.srv .top{position:absolute; top:0; left:0; right:0; height:4px; border-radius:12px 12px 0 0;}
+.hub{background:linear-gradient(180deg,#fff,#fdfbf8); border:2px solid var(--red); text-align:center;}
+
+/* ---------- table ---------- */
+table{width:100%; border-collapse:collapse; font-size:clamp(12px,1.08vw,14.5px);}
+th{text-align:left; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--mut); padding:0 12px 8px; font-weight:700; border-bottom:1px solid var(--line);}
+td{padding:11px 12px; border-bottom:1px solid var(--line); vertical-align:top; line-height:1.45;}
+tr:last-child td{border-bottom:0;}
+tbody tr{transition:background .16s ease;}
+tbody tr:hover{background:var(--code);}
+
+/* ---------- chrome ---------- */
+#bar{position:fixed; left:0; top:0; height:3px; background:var(--red); z-index:60; transition:width .45s cubic-bezier(.22,.8,.3,1); box-shadow:0 0 8px rgba(179,27,27,.4);}
+#chrome{
+  position:fixed; left:0; right:0; bottom:0; height:52px; z-index:55;
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  padding:0 clamp(14px,3vw,40px); background:rgba(250,249,247,.93);
+  border-top:1px solid var(--line); backdrop-filter:blur(8px);
+}
+#chrome .brandline{display:flex; align-items:center; gap:9px; font-size:12px; color:var(--mut); min-width:0;}
+#chrome .brandline b{color:var(--red); font-weight:700;}
+#chrome .dotmark{width:9px; height:9px; border-radius:2px; background:var(--red); flex:none;}
+#chrome .ctrls{display:flex; align-items:center; gap:6px;}
+.nb{border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:7px;
+  width:32px; height:32px; cursor:pointer; font-size:14px; line-height:1; transition:all .16s ease;}
+.nb:hover{background:var(--red); color:#fff; border-color:var(--red);}
+.nb.wide{width:auto; padding:0 12px; font:600 11.5px/1 var(--sans); letter-spacing:.05em;}
+#count{font:600 12.5px/1 var(--mono); color:var(--mut); min-width:56px; text-align:center;}
+.hint{font-size:11px; color:var(--mut-2); letter-spacing:.02em;}
+@media(max-width:760px){.hint{display:none;}}
+
+/* ---------- overview ---------- */
+#ov{position:fixed; inset:0; z-index:70; background:rgba(250,249,247,.985); backdrop-filter:blur(4px);
+  display:none; flex-direction:column; padding:clamp(18px,4vh,44px) clamp(18px,4vw,56px); overflow-y:auto;}
+#ov.open{display:flex; animation:fadein .22s ease;}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+#ov h2{margin-bottom:4px;}
+.ovg{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; margin-top:20px;}
+.ovc{text-align:left; border:1px solid var(--line); background:var(--card); border-radius:10px; padding:14px 15px;
+  cursor:pointer; font-family:var(--sans); box-shadow:var(--shadow); transition:all .2s ease; min-height:92px;
+  display:flex; flex-direction:column; justify-content:space-between; gap:8px;}
+.ovc:hover{transform:translateY(-4px); box-shadow:var(--shadow-lg); border-color:var(--red);}
+.ovc.cur{border-color:var(--red); background:var(--red-soft);}
+.ovc .n{font:700 11px/1 var(--mono); color:var(--red); letter-spacing:.1em;}
+.ovc .t{font:600 13.5px/1.3 var(--sans); color:var(--ink);}
+
+/* ---------- title slide ---------- */
+.title-wrap{display:flex; flex-direction:column; justify-content:center; min-height:78vh;}
+.rule{width:88px; height:5px; background:var(--red); border-radius:3px; margin:0 0 26px;}
+.byline{display:flex; gap:clamp(14px,2.4vw,34px); flex-wrap:wrap; margin-top:clamp(18px,3vh,34px); padding-top:clamp(14px,2.4vh,26px); border-top:1px solid var(--line);}
+.byline div{font-size:clamp(11.5px,1.02vw,13.5px); color:var(--mut);}
+.byline b{display:block; color:var(--ink); font-size:clamp(13px,1.22vw,16.5px); font-weight:700; margin-bottom:2px;}
+
+/* ---------- divider slide ---------- */
+.divider{background:var(--ink); color:#f3f0ec;}
+.divider h2, .divider h1{color:#fff;}
+.divider .sub{color:#bdb6ad;}
+.divider .kicker{color:#e58e8e;}
+.divider .kicker::before{background:#e58e8e;}
+.divider .card{background:#2c2c2c; border-color:#3d3d3d; color:#e8e4df; box-shadow:none;}
+.divider .card h3{color:#fff;}
+.divider .small{color:#a9a29a;}
+.divider a.fl{background:#333; border-color:#454545; color:#f0b9b9;}
+.divider a.fl:hover{background:#e58e8e; color:#1b1b1b;}
+
+/* ============================================================
+   APPENDIX — open risk vectors
+   ============================================================ */
+.appx-hero{background:linear-gradient(160deg,#fdf6ec 0%,#faf3e6 55%,#f6ece0 100%);}
+.appx-hero .rule{background:var(--red); width:120px;}
+.appx-tag{display:inline-flex; align-items:center; gap:7px; font:700 10.5px/1 var(--sans);
+  letter-spacing:.14em; text-transform:uppercase; color:var(--red-dk);
+  background:#fff; border:1px solid var(--cream-line); border-radius:99px; padding:6px 12px;}
+.optional-strip{border:1px dashed #d9ab5e; background:#fff8ee; border-radius:10px; padding:12px 16px;}
+
+.rk-card{border-left:4px solid var(--red); position:relative;}
+.rk-card .rk-n{position:absolute; top:12px; right:14px; font:700 11px/1 var(--mono); color:var(--mut-2); letter-spacing:.08em;}
+.rk-card.c1{border-left-color:#b31b1b;}
+.rk-card.c2{border-left-color:#8a5a00;}
+.rk-card.c3{border-left-color:#1b6e1b;}
+.rk-card.c4{border-left-color:#5b4b8a;}
+.rk-card.c5{border-left-color:#0f6f7a;}
+.q-open{font-style:italic; color:var(--ink-2); font-size:clamp(12px,1.08vw,14.5px); border-left:2px solid var(--cream-line); padding-left:10px; margin:8px 0 0;}
+.posture{font-size:11px; font-weight:700; letter-spacing:.05em; border-radius:99px; padding:3px 9px; white-space:nowrap;}
+.p-open{background:var(--red-soft); color:var(--red-dk);}
+.p-seam{background:var(--amber-bg); color:var(--amber-fg);}
+.p-built{background:var(--green-bg); color:var(--green-fg);}
+
+/* risk matrix widget */
+.mx-wrap{display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:clamp(10px,1.3vw,18px);}
+.mx{display:grid; grid-template-columns:auto repeat(3,minmax(0,1fr)); grid-template-rows:auto repeat(3,minmax(0,1fr)); gap:6px;}
+.mx .axl{display:flex; align-items:center; justify-content:center; font:700 10px/1.2 var(--sans);
+  letter-spacing:.08em; text-transform:uppercase; color:var(--mut); text-align:center; padding:4px;}
+.mx .axl.v{writing-mode:vertical-rl; transform:rotate(180deg);}
+.cell{background:var(--card); border:1px solid var(--line); border-radius:9px; padding:8px; min-height:80px;
+  display:flex; flex-wrap:wrap; gap:5px; align-content:flex-start;}
+.cell.hot{background:#fdf2f2; border-color:#eccaca;}
+.cell.warm{background:var(--cream); border-color:var(--cream-line);}
+.pip{width:30px; height:30px; border-radius:8px; border:1px solid transparent; cursor:pointer;
+  font:700 11px/1 var(--mono); color:#fff; display:flex; align-items:center; justify-content:center;
+  transition:transform .18s ease, box-shadow .18s ease, opacity .18s ease;}
+.pip:hover{transform:translateY(-3px) scale(1.09); box-shadow:var(--shadow);}
+.pip.on{box-shadow:0 0 0 3px #fff, 0 0 0 5px var(--ink); transform:scale(1.09);}
+.pip.dim{opacity:.16;}
+.pip.k1{background:#b31b1b;} .pip.k2{background:#8a5a00;} .pip.k3{background:#1b6e1b;}
+.pip.k4{background:#5b4b8a;} .pip.k5{background:#0f6f7a;}
+.mx-detail{background:var(--card); border:1px solid var(--line); border-radius:11px; padding:clamp(13px,1.6vw,20px); box-shadow:var(--shadow);}
+.mx-detail .obj{font:700 clamp(14px,1.5vw,20px)/1.3 var(--serif); margin:8px 0 8px;}
+.mx-legend{display:flex; gap:12px; flex-wrap:wrap; margin-top:10px;}
+.mx-legend span{display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--mut);}
+.mx-legend i{width:11px; height:11px; border-radius:3px; display:inline-block;}
+
+/* appendix marker in overview + chrome */
+.ovc.appx{background:var(--cream); border-color:var(--cream-line);}
+.ovc.appx .n{color:var(--amber-fg);}
+.ovc .ap{font:700 9px/1 var(--sans); letter-spacing:.1em; color:var(--amber-fg); background:#fff;
+  border:1px solid var(--cream-line); border-radius:99px; padding:3px 7px; align-self:flex-start;}
+#appxflag{display:none; font:700 10px/1 var(--sans); letter-spacing:.12em; color:var(--amber-fg);
+  background:var(--amber-bg); border-radius:99px; padding:5px 10px;}
+#appxflag.on{display:inline-block;}
+
+/* ---------- responsive ---------- */
+@media(max-width:1080px){
+  .g4,.g5,.sc-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .g3{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .tx{grid-template-columns:1fr;} .tx-list{max-height:200px; flex-direction:row; overflow-x:auto;}
+  .tx-item{min-width:210px;}
+  .g21,.g12{grid-template-columns:1fr;}
+}
+@media(max-width:1080px){ .mx-wrap{grid-template-columns:1fr;} }
+@media(max-width:720px){
+  .g2,.g3,.g4,.g5,.sc-grid,.lanes{grid-template-columns:1fr;}
+  .flow{grid-template-columns:1fr;} .flow .arw{transform:rotate(90deg); margin:-4px 0;}
+  .mx .axl.v{writing-mode:horizontal-tb; transform:none;}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important; transition-duration:.01ms !important;}
+}
+@media print{ #chrome,#bar,#ov{display:none;} .slide{position:static; opacity:1; visibility:visible; transform:none; page-break-after:always;} }
+</style>
+</head>
+<body>
+
+<div id="bar" style="width:0"></div>
+<div id="deck">
+
+<!-- ============================ 1 · TITLE ============================ -->
+<section class="slide" data-title="Title">
+ <div class="inner title-wrap">
+  <div class="rule" data-r></div>
+  <div class="kicker" data-r>Cornell AI-DLC · Track A · <span class="badge redb">Progress review</span></div>
+  <h1 data-r>The Cornell&nbsp;Builder</h1>
+  <p class="sub" data-r style="font-size:clamp(16px,1.85vw,25px); color:var(--ink-2); max-width:34ch;">
+    Plain-language infrastructure requests, turned into a pull request a human reviews and merges.
+  </p>
+  <div class="grid g4" style="margin-top:clamp(14px,2.4vh,28px); max-width:820px;">
+    <div class="card stat" data-r><span class="num" data-count="8">0</span><span class="lab">Tools, frozen</span></div>
+    <div class="card stat" data-r><span class="num" data-count="77">0</span><span class="lab">Tests green</span></div>
+    <div class="card stat" data-r><span class="num" data-count="7">0</span><span class="lab">Blueprints</span></div>
+    <div class="card stat" data-r><span class="num" data-count="3">0</span><span class="lab">Delivery surfaces</span></div>
+  </div>
+  <div class="byline">
+    <div data-r><b>What this is</b>An MCP server + the surfaces that wrap it</div>
+    <div data-r><b>Repository</b><a href="https://github.com/cu-aaii/ai-dlc-workshop">cu-aaii/ai-dlc-workshop</a> · public</div>
+    <div data-r><b>Contracts</b><a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a></div>
+    <div data-r><b>Audience</b>Leadership first · engineering detail at the end</div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 2 · THE PROBLEM ============================ -->
+<section class="slide" data-title="The problem today">
+ <div class="inner">
+  <div class="kicker" data-r>02 · What this replaces</div>
+  <h2 data-r>Today, getting cloud infrastructure is a project of its own</h2>
+  <p class="sub" data-r>
+    A Cornell researcher who needs a small AWS service does not have an infrastructure problem — they have a
+    <strong>procedural</strong> problem. Drag the scrubber to walk one request down both paths.
+  </p>
+
+  <div class="scrub" data-r>
+    <div class="scrub-head">
+      <div>
+        <div class="tiny" style="letter-spacing:.12em; text-transform:uppercase; font-weight:700;">Journey step <span id="jn">1</span> of 7</div>
+        <div class="scrub-step" id="jtitle">"I need a chatbot over my course documents."</div>
+      </div>
+      <span class="badge est">⚠ Durations are ESTIMATES — not measured at Cornell</span>
+    </div>
+
+    <div class="rail">
+      <input id="jr" type="range" min="0" max="6" value="0" step="1" aria-label="Journey step">
+      <div class="dots" id="jdots"></div>
+    </div>
+
+    <div class="lanes">
+      <div class="lane">
+        <h4>Manual path today</h4>
+        <div class="body" id="jA">—</div>
+        <div class="clock" id="jAc">—</div>
+      </div>
+      <div class="lane b">
+        <h4>With the Builder</h4>
+        <div class="body" id="jB">—</div>
+        <div class="clock" id="jBc">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g3" style="margin-top:14px;">
+    <div class="card hov" data-r><h3>The expertise wall</h3><p class="small">CloudFormation, tagging conventions, pipeline registration and stack naming are all prerequisites before the first useful thing exists. Most researchers stop here.</p></div>
+    <div class="card hov" data-r><h3>The queue</h3><p class="small">Every step above is somebody else's ticket. The waiting, not the typing, is where the calendar goes.</p></div>
+    <div class="card hov" data-r><h3>The silent failure</h3><p class="small">A request that looks approved and deploys nothing is the worst outcome, and it happens. The <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints">blueprints</a> conventions exist because of it.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 3 · WHAT IT IS ============================ -->
+<section class="slide" data-title="What the Builder is">
+ <div class="inner">
+  <div class="kicker" data-r>03 · In plain language</div>
+  <h2 data-r>Describe what you need. Get a pull request. A human merges it.</h2>
+  <p class="sub" data-r>Three moves, and only the third one changes anything in the cloud.</p>
+
+  <div class="flow" style="margin-bottom:clamp(12px,2vh,20px);">
+    <div class="card hov accent" data-r>
+      <span class="step-n">1</span>
+      <h3>You ask, in your own words</h3>
+      <p class="small">No template, no form, no jargon. <em class="q">"I want a chatbot over my course documents."</em></p>
+    </div>
+    <div class="arw" data-r>→</div>
+    <div class="card hov accent" data-r>
+      <span class="step-n">2</span>
+      <h3>A ranked catalog of blueprints comes back</h3>
+      <p class="small">Every blueprint, ranked — never filtered — each with its inputs, monthly cost, data classification and maturity, so the choice is informed.</p>
+    </div>
+    <div class="arw" data-r>→</div>
+    <div class="card hov accent" data-r>
+      <span class="step-n">3</span>
+      <h3>A pull request is opened for a person to review</h3>
+      <p class="small">Small, conventional, readable. <strong>Merging is what deploys.</strong> Nothing before the merge touches the cloud.</p>
+    </div>
+  </div>
+
+  <div class="grid g21">
+    <div class="card cream" data-r>
+      <h3>A blueprint is the reusable unit</h3>
+      <p class="small" style="margin-bottom:8px;">A blueprint is a governed, self-contained piece of infrastructure that somebody has already got right once — the template, the required Cornell tags, the cost estimate, the data classification. Seven exist today and the catalog is meant to grow.</p>
+      <p class="small" style="margin:0;">
+        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/hello-world">blueprints/hello-world</a>
+        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/notify-topic">blueprints/notify-topic</a>
+        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/knowledgebase">blueprints/knowledgebase</a>
+        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/entra-probe">blueprints/entra-probe</a>
+        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/tiny-chatbot">blueprints/tiny-chatbot</a>
+        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/course-chatbot">blueprints/course-chatbot</a>
+        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/aisei-site">blueprints/aisei-site</a>
+        — index at <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/blueprints/README.md">blueprints/README.md</a>
+      </p>
+    </div>
+    <div class="card" data-r>
+      <h3>What it deliberately is <em>not</em></h3>
+      <ul class="tick cross">
+        <li>Not a deploy button — it cannot deploy.</li>
+        <li>Not an AWS console replacement for platform staff.</li>
+        <li>Not a place credentials live. The user's machine holds nothing.</li>
+        <li>Not a bypass of review. It <em>feeds</em> review.</li>
+      </ul>
+    </div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 4 · THE EIGHT TOOLS ============================ -->
+<section class="slide" data-title="The eight tools">
+ <div class="inner">
+  <div class="kicker" data-r>04 · Capability, expressed as objectives <span class="badge greyb">interactive</span></div>
+  <h2 data-r>Eight tools. Four that read, four that write.</h2>
+  <p class="sub" data-r>
+    The surface is frozen by contract C3 in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a> —
+    renaming even one is a formal, cross-team contract change. Select a tool to see the objective it achieves.
+  </p>
+
+  <div class="tx-filters" data-r>
+    <button class="chipf on" data-f="all">All eight</button>
+    <button class="chipf" data-f="read">Read · answers a question</button>
+    <button class="chipf" data-f="write">Write · proposes a change</button>
+  </div>
+
+  <div class="tx" data-r>
+    <div class="tx-list" id="txlist"></div>
+    <div class="tx-detail" id="txdetail"></div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 5 · USER STORY ============================ -->
+<section class="slide" data-title="User story">
+ <div class="inner">
+  <div class="kicker" data-r>05 · End to end</div>
+  <h2 data-r>Priya wants a chatbot over her course readings</h2>
+  <p class="sub" data-r>
+    An illustrative composite of the <strong>Builder</strong> persona defined in
+    <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/docs/aidlc/builder-mcp/inception/user-stories/personas.md">docs/aidlc/builder-mcp/inception/user-stories/personas.md</a>:
+    a lecturer who wants a working course tool this term and has no intention of learning CloudFormation.
+  </p>
+
+  <div class="grid g2">
+    <div class="card hov" data-r><h3><span class="step-n">1</span><br>She asks</h3>
+      <p class="small"><em class="q">"I want a chatbot my students can ask questions of, over the readings for my course."</em> She types this into Claude, the same way she'd ask a colleague.</p></div>
+    <div class="card hov" data-r><h3><span class="step-n">2</span><br>She sees the shelf, not a form</h3>
+      <p class="small">A ranked list comes back. Each entry carries its monthly cost, what data classification it is cleared for, and how mature it is. She picks the knowledge-base blueprint because it says out loud that course documents are not public data.</p></div>
+    <div class="card hov" data-r><h3><span class="step-n">3</span><br>She reads a plan before anything happens</h3>
+      <p class="small">The Builder returns a <strong>plan</strong>, not an action: the stack that would be created, the cost, the pull request that would be opened. Nothing has been done. She confirms.</p></div>
+    <div class="card hov" data-r><h3><span class="step-n">4</span><br>A reviewer gets a small, familiar diff</h3>
+      <p class="small">One pipeline action added, plus the deployment's own record. Conventional shape, minutes to read — exactly what the reviewer persona says they need to approve quickly and safely.</p></div>
+    <div class="card hov" data-r><h3><span class="step-n">5</span><br>The merge deploys it</h3>
+      <p class="small">A human clicks merge. The platform pipeline builds and deploys. Priya never held an AWS credential and never opened the console.</p></div>
+    <div class="card hov cream" data-r><h3><span class="step-n">6</span><br>She can still ask questions afterwards</h3>
+      <p class="small">"Is it live?" · "Why did it fail?" · "Write me the security summary." · "Write the handover doc for the RA taking this over in May." All plain language, all read-only.</p></div>
+  </div>
+
+  <p class="tiny" data-r style="margin-top:12px;">
+    Four personas — Builder, Reviewer, Platform Operator, Blueprint Author — drive the design; the story-to-tool mapping is in
+    <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/docs/aidlc/builder-mcp/inception/user-stories/story-tool-map.md">docs/aidlc/builder-mcp/inception/user-stories/story-tool-map.md</a>.
+  </p>
+ </div>
+</section>
+
+<!-- ============================ 6 · GOVERNANCE ============================ -->
+<section class="slide" data-title="Governance">
+ <div class="inner">
+  <div class="kicker" data-r>06 · Why leadership can trust it</div>
+  <h2 data-r>The guarantees are permanent, not current limitations</h2>
+  <p class="sub" data-r>
+    These four hold for every tool, forever. They are written into contract C3, asserted by the test suite, and
+    they are the reason an AI-driven tool can be pointed at a shared AWS account at all.
+  </p>
+
+  <div class="grid g2">
+    <div class="card accent hov" data-r><h3>✕ It never merges</h3>
+      <p class="small">No tool can merge a pull request. Not with a token, not with elevated rights, not by asking twice. Approval is a human act and there is no code path around it.</p></div>
+    <div class="card accent hov" data-r><h3>✕ It never pushes to a tracked branch</h3>
+      <p class="small">Every change arrives as a new branch and a pull request. The main branch is never written to directly, so the review gate cannot be stepped over.</p></div>
+    <div class="card accent hov" data-r><h3>✕ It never calls CloudFormation Create, Update or Delete</h3>
+      <p class="small">The server cannot create, change or destroy a stack. That permission belongs to the platform pipeline, and the pipeline acts only on a merge. Even deletion is a pull request.</p></div>
+    <div class="card accent hov" data-r><h3>✕ The user's machine holds no credential</h3>
+      <p class="small">No AWS keys, no git token on the researcher's laptop. The server process holds what it needs; the client holds nothing. Revocation is central and immediate.</p></div>
+  </div>
+
+  <div class="card cream" data-r style="margin-top:14px;">
+    <h3>One sentence for the risk register</h3>
+    <p style="margin:6px 0 0; font-size:clamp(13px,1.32vw,18px); line-height:1.5;">
+      A deployment happens exactly one way — <strong>a human approves the pull request the Builder opened, and the merge does the rest</strong>.
+      Everything the Builder can do before that point is either reading, or writing a proposal.
+    </p>
+  </div>
+
+  <p class="tiny" data-r style="margin-top:12px;">
+    Written down in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a> (C3, C5) ·
+    AWS permissions in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/infra/builder-mcp.yml">packages/builder-mcp/infra/builder-mcp.yml</a> ·
+    live tool-by-tool evidence in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/docs/tool-verification.html">packages/builder-mcp/docs/tool-verification.html</a> ·
+    tests in <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/packages/builder-mcp/tests">packages/builder-mcp/tests</a>.
+  </p>
+ </div>
+</section>
+
+<!-- ============================ 7 · AI-DLC SCORECARD ============================ -->
+<section class="slide" data-title="AI-DLC scorecard">
+ <div class="inner">
+  <div class="kicker" data-r>07 · Method maturity <span class="badge greyb">interactive</span></div>
+  <h2 data-r>How well did we actually follow AI-DLC?</h2>
+  <p class="sub" data-r>
+    The five always-execute stages of the AI-DLC adaptive workflow, per
+    <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/docs/aidlc-rules">docs/aidlc-rules</a> (v1.0.1).
+    Scored honestly. Click a stage; use the filters to see only what is weak.
+  </p>
+
+  <div class="sc-top" data-r>
+    <div class="tx-filters" style="margin:0;">
+      <button class="chipf on" data-sf="all">All five</button>
+      <button class="chipf" data-sf="s">Strong</button>
+      <button class="chipf" data-sf="p">Partial</button>
+      <button class="chipf" data-sf="t">Thin</button>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; flex:1; justify-content:flex-end; min-width:240px;">
+      <span class="tiny" style="white-space:nowrap;">3 strong · 1 partial · 1 thin</span>
+      <div class="meter"><i class="m-s" style="width:0"></i><i class="m-p" style="width:0"></i><i class="m-t" style="width:0"></i></div>
+    </div>
+  </div>
+
+  <div class="sc-grid" id="scgrid" data-r></div>
+  <div class="sc-detail" id="scdetail" data-r></div>
+ </div>
+</section>
+
+<!-- ============================ 8 · THREE SURFACES ============================ -->
+<section class="slide" data-title="Three surfaces">
+ <div class="inner">
+  <div class="kicker" data-r>08 · Delivery</div>
+  <h2 data-r>Three ways in. One server underneath.</h2>
+  <p class="sub" data-r>
+    These are <strong>siblings, not forks</strong>. Each is a client of the same server, running the same eight tools under the same
+    governance invariants. Fix the server once and all three inherit it; there is no second implementation to keep in step.
+  </p>
+
+  <div class="grid g3" style="margin-bottom:14px;">
+    <div class="card srv hov" data-r>
+      <div class="top" style="background:var(--red);"></div>
+      <div style="font-size:26px; margin-bottom:6px;">⚙️</div>
+      <h3>The MCP server</h3>
+      <p class="small">The product. Eight tools, the catalog, the pull-request machinery and every AWS read. Deployed to AWS Bedrock AgentCore by the same merge-deploys rule it enforces on everyone else.</p>
+      <p class="tiny" style="margin-top:8px;"><a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/README.md">packages/builder-mcp/README.md</a></p>
+    </div>
+    <div class="card srv hov" data-r>
+      <div class="top" style="background:#8a5a00;"></div>
+      <div style="font-size:26px; margin-bottom:6px;">🖥️</div>
+      <h3>Browser devtools console <span class="badge greyb">teammate's work</span></h3>
+      <p class="small">A local browser harness built by a colleague: every tool, its schema, and a live log of every call. This is what you demo from when you want the audience to see the machinery working, not just the answer.</p>
+      <p class="tiny" style="margin-top:8px;"><a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/devtools/README.md">packages/builder-mcp/devtools/README.md</a></p>
+    </div>
+    <div class="card srv hov" data-r>
+      <div class="top" style="background:#1b6e1b;"></div>
+      <div style="font-size:26px; margin-bottom:6px;">🔌</div>
+      <h3>Claude Code / Cowork plugin <span class="badge amber">new</span></h3>
+      <p class="small">One install command and the eight tools appear inside Claude, with a skill that teaches Claude to use them correctly. It fetches the server straight from the public repo — no checkout, no build step, no credential.</p>
+      <p class="tiny" style="margin-top:8px;">
+        <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/plugin/README.md">packages/builder-mcp/plugin/README.md<span class="nb">NEW</span></a>
+        <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/plugin/SPEC-PLUGIN.md">packages/builder-mcp/plugin/SPEC-PLUGIN.md<span class="nb">NEW</span></a>
+      </p>
+    </div>
+  </div>
+
+  <div class="card hub" data-r>
+    <p style="margin:0 0 6px; font:700 clamp(14px,1.5vw,20px)/1.35 var(--serif);">All three speak to <code>builder_mcp.server</code>. None of them owns it.</p>
+    <p class="small" style="margin:0;">
+      The plugin's own contract document says this in its first paragraph and forbids changing the server to suit packaging.
+      The plugin adds <em>zero</em> tools: the C3 surface stays at exactly eight, and a test enforces the count.
+      Plugin files —
+      <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/plugin/.claude-plugin/plugin.json">packages/builder-mcp/plugin/.claude-plugin/plugin.json<span class="nb">NEW</span></a>
+      <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/plugin/.mcp.json">packages/builder-mcp/plugin/.mcp.json<span class="nb">NEW</span></a>
+      <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/plugin/skills/builder-mcp/SKILL.md">packages/builder-mcp/plugin/skills/builder-mcp/SKILL.md<span class="nb">NEW</span></a>
+    </p>
+  </div>
+
+  <div class="grid g2" style="margin-top:12px;">
+    <div class="card" data-r><h3>Verified, not assumed</h3>
+      <ul class="tick" style="margin-top:6px;">
+        <li>Installs non-interactively with <code>claude plugin install</code>.</li>
+        <li>Passes <code>claude plugin validate --strict</code>, warnings treated as fatal.</li>
+        <li>All eight tools answer a live handshake over stdio.</li>
+        <li>The colleague's console still starts and connects, untouched.</li>
+      </ul>
+      <p class="tiny" style="margin-top:8px;">Cowork packaging is one script:
+        <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/plugin/build.sh">packages/builder-mcp/plugin/build.sh<span class="nb">NEW</span></a></p>
+      </div>
+    <div class="card cream" data-r><h3>Why "new" badges appear on some links</h3>
+      <p class="small">The plugin is not yet merged to the main branch. Links marked <span class="badge amber">NEW</span> point at where the file will live and will 404 until the pull request merges — which is, fittingly, the same gate everything else goes through.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 9 · VALUE ============================ -->
+<section class="slide" data-title="Value to the community">
+ <div class="inner">
+  <div class="kicker" data-r>09 · Compounding value</div>
+  <h2 data-r>The value is not the first deployment. It's the hundredth.</h2>
+  <p class="sub" data-r>Every piece of this gets more useful as more of the university uses it — which is the opposite of how one-off consulting engagements behave.</p>
+
+  <div class="grid g3">
+    <div class="card hov" data-r><h3>📚 Solved once, reused forever</h3>
+      <p class="small">A blueprint encodes somebody's hard-won correct answer — the template, the four required Cornell tags, the cost profile, the data classification. The second department to want that thing gets it for free, already compliant.</p></div>
+    <div class="card hov" data-r><h3>📈 The catalog grows with the institution</h3>
+      <p class="small">Blueprint authorship is a first-class role, not a favour. A unit that builds something good contributes it back and every builder on campus can find it — without maintaining forty forks of it.</p></div>
+    <div class="card hov" data-r><h3>📄 Specs on demand, for six audiences</h3>
+      <p class="small">Any deployment can render itself as prose for whoever is asking: a security reviewer, a developer, a stakeholder, an incoming staff member, or someone offboarding. The document is generated from what is actually deployed, so it cannot go stale.</p></div>
+    <div class="card hov" data-r><h3>🏷️ Inventory that is actually complete</h3>
+      <p class="small">Because every blueprint must carry owner, blueprint, version and deployment-id tags, the platform team can answer "what is running, who owns it, what does it cost" across everything — not just the deployments they personally set up.</p></div>
+    <div class="card hov" data-r><h3>🤝 Handover stops being a crisis</h3>
+      <p class="small">Research staff turn over constantly. A deployment that can describe itself, on request, in transfer and offboarding form is one that survives the person who created it leaving.</p></div>
+    <div class="card hov cream" data-r><h3>🎓 It teaches while it works</h3>
+      <p class="small">Every request produces a readable pull request. Builders who want to learn the platform can read exactly what was proposed on their behalf. The path from "I used the tool" to "I understand the tool" is open, not hidden.</p></div>
+  </div>
+
+  <p class="tiny" data-r style="margin-top:12px;">
+    Blueprint requirements — the four mandatory <code>cornell:*</code> tags, pipeline registration, the "no manifest, no catalog entry" rule —
+    are in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/blueprints/README.md">blueprints/README.md</a>.
+  </p>
+ </div>
+</section>
+
+<!-- ============================ 10 · DIVIDER ============================ -->
+<section class="slide divider" data-title="Glasses off">
+ <div class="inner title-wrap">
+  <div class="kicker" data-r>Section two · for the engineering teams</div>
+  <h1 data-r style="max-width:20ch;">Taking off the rosy-eyed&nbsp;glasses.</h1>
+  <p class="sub" data-r style="max-width:60ch; font-size:clamp(15px,1.65vw,22px);">
+    Everything up to here is true and none of it is the whole story. The next three slides are the constraints,
+    the honest answer to "who can actually use this today", and what has to change organisationally before the
+    answer becomes "a researcher".
+  </p>
+  <div class="grid g3" style="margin-top:26px; max-width:900px;">
+    <div class="card" data-r><h3>Bottlenecks</h3><p class="small">Measured limits, not vibes.</p></div>
+    <div class="card" data-r><h3>Who it's for</h3><p class="small">Today vs aspirationally, with the gaps named.</p></div>
+    <div class="card" data-r><h3>Change management</h3><p class="small">The review gate is a people problem.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 11 · BOTTLENECKS ============================ -->
+<section class="slide" data-title="Bottlenecks">
+ <div class="inner">
+  <div class="kicker" data-r>11 · Honest constraints <span class="badge amber">developer-oriented</span></div>
+  <h2 data-r>Five things that will bite, in the order they'll bite you</h2>
+  <p class="sub" data-r>All verified. None are hypothetical, and the first one has already surprised people in a demo.</p>
+
+  <div class="grid g2">
+    <div class="card accent hov" data-r>
+      <h3>1 · Roughly six catalog searches per hour without a token</h3>
+      <p class="small">Anonymous GitHub API access costs <strong>~9 requests per catalog search</strong> (one directory listing plus one per catalog entry) against a <strong>60&nbsp;requests/hour per-IP</strong> ceiling. That is about <strong>six searches an hour</strong>.
+      On a shared campus NAT, everyone behind that address shares the same 60. A token raises the ceiling to <strong>5,000/hour</strong>.</p>
+      <div class="grid g3" style="margin-top:10px;">
+        <div class="card stat" style="box-shadow:none; background:var(--code);"><span class="num" style="font-size:clamp(20px,2.6vw,34px);" data-count="9">0</span><span class="lab">reqs / search</span></div>
+        <div class="card stat" style="box-shadow:none; background:var(--code);"><span class="num" style="font-size:clamp(20px,2.6vw,34px);" data-count="60">0</span><span class="lab">anon / hour</span></div>
+        <div class="card stat" style="box-shadow:none; background:var(--cream);"><span class="num" style="font-size:clamp(20px,2.6vw,34px);" data-count="5000">0</span><span class="lab">with token</span></div>
+      </div>
+    </div>
+    <div class="card accent hov" data-r>
+      <h3>2 · No token means every write is a dry run</h3>
+      <p class="small">Without a GitHub token, every write tool returns a <strong>plan</strong> instead of opening a pull request. This is by design and is documented — and it still surprises people, because the plan looks like success. If a demo "creates a deployment" and no PR exists, this is why.</p>
+    </div>
+    <div class="card accent hov" data-r>
+      <h3>3 · The catalog always reads the default branch</h3>
+      <p class="small">The catalog fetch reads the repository's <strong>default branch</strong>. There is no branch override. An installed plugin therefore sees <code>main</code> regardless of which branch you are working on — so a blueprint you just wrote on a feature branch is invisible to the tool until it merges.</p>
+    </div>
+    <div class="card accent hov" data-r>
+      <h3>4 · <code>uv</code> must be installed locally</h3>
+      <p class="small">The plugin launches the server through <code>uv</code>. Its absence is an install-time failure, deliberately loud rather than a silent tool-less session — but it <em>is</em> a prerequisite on every machine, and one more thing to put in the onboarding instructions.</p>
+    </div>
+    <div class="card accent hov" data-r>
+      <h3>5 · AWS access is still required to read status</h3>
+      <p class="small">Creating a deployment needs no AWS credential. <em>Watching</em> it does: stack status, pipeline stages and health checks are real AWS reads. Without credentials those tools degrade to a clear error rather than a lie — but "is my thing live yet?" goes unanswered.</p>
+    </div>
+    <div class="card cream" data-r>
+      <h3>Where these are written down</h3>
+      <p class="small">Rate-limit measurement and the token policy: <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/plugin/SPEC-PLUGIN.md">packages/builder-mcp/plugin/SPEC-PLUGIN.md<span class="nb">NEW</span></a> (P2, P4).
+      Degradation behaviour: <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a> (C5).
+      Known gaps and agreed-but-unbuilt work: <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/BACKLOG.md">packages/builder-mcp/BACKLOG.md</a> and
+      <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/ROADMAP.md">packages/builder-mcp/ROADMAP.md</a>.</p>
+    </div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 12 · WHO IS IT FOR ============================ -->
+<section class="slide" data-title="Who it's for">
+ <div class="inner">
+  <div class="kicker" data-r>12 · Today vs aspirationally</div>
+  <h2 data-r>Today this is for a developer. The goal is that it isn't.</h2>
+  <p class="sub" data-r>
+    The design target is a researcher with no CloudFormation knowledge. That is not who can use it this afternoon,
+    and pretending otherwise would set the pilot up to fail.
+  </p>
+
+  <div class="grid g2" style="margin-bottom:14px;">
+    <div class="card hov" data-r style="border-top:4px solid var(--red);">
+      <h3>Today · a developer or a technically confident RSE</h3>
+      <p class="small" style="margin-bottom:8px;">Someone who already has:</p>
+      <ul class="tick dot">
+        <li>Claude Code or Cowork installed and working.</li>
+        <li>Comfort with <code>uv</code>, a terminal, and a package manager.</li>
+        <li>A GitHub account, and the judgement to create and scope a token.</li>
+        <li>Enough fluency to read a pull request diff and tell whether it says what they meant.</li>
+        <li>AWS credentials, if they want to watch the deployment progress.</li>
+      </ul>
+    </div>
+    <div class="card hov cream" data-r style="border-top:4px solid #8a5a00;">
+      <h3>Aspirationally · a researcher who has never heard of CloudFormation</h3>
+      <p class="small" style="margin-bottom:8px;">Someone whose entire interaction is:</p>
+      <ul class="tick">
+        <li>Describe the thing they want, in their own words.</li>
+        <li>Read a plain-language plan and a cost, and say yes.</li>
+        <li>Get told when it is live, and be able to ask why if it isn't.</li>
+      </ul>
+      <p class="small" style="margin-top:10px;">Nothing in the architecture prevents this. The gap is entirely in setup, identity and support.</p>
+    </div>
+  </div>
+
+  <div class="card" data-r>
+    <h3 style="margin-bottom:10px;">The specific gaps between those two people</h3>
+    <table>
+      <thead><tr><th style="width:23%">Gap</th><th style="width:39%">What it means today</th><th>What has to change</th></tr></thead>
+      <tbody>
+        <tr><td><b>Installation</b></td><td>A terminal, a package manager and <code>uv</code> before the first search.</td><td>A managed or pre-provisioned client, so nobody installs anything.</td></tr>
+        <tr><td><b>Credentials</b></td><td>The user creates and scopes their own GitHub token to get past the anonymous rate limit and open real pull requests.</td><td>Institutional identity — a GitHub App installation, and per-user NetID identity rather than a shared application identity — so no researcher ever handles a token. Both are already the stated next targets.</td></tr>
+        <tr><td><b>Reading the output</b></td><td>The dry-run plan and the resulting diff assume the reader can sanity-check them.</td><td>Plain-language plan summaries and cost framing aimed at a non-engineer, plus a reviewer who is expected to catch what the requester can't.</td></tr>
+        <tr><td><b>Catalog coverage</b></td><td>Seven blueprints. If the thing you want isn't there, the honest answer is "not yet".</td><td>A blueprint contribution pipeline and enough catalog breadth that a first-time ask usually lands.</td></tr>
+        <tr><td><b>Watching it work</b></td><td>Status and health need AWS credentials the researcher will never have.</td><td>Status surfaced through the platform rather than the user's own AWS access.</td></tr>
+        <tr><td><b>Support path</b></td><td>When it goes wrong, the user is on their own with an error narrative.</td><td>A named team that owns "my deployment is stuck", with a response expectation.</td></tr>
+      </tbody>
+    </table>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 13 · CHANGE MANAGEMENT ============================ -->
+<section class="slide" data-title="Change management">
+ <div class="inner">
+  <div class="kicker" data-r>13 · Bridging the gap</div>
+  <h2 data-r>The hard part is not the software. It's the review queue.</h2>
+  <p class="sub" data-r>
+    The Builder deliberately routes everything through a human merge. That is the security model — and it means
+    the system's throughput is set by <strong>how many people can review, and how quickly</strong>. This is a staffing and
+    training question, not an engineering one.
+  </p>
+
+  <div class="grid g3" style="margin-bottom:14px;">
+    <div class="card hov" data-r><h3>Who must be trained</h3>
+      <ul class="tick dot" style="margin-top:6px;">
+        <li><b>Builders</b> — that a plan is not a deployment, and that a pull request needs a human before anything happens.</li>
+        <li><b>Reviewers</b> — what a well-formed registration pull request looks like, and which three or four things actually need checking.</li>
+        <li><b>Blueprint authors</b> — the manifest contract, the mandatory tags, and the traps that produce a green pull request that deploys nothing.</li>
+        <li><b>Platform operators</b> — inventory, cost attribution and teardown, all of which depend on tagging discipline holding.</li>
+      </ul></div>
+    <div class="card hov" data-r><h3>Who must approve</h3>
+      <ul class="tick dot" style="margin-top:6px;">
+        <li>A <b>second person</b> on every pull request — nobody approves their own.</li>
+        <li>The <b>platform team</b> owns the shared AWS account, the pipeline and the secrets. That does not move.</li>
+        <li><b>Security</b> signs off the model once, not per deployment — the exportable security spec exists precisely to make that repeatable.</li>
+        <li><b>Data governance</b> decides which classifications a blueprint may carry; the tool enforces the answer, it does not make it.</li>
+      </ul></div>
+    <div class="card hov" data-r><h3>Why the gate is a feature</h3>
+      <p class="small">Removing the human merge would remove the entire safety argument. The correct response to a slow queue is
+      <strong>more reviewers and smaller diffs</strong> — never an automated merge. Every design choice so far pushes in that direction:
+      one-action insertions, conventional stack names, readable diffs.</p>
+      <p class="small" style="margin-top:8px;">A reviewer's stated fear is an unreviewable diff. Keeping diffs small is how we protect the queue.</p></div>
+  </div>
+
+  <div class="card cream" data-r>
+    <h3 style="margin-bottom:8px;">Growing reviewer capacity — the plan, in escalating order</h3>
+    <div class="grid g4" style="margin-top:4px;">
+      <div><div class="step-n">1</div><p class="small"><b>Make review cheap.</b> Small, conventional pull requests that a trained reviewer reads in minutes. Already the design.</p></div>
+      <div><div class="step-n">2</div><p class="small"><b>Automate the checkable part.</b> Convention, registration and template validity are already machine-checked, so humans spend their attention on judgement, not syntax.</p></div>
+      <div><div class="step-n">3</div><p class="small"><b>Train a reviewer cohort per college or unit.</b> Reviewing does not require platform-team membership — it requires knowing what to look for. Publish that checklist.</p></div>
+      <div><div class="step-n">4</div><p class="small"><b>Tier by risk.</b> A zero-cost, public-data blueprint and a stack holding student records do not warrant the same scrutiny. Classification is already in every manifest; use it to route.</p></div>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:12px;">
+    <div class="card" data-r><h3>Risks to name out loud</h3>
+      <ul class="tick cross" style="margin-top:6px;">
+        <li><b>Catalog starvation</b> — already recorded as a high risk. A catalog that doesn't cover what people ask for makes the tool feel broken.</li>
+        <li><b>Reviewer bottleneck</b> — a fast requester queued behind a slow gate is a worse experience than the ticket it replaced.</li>
+        <li><b>Orphaned deployments</b> — owners graduate and leave. Teardown must be as governed as creation, and it is: deletion is a pull request too.</li>
+        <li><b>Over-trust</b> — an approved plan that nobody actually read is the failure mode to design against.</li>
+      </ul></div>
+    <div class="card" data-r><h3>What we are <em>not</em> asking for</h3>
+      <ul class="tick" style="margin-top:6px;">
+        <li>No new AWS access for researchers. The credential boundary does not move.</li>
+        <li>No change to who owns the shared account.</li>
+        <li>No bypass of security or data-governance review.</li>
+        <li>No new approval body — the reviewers are the ones already approving pull requests.</li>
+      </ul>
+      <p class="small" style="margin-top:10px;">The ask is <strong>trained reviewers, a named support path, and permission to pilot</strong>.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 14 · NEXT STEPS ============================ -->
+<section class="slide" data-title="Next steps">
+ <div class="inner">
+  <div class="kicker" data-r>14 · Immediate next steps</div>
+  <h2 data-r>What happens next, and who it needs</h2>
+  <p class="sub" data-r>Near-term and concrete. Everything here is either already in flight or blocked on one decision.</p>
+
+  <div class="grid g2">
+    <div class="card accent hov" data-r><h3>1 · Merge the plugin</h3>
+      <p class="small">It validates strictly, installs non-interactively, and all eight tools answer a live handshake. It is on a branch. Open the pull request, get it reviewed, merge it — after which every <span class="badge amber">NEW</span> link in this deck resolves.</p>
+      <p class="tiny" style="margin-top:6px;">Needs: one reviewer.</p></div>
+
+    <div class="card accent hov" data-r><h3>2 · Get off anonymous GitHub access</h3>
+      <p class="small">Six searches an hour per IP is not a pilot-ready number on a shared campus network. Short term, document token creation in the install instructions. Properly, install a GitHub App so the platform holds the credential and no user ever does.</p>
+      <p class="tiny" style="margin-top:6px;">Needs: an org-level GitHub decision.</p></div>
+
+    <div class="card accent hov" data-r><h3>3 · Run one end-to-end deployment on real AWS</h3>
+      <p class="small">Request → plan → pull request → merge → pipeline → live stack, measured, more than once, so we can quote a rate rather than an anecdote. This is the single biggest gap in the maturity scorecard and it is blocked only on account access.</p>
+      <p class="tiny" style="margin-top:6px;">Needs: AWS account access and a scheduled window.</p></div>
+
+    <div class="card accent hov" data-r><h3>4 · Grow the catalog past seven</h3>
+      <p class="small">Catalog starvation is the top product risk. Recruit two or three blueprint authors from units that already have something worth sharing, and put them through the manifest contract.</p>
+      <p class="tiny" style="margin-top:6px;">Needs: two or three volunteers and a review of their first submissions.</p></div>
+
+    <div class="card accent hov" data-r><h3>5 · Publish the reviewer checklist and name the support path</h3>
+      <p class="small">Reviewer capacity is the throughput ceiling. Write the four-item checklist, train a first cohort, and put a name against "my deployment is stuck".</p>
+      <p class="tiny" style="margin-top:6px;">Needs: a decision on who owns support.</p></div>
+
+    <div class="card cream" data-r><h3>6 · Pilot with a real researcher</h3>
+      <p class="small">One willing, technically confident researcher with a real need — not a demo. The purpose is to find out which of the gaps on the previous slide actually blocks them, rather than which ones we assume will.</p>
+      <p class="tiny" style="margin-top:6px;">Needs: leadership permission to pilot, and a candidate.</p></div>
+  </div>
+
+  <div class="card" data-r style="margin-top:14px;">
+    <h3 style="margin-bottom:8px;">Read further</h3>
+    <p class="small" style="margin:0;">
+      Repository: <a href="https://github.com/cu-aaii/ai-dlc-workshop">cu-aaii/ai-dlc-workshop</a> ·
+      Contracts <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a> ·
+      How to run <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/README.md">packages/builder-mcp/README.md</a> ·
+      Ordered next actions <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/ROADMAP.md">packages/builder-mcp/ROADMAP.md</a> ·
+      Agreed backlog <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/BACKLOG.md">packages/builder-mcp/BACKLOG.md</a> ·
+      Decision log <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/docs/aidlc/builder-mcp/PROJECT-KNOWLEDGE.md">docs/aidlc/builder-mcp/PROJECT-KNOWLEDGE.md</a> ·
+      Deploy runbook <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/deploy/HANDOFF.md">packages/builder-mcp/deploy/HANDOFF.md</a> ·
+      Local testing <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/deploy/LOCAL-TESTING.md">packages/builder-mcp/deploy/LOCAL-TESTING.md</a> ·
+      Plugin contracts <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/plugin/SPEC-PLUGIN.md">packages/builder-mcp/plugin/SPEC-PLUGIN.md<span class="nb">NEW</span></a>
+    </p>
+  </div>
+
+  <p class="tiny" data-r style="margin-top:12px;">
+    <b>The main deck ends here.</b> An optional appendix follows — five more slides on open risk vectors.
+    Show it to a technical or governance audience; skip it if the room is short on time.
+  </p>
+ </div>
+</section>
+
+<!-- ============================ 15 · APPENDIX DIVIDER ============================ -->
+<section class="slide appx-hero" data-title="Appendix opens" data-appx="1">
+ <div class="inner title-wrap">
+  <div class="rule" data-r></div>
+  <div class="kicker" data-r>Optional appendix · safe to skip</div>
+  <h1 data-r style="max-width:16ch;">Open risk vectors.</h1>
+  <p class="sub" data-r style="max-width:62ch; font-size:clamp(15px,1.65vw,22px); color:var(--ink-2);">
+    Questions we have not answered yet, raised so that nobody has to discover them in production.
+  </p>
+
+  <div class="optional-strip" data-r style="max-width:74ch; margin-bottom:18px;">
+    <p style="margin:0; font-size:clamp(12.5px,1.13vw,15px); line-height:1.55;">
+      <strong>Read this section as forward-looking risk, not as an incident log.</strong>
+      Nothing on the following slides is a known failure, an outage, or something that has gone wrong.
+      These are open questions and design risks for a system that has not yet been used at scale by people
+      outside the team. Several of them already have a partial answer built in — where that is true, it is
+      marked, because a half-solved risk and an unexamined one are very different things.
+    </p>
+  </div>
+
+  <div class="grid g5" style="max-width:1080px;">
+    <div class="card" data-r style="border-top:4px solid #b31b1b;"><span class="badge redb">Category 1</span><h3 style="margin-top:8px;">Natural language &amp; prompt robustness</h3></div>
+    <div class="card" data-r style="border-top:4px solid #8a5a00;"><span class="badge amber">Category 2</span><h3 style="margin-top:8px;">Authentication, authorization &amp; identity</h3></div>
+    <div class="card" data-r style="border-top:4px solid #1b6e1b;"><span class="badge green">Category 3</span><h3 style="margin-top:8px;">Fail-fast execution &amp; safe prototyping</h3></div>
+    <div class="card" data-r style="border-top:4px solid #5b4b8a;"><span class="badge greyb">Category 4</span><h3 style="margin-top:8px;">Workflow hardening &amp; intent boundaries</h3></div>
+    <div class="card" data-r style="border-top:4px solid #0f6f7a;"><span class="badge greyb">Category 5</span><h3 style="margin-top:8px;">Gaps we should also be naming</h3></div>
+  </div>
+
+  <p class="tiny" data-r style="margin-top:16px;">Categories 1–4 raised by the project lead. Category 5 added in response to "what are we <em>not</em> thinking about?"</p>
+ </div>
+</section>
+
+<!-- ============================ 16 · CATEGORIES 1 & 2 ============================ -->
+<section class="slide" data-title="Language &amp; identity risk" data-appx="1">
+ <div class="inner">
+  <div class="kicker" data-r>Appendix · categories 1 and 2 <span class="badge est">open questions, not failures</span></div>
+  <h2 data-r>Can it understand real people, and does it know who they are?</h2>
+  <p class="sub" data-r>The first two risk categories sit at opposite ends of the same request: what the user typed, and whether they were allowed to type it.</p>
+
+  <div class="grid g2">
+    <div class="card rk-card c1 hov" data-r>
+      <span class="rk-n">R1</span>
+      <span class="badge redb">Category 1 · language</span>
+      <h3 style="margin-top:8px;">Linguistic variability</h3>
+      <p class="small">How resilient are the tool calls and prompt wrappers to language that is not clean, standard English?
+      Typos, grammatical errors, non-native phrasing, and the compressed half-sentences a student actually types into a syllabus bot at 11pm.
+      Our own testing has been done by people who write like the documentation.</p>
+      <p class="q-open">Open question: what is the failure mode when a query is understood approximately rather than exactly — a wrong-but-plausible blueprint match, or a clean "I'm not sure what you mean"?</p>
+      <p style="margin-top:10px;"><span class="posture p-open">OPEN</span></p>
+    </div>
+
+    <div class="card rk-card c1 hov" data-r>
+      <span class="rk-n">R2</span>
+      <span class="badge redb">Category 1 · language</span>
+      <h3 style="margin-top:8px;">Prompt specificity battery</h3>
+      <p class="small">There is no structured test battery benchmarking reliability across a spectrum of prompt clarity —
+      from vague and ambiguous ("I need an AI thing for my class") through to hyper-specific structured instruction.
+      Without one, "it works" means "it worked for the phrasings we happened to try".</p>
+      <p class="q-open">Open question: what does the reliability curve look like as prompts get vaguer, and where on that curve does it become unsafe rather than merely unhelpful?</p>
+      <p style="margin-top:10px;"><span class="posture p-open">OPEN</span></p>
+    </div>
+
+    <div class="card rk-card c2 hov" data-r>
+      <span class="rk-n">R3</span>
+      <span class="badge amber">Category 2 · identity</span>
+      <h3 style="margin-top:8px;">Access control scope per deployment tier</h3>
+      <p class="small">A public, student-facing service and an internal staff workflow do not warrant the same authentication posture,
+      and we have not decided what each tier should require. The server's inbound authentication currently runs in an open testing-phase mode
+      with an institutional identity path designed and stashed behind a switch — the decision about <em>which tier gets which</em> has not been made.</p>
+      <p class="q-open">Open question: what is the minimum acceptable auth for each deployment tier, and who signs that off?</p>
+      <p style="margin-top:10px;"><span class="posture p-seam">DESIGNED, NOT DECIDED</span>
+      <span class="tiny"> &nbsp;See C5 in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a></span></p>
+    </div>
+
+    <div class="card rk-card c2 hov" data-r>
+      <span class="rk-n">R4</span>
+      <span class="badge amber">Category 2 · identity</span>
+      <h3 style="margin-top:8px;">Identity context passing, before execution</h3>
+      <p class="small">User identity and role-based permissions must be verified <strong>before</strong> the server executes a downstream action or retrieves
+      restricted context — not after, and not as a display-only field. The known gap is real and documented: the production authentication path
+      carries <em>application</em> identity, whereas per-user NetID identity requires a different flow that is on the backlog, not built.</p>
+      <p class="q-open">Open question: until per-user identity lands, what may a deployment be allowed to retrieve on a user's behalf?</p>
+      <p style="margin-top:10px;"><span class="posture p-seam">GAP NAMED IN THE SPEC</span>
+      <span class="tiny"> &nbsp;<a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/BACKLOG.md">packages/builder-mcp/BACKLOG.md</a></span></p>
+    </div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 17 · CATEGORIES 3 & 4 ============================ -->
+<section class="slide" data-title="Sandboxing &amp; intent boundaries" data-appx="1">
+ <div class="inner">
+  <div class="kicker" data-r>Appendix · categories 3 and 4 <span class="badge est">open questions, not failures</span></div>
+  <h2 data-r>Can people experiment safely, and can the tool be pushed off its job?</h2>
+  <p class="sub" data-r>Categories 3 and 4 are about what happens either side of a correct request: safe failure before it, and boundary enforcement during it.</p>
+
+  <div class="grid g2">
+    <div class="card rk-card c3 hov" data-r>
+      <span class="rk-n">R5</span>
+      <span class="badge green">Category 3 · fail fast</span>
+      <h3 style="margin-top:8px;">A rapid-iteration sandbox</h3>
+      <p class="small">Non-technical faculty and staff need somewhere to fail fast — to try a thing, watch it not work, adjust, and try again —
+      with no downstream consequence and no reviewer's time consumed. Today the closest equivalents are the dry-run plan and a local preview tool
+      that renders exactly what a deployment pull request <em>would</em> deploy without calling AWS or GitHub. Both are developer-facing.</p>
+      <p class="q-open">Open question: what does a low-stakes sandbox look like for someone who will never open a terminal?</p>
+      <p style="margin-top:10px;"><span class="posture p-seam">SEAM EXISTS, NOT PRODUCTISED</span>
+      <span class="tiny"> &nbsp;<a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/devtools/preview_deploy.py">packages/builder-mcp/devtools/preview_deploy.py</a></span></p>
+    </div>
+
+    <div class="card rk-card c3 hov" data-r>
+      <span class="rk-n">R6</span>
+      <span class="badge green">Category 3 · fail fast</span>
+      <h3 style="margin-top:8px;">Cost and vulnerability guardrails</h3>
+      <p class="small">An unmonitored live deployment can quietly run up model or API costs, consume cloud resources, or expose a vulnerability simply by
+      being exposed too early. Every blueprint declares a baseline monthly cost and what that cost scales with, and that figure is shown before a
+      deployment is proposed — but there is no ceiling, no alerting threshold, and no automatic stop.</p>
+      <p class="q-open">Open question: who is notified, and what happens automatically, when a pilot deployment's spend or exposure crosses a line?</p>
+      <p style="margin-top:10px;"><span class="posture p-seam">ESTIMATED, NOT ENFORCED</span>
+      <span class="tiny"> &nbsp;C1 <code>cost</code> block, <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a></span></p>
+    </div>
+
+    <div class="card rk-card c4 hov" data-r>
+      <span class="rk-n">R7</span>
+      <span class="badge greyb">Category 4 · intent boundary</span>
+      <h3 style="margin-top:8px;">Diverting and misaligned workflows</h3>
+      <p class="small">Tool definitions need hardening so a user cannot pull the tool away from its intended domain — whether by deliberate prompt injection
+      or by ordinary operational drift, which is the more likely of the two. The governance invariants put a hard floor under the worst case: no merge,
+      no push, no CloudFormation write, no credential on the client. What they do <em>not</em> constrain is how far a request can wander within those limits.</p>
+      <p class="q-open">Open question: what is the test that proves a tool refuses an off-domain instruction, rather than a reviewer noticing later?</p>
+      <p style="margin-top:10px;"><span class="posture p-built">FLOOR EXISTS</span> <span class="posture p-open">CEILING OPEN</span></p>
+    </div>
+
+    <div class="card rk-card c4 hov" data-r>
+      <span class="rk-n">R8</span>
+      <span class="badge greyb">Category 4 · intent boundary</span>
+      <h3 style="margin-top:8px;">Scope locking</h3>
+      <p class="small">An agent built for one domain — syllabus questions and answers, say — must not be manipulable into off-scope or privileged actions.
+      This applies to the deployments the Builder creates at least as much as to the Builder itself: a chatbot blueprint deployed forty times is forty
+      chances for scope to be tested by someone curious.</p>
+      <p class="q-open">Open question: should scope constraints be a declared, reviewable field on the blueprint contract, the way cost and data classification already are?</p>
+      <p style="margin-top:10px;"><span class="posture p-open">OPEN</span>
+      <span class="tiny"> &nbsp;Would be a C1 change — <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a></span></p>
+    </div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 18 · CATEGORY 5 (part 1) ============================ -->
+<section class="slide" data-title="Gaps we should name (1)" data-appx="1">
+ <div class="inner">
+  <div class="kicker" data-r>Appendix · category 5 · what are we <em>not</em> thinking about?</div>
+  <h2 data-r>Four more, starting with the biggest omission</h2>
+  <p class="sub" data-r>Raised in answer to the project lead's question. Two of these already have a real partial answer built in, which is worth saying out loud.</p>
+
+  <div class="grid g2">
+    <div class="card rk-card c5 hov" data-r>
+      <span class="rk-n">R9</span>
+      <span class="badge greyb">Biggest omission</span>
+      <h3 style="margin-top:8px;">Data classification &amp; regulatory compliance</h3>
+      <p class="small">A student-facing syllabus bot touches FERPA-protected records the moment a student asks about their own work.
+      Research workloads can raise HIPAA, export control, or IRB obligations on top. Regulatory exposure is not a cloud problem, it is an
+      institutional one, and it is the fastest way for a promising pilot to be stopped.</p>
+      <p class="small" style="margin-top:8px;"><strong>Good news, and it is genuinely good:</strong> this is partly built. The blueprint contract C1 carries a
+      <code>data_classification</code> field on every blueprint, and the review gate blocks anything above the declared level. The mechanism exists;
+      what is missing is the institutional mapping from Cornell's classification vocabulary onto it, and a decision about who owns that mapping.</p>
+      <p style="margin-top:10px;"><span class="posture p-built">MECHANISM BUILT</span> <span class="posture p-open">POLICY MAPPING OPEN</span>
+      <span class="tiny"> &nbsp;C1, <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a></span></p>
+    </div>
+
+    <div class="card rk-card c5 hov" data-r>
+      <span class="rk-n">R10</span>
+      <span class="badge greyb">Category 5</span>
+      <h3 style="margin-top:8px;">Auditability &amp; attribution</h3>
+      <p class="small">Who asked for this, who approved it, who deployed it — and can we reconstruct <em>why</em> eight months from now, when the person
+      who asked has graduated and the person who approved has changed roles?</p>
+      <p class="small" style="margin-top:8px;"><strong>Strong story here.</strong> Because every deployment is a merged pull request, the audit trail is permanent,
+      attributable and already exists — the request, the plan, the reviewer, the timestamp and the discussion are all in one place by construction, not by
+      anyone remembering to log it. Pair that with the mandatory <code>cornell:deployment-id</code> tag as the join key between the git record and the running
+      resource, and the chain is complete from utterance to instance.</p>
+      <p style="margin-top:10px;"><span class="posture p-built">LARGELY SOLVED BY CONSTRUCTION</span>
+      <span class="tiny"> &nbsp;Tag requirements: <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/blueprints/README.md">blueprints/README.md</a></span></p>
+    </div>
+
+    <div class="card rk-card c5 hov" data-r>
+      <span class="rk-n">R11</span>
+      <span class="badge greyb">Category 5</span>
+      <h3 style="margin-top:8px;">Lifecycle, offboarding &amp; orphaned resources</h3>
+      <p class="small">The classic university cost leak. A grant ends. A student graduates. A PI moves institution. The infrastructure keeps running,
+      nobody owns it, and it surfaces two years later as a line item nobody can explain. Orphaned deployments are already recorded as a platform-operator fear.</p>
+      <p class="small" style="margin-top:8px;"><strong>The seam exists; the process does not.</strong> The spec-export tool already has <code>offboarding</code> and
+      <code>transfer</code> audiences, so a deployment can write its own handover document on request, and deletion is a governed pull request rather than an
+      untracked console click. What is missing is entirely organisational: nobody is scheduled to ask the question.</p>
+      <p style="margin-top:10px;"><span class="posture p-seam">SEAM EXISTS, PROCESS MISSING</span></p>
+    </div>
+
+    <div class="card rk-card c5 hov" data-r>
+      <span class="rk-n">R12</span>
+      <span class="badge greyb">Category 5</span>
+      <h3 style="margin-top:8px;">Cost attribution &amp; chargeback</h3>
+      <p class="small">Distinct from the runaway-spend guardrails in category 3. That question is "how do we stop it"; this one is <strong>"whose budget is this?"</strong>
+      Departments, grants and cost centres all need to see their own spend, and a shared account with no attribution model becomes one central bill that nobody
+      will agree to pay.</p>
+      <p class="small" style="margin-top:8px;">The hook is already mandatory: every resource carries a <code>cornell:owner</code> tag, so per-owner spend is
+      derivable today. What does not exist is the mapping from an owner NetID to a cost centre, or any agreement about who is charged.</p>
+      <p style="margin-top:10px;"><span class="posture p-seam">HOOK EXISTS</span> <span class="posture p-open">MODEL OPEN</span></p>
+    </div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 19 · CATEGORY 5 (part 2) ============================ -->
+<section class="slide" data-title="Gaps we should name (2)" data-appx="1">
+ <div class="inner">
+  <div class="kicker" data-r>Appendix · category 5 continued</div>
+  <h2 data-r>Four that are easy to postpone and expensive to retrofit</h2>
+  <p class="sub" data-r>None of these is urgent this month. All of them get harder, not easier, the longer the pilot runs without them.</p>
+
+  <div class="grid g2">
+    <div class="card rk-card c5 hov" data-r>
+      <span class="rk-n">R13</span>
+      <span class="badge greyb">Category 5</span>
+      <h3 style="margin-top:8px;">Evaluation as continuous regression, not a one-time battery</h3>
+      <p class="small">The prompt-robustness battery in category 1 only holds its value if it runs on <strong>every change</strong>. A battery run once produces a
+      number for a slide; a battery run on every commit produces a guarantee. Without that, robustness decays silently — nobody breaks it deliberately, it just
+      erodes as prompts and tool descriptions are edited, and nobody finds out until a user does.</p>
+      <p class="small" style="margin-top:8px;">Worth knowing: tooling for scored plugin evaluations already exists, so this is a wiring-up job rather than a
+      build-from-scratch one. The existing test suite is the natural place to hang it.</p>
+      <p style="margin-top:10px;"><span class="posture p-open">OPEN</span>
+      <span class="tiny"> &nbsp;<a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/packages/builder-mcp/tests">packages/builder-mcp/tests</a></span></p>
+    </div>
+
+    <div class="card rk-card c5 hov" data-r>
+      <span class="rk-n">R14</span>
+      <span class="badge greyb">Category 5</span>
+      <h3 style="margin-top:8px;">Degradation UX — correct, but silent</h3>
+      <p class="small">The category where the system is behaving <em>exactly</em> as specified and the user cannot tell. We already have a live example, on the
+      bottlenecks slide: with no GitHub token every write tool returns a dry-run plan instead of opening a pull request. That is correct by contract C5, it is
+      documented, and it still reads as success to someone who does not know to look.</p>
+      <p class="small" style="margin-top:8px;"><strong>The generalisable lesson: correct-but-silent is a usability defect, not a documentation problem.</strong>
+      Every degraded mode we add needs an answer to "how does the user find out?" written at the same time as the mode itself.</p>
+      <p style="margin-top:10px;"><span class="posture p-open">PATTERN IDENTIFIED, NOT SYSTEMATISED</span>
+      <span class="tiny"> &nbsp;C5, <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a></span></p>
+    </div>
+
+    <div class="card rk-card c5 hov" data-r>
+      <span class="rk-n">R15</span>
+      <span class="badge greyb">Category 5</span>
+      <h3 style="margin-top:8px;">Support model &amp; escalation</h3>
+      <p class="small">Who does a faculty member call at 9pm the night before term starts, when a deployment they were relying on has failed?
+      Right now the honest answer is "whoever they happen to know on the team". Unowned support is how promising internal tools die — not dramatically,
+      but by two or three people quietly deciding it is not dependable enough to build a course on.</p>
+      <p class="small" style="margin-top:8px;">This is the same ask as the change-management slide, restated as a risk: a named owner, a response expectation,
+      and an escalation path for the case where the pipeline itself is the problem.</p>
+      <p style="margin-top:10px;"><span class="posture p-open">OPEN — NEEDS A DECISION, NOT A BUILD</span></p>
+    </div>
+
+    <div class="card rk-card c5 hov" data-r>
+      <span class="rk-n">R16</span>
+      <span class="badge greyb">Category 5</span>
+      <h3 style="margin-top:8px;">Accessibility</h3>
+      <p class="small">Anything student-facing carries a legal accessibility obligation for the university, and blueprints that ship a user interface
+      inherit that obligation the moment they are deployed at scale. It is far cheaper to put accessibility requirements into the blueprint contract
+      once than to retrofit forty deployments that all copied the same inaccessible starting point.</p>
+      <p class="q-open">Open question: should a blueprint that ships a user-facing interface be required to declare its accessibility posture, the same way it
+      declares its cost and its data classification?</p>
+      <p style="margin-top:10px;"><span class="posture p-open">OPEN</span></p>
+    </div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 20 · RISK MATRIX ============================ -->
+<section class="slide" data-title="Risk matrix" data-appx="1">
+ <div class="inner">
+  <div class="kicker" data-r>Appendix · synthesis <span class="badge greyb">interactive</span></div>
+  <h2 data-r>All sixteen, placed</h2>
+  <p class="sub" data-r>
+    Filter by category, or click any marker for the detail. Placement is the team's <strong>judgement, not measurement</strong> —
+    it exists to force a conversation about sequencing, not to be quoted as data.
+  </p>
+
+  <div class="tx-filters" data-r>
+    <button class="chipf on" data-rf="all">All 16</button>
+    <button class="chipf" data-rf="1">1 · Language</button>
+    <button class="chipf" data-rf="2">2 · Identity</button>
+    <button class="chipf" data-rf="3">3 · Fail-fast</button>
+    <button class="chipf" data-rf="4">4 · Intent boundary</button>
+    <button class="chipf" data-rf="5">5 · Also naming</button>
+  </div>
+
+  <div class="mx-wrap" data-r>
+    <div>
+      <div class="mx" id="mx"></div>
+      <div class="mx-legend">
+        <span><i style="background:#b31b1b"></i>Language</span>
+        <span><i style="background:#8a5a00"></i>Identity</span>
+        <span><i style="background:#1b6e1b"></i>Fail-fast</span>
+        <span><i style="background:#5b4b8a"></i>Intent boundary</span>
+        <span><i style="background:#0f6f7a"></i>Also naming</span>
+      </div>
+    </div>
+    <div class="mx-detail" id="mxdetail"></div>
+  </div>
+
+  <div class="grid g3" style="margin-top:12px;">
+    <div class="card cream" data-r><h3>Cheapest to close first</h3><p class="small">R14 degradation messaging and R15 a named support owner both need a decision and some words, not engineering. R12 cost attribution is a mapping exercise on a tag that already exists.</p></div>
+    <div class="card cream" data-r><h3>Must be answered before any student-facing pilot</h3><p class="small">R9 data classification mapping, R3 and R4 identity and authorization tiers, and R16 accessibility. None of these can be retrofitted after a launch without pain.</p></div>
+    <div class="card cream" data-r><h3>Compounding if deferred</h3><p class="small">R13 continuous evaluation and R11 lifecycle. Both are cheap now and get more expensive with every additional deployment and every additional month.</p></div>
+  </div>
+
+  <p class="tiny" data-r style="margin-top:12px;">
+    None of the above is a known incident. Where an item is marked as partly built, the mechanism is in
+    <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a> and
+    <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/blueprints/README.md">blueprints/README.md</a>;
+    agreed-but-unbuilt work is tracked in
+    <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/BACKLOG.md">packages/builder-mcp/BACKLOG.md</a>.
+  </p>
+ </div>
+</section>
+
+</div><!-- /deck -->
+
+<!-- ============================ CHROME ============================ -->
+<div id="chrome">
+  <div class="brandline"><span class="dotmark"></span><b>Cornell Builder</b> · AI-DLC Track A · progress review <span id="appxflag">OPTIONAL APPENDIX</span></div>
+  <div class="ctrls">
+    <span class="hint">← → navigate &nbsp;·&nbsp; O overview &nbsp;·&nbsp; F fullscreen</span>
+    <button class="nb wide" id="btnOv" title="Overview (O)">OVERVIEW</button>
+    <button class="nb" id="btnPrev" title="Previous (←)" aria-label="Previous slide">‹</button>
+    <span id="count">1 / 20</span>
+    <button class="nb" id="btnNext" title="Next (→)" aria-label="Next slide">›</button>
+  </div>
+</div>
+
+<div id="ov">
+  <h2>Jump to a slide</h2>
+  <p class="small">Click a card, or press <b>Esc</b> to close.</p>
+  <div class="ovg" id="ovg"></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------------- deck engine ---------------- */
+var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+var cur = 0, N = slides.length;
+var bar = document.getElementById('bar');
+var count = document.getElementById('count');
+var ov = document.getElementById('ov');
+
+// stagger reveals
+slides.forEach(function(s){
+  Array.prototype.slice.call(s.querySelectorAll('[data-r]')).forEach(function(el,i){
+    el.style.transitionDelay = Math.min(i*55, 520) + 'ms';
+  });
+});
+
+function easeOut(t){ return 1 - Math.pow(1-t, 3); }
+
+function runCounters(slide){
+  Array.prototype.slice.call(slide.querySelectorAll('[data-count]')).forEach(function(el){
+    var target = parseFloat(el.getAttribute('data-count'));
+    var dur = 1000, t0 = null;
+    function frame(ts){
+      if(t0===null) t0 = ts;
+      var p = Math.min((ts-t0)/dur, 1);
+      var v = Math.round(target * easeOut(p));
+      el.textContent = v.toLocaleString('en-US');
+      if(p < 1) requestAnimationFrame(frame);
+    }
+    el.textContent = '0';
+    requestAnimationFrame(frame);
+  });
+}
+
+function go(n, dir){
+  n = Math.max(0, Math.min(N-1, n));
+  if(n === cur && slides[cur].classList.contains('active')) return;
+  slides.forEach(function(s){ s.classList.remove('active','prev'); });
+  if(dir === 'back') { /* incoming from left */ }
+  cur = n;
+  var s = slides[cur];
+  s.classList.add('active');
+  s.scrollTop = 0;
+  bar.style.width = ((cur+1)/N*100) + '%';
+  count.textContent = (cur+1) + ' / ' + N;
+  runCounters(s);
+  paintOverview();
+  document.getElementById('appxflag').classList.toggle('on', s.getAttribute('data-appx') === '1');
+  if(s.querySelector('.meter')) animateMeter();
+  if(s.querySelector('#jr')){ var j = document.getElementById('jr'); j.value = 0; paintJourney(); }
+}
+
+function next(){ if(cur < N-1) go(cur+1); }
+function prev(){ if(cur > 0) go(cur-1, 'back'); }
+
+document.getElementById('btnNext').onclick = next;
+document.getElementById('btnPrev').onclick = prev;
+document.getElementById('btnOv').onclick = toggleOv;
+
+document.addEventListener('keydown', function(e){
+  var tag = (e.target.tagName || '').toLowerCase();
+  if(tag === 'input' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return; // let sliders work
+  if(ov.classList.contains('open')){
+    if(e.key === 'Escape' || e.key === 'o' || e.key === 'O'){ toggleOv(); e.preventDefault(); }
+    return;
+  }
+  switch(e.key){
+    case 'ArrowRight': case 'PageDown': next(); e.preventDefault(); break;
+    case ' ': next(); e.preventDefault(); break;
+    case 'ArrowLeft': case 'PageUp': prev(); e.preventDefault(); break;
+    case 'Home': go(0); e.preventDefault(); break;
+    case 'End': go(N-1); e.preventDefault(); break;
+    case 'o': case 'O': toggleOv(); e.preventDefault(); break;
+    case 'f': case 'F':
+      if(!document.fullscreenElement){ if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); }
+      else if(document.exitFullscreen){ document.exitFullscreen(); }
+      e.preventDefault(); break;
+  }
+});
+
+/* ---------------- overview ---------------- */
+var ovg = document.getElementById('ovg');
+slides.forEach(function(s,i){
+  var b = document.createElement('button');
+  var isAppx = s.getAttribute('data-appx') === '1';
+  b.className = 'ovc' + (isAppx ? ' appx' : '');
+  var n = (i+1) < 10 ? '0' + (i+1) : String(i+1);
+  b.innerHTML = '<span class="n">' + n + '</span><span class="t">' +
+                (s.getAttribute('data-title') || ('Slide ' + (i+1))) + '</span>' +
+                (isAppx ? '<span class="ap">APPENDIX</span>' : '');
+  b.onclick = function(){ toggleOv(); go(i); };
+  ovg.appendChild(b);
+});
+function paintOverview(){
+  Array.prototype.slice.call(ovg.children).forEach(function(c,i){
+    c.classList.toggle('cur', i === cur);
+  });
+}
+function toggleOv(){ ov.classList.toggle('open'); paintOverview(); }
+ov.addEventListener('click', function(e){ if(e.target === ov) toggleOv(); });
+
+/* ============================================================
+   WIDGET 1 — journey scrubber
+   ============================================================ */
+var JOURNEY = [
+  { k:'The ask',
+    t:'"I need a chatbot over my course documents."',
+    a:'Identical starting point. The difference is what happens in the next five minutes.',
+    ac:'Day 0', acn:'',
+    b:'Identical starting point.', bc:'Minute 0', bcn:'' },
+  { k:'Find out what is even allowed',
+    t:'Who do I ask, and what am I permitted to run?',
+    a:'Email a colleague, then IT, then possibly a research-computing consultation. Nobody owns the whole answer, so the question gets forwarded.',
+    ac:'+ a few days to 2 weeks', acn:'estimate',
+    b:'Ask in plain language. Every blueprint in the catalog comes back ranked, each with its cost, maturity, and the data classification it is cleared for.',
+    bc:'+ seconds', bcn:'' },
+  { k:'Turn the need into infrastructure',
+    t:'Somebody has to author a CloudFormation template',
+    a:'Either the researcher learns CloudFormation, or a research software engineer is found and scheduled. This is where most requests quietly die.',
+    ac:'+ 1 to 4 weeks', acn:'estimate',
+    b:'No template is authored. An existing blueprint is selected and pinned at a specific version — solved once by someone who got it right, reused verbatim.',
+    bc:'+ seconds', bcn:'' },
+  { k:'Security and data classification',
+    t:'Is this cleared for the data I want to put in it?',
+    a:'A separate review, usually a separate queue, often re-asking questions the template already answers.',
+    ac:'+ 1 to 3 weeks', acn:'estimate',
+    b:'Data classification is declared in the blueprint itself and shown before anything is proposed. A security-audience spec can be exported on demand for the reviewer.',
+    bc:'+ seconds', bcn:'' },
+  { k:'Get it onto the deploy path',
+    t:'Account access, pipeline registration, tagging, stack naming',
+    a:'Onboarding to an account, registering the template, getting the four mandatory Cornell tags and the stack-name convention right. Getting any of it wrong produces a green process that deploys nothing.',
+    ac:'+ days to weeks', acn:'estimate',
+    b:'The registration pull request is generated: one pipeline action, conventional stack name, tags already correct because the blueprint carries them.',
+    bc:'+ minutes', bcn:'' },
+  { k:'Human review',
+    t:'A second person approves',
+    a:'Whatever arrives at the gate — often a large, unfamiliar diff that takes real effort to review.',
+    ac:'+ days', acn:'estimate',
+    b:'THE SAME STEP, UNCHANGED — and deliberately so. The difference is that the diff is small, conventional and machine-validated, so it is reviewable in minutes.',
+    bc:'+ hours to days', bcn:'the real clock' },
+  { k:'Live',
+    t:'Running, tagged, attributable to an owner',
+    a:'It works — if the researcher survived the queue. Nobody has a complete inventory of what was built this way.',
+    ac:'Weeks to months, total', acn:'estimate',
+    b:'It works, it is tagged with owner and blueprint version, it appears in inventory and cost reporting, and it can describe itself for security review or handover.',
+    bc:'Same day to a few days, total', bcn:'estimate' }
+];
+
+var jr = document.getElementById('jr'),
+    jdots = document.getElementById('jdots'),
+    jn = document.getElementById('jn'),
+    jtitle = document.getElementById('jtitle'),
+    jA = document.getElementById('jA'), jAc = document.getElementById('jAc'),
+    jB = document.getElementById('jB'), jBc = document.getElementById('jBc');
+
+JOURNEY.forEach(function(st,i){
+  var b = document.createElement('button');
+  b.innerHTML = '<span class="pip"></span>' + st.k;
+  b.onclick = function(){ jr.value = i; paintJourney(); };
+  jdots.appendChild(b);
+});
+
+function swap(el, html){
+  el.innerHTML = html;
+  el.classList.remove('fade-swap');
+  void el.offsetWidth;
+  el.classList.add('fade-swap');
+}
+
+function paintJourney(){
+  var i = parseInt(jr.value, 10), st = JOURNEY[i];
+  jn.textContent = (i+1);
+  swap(jtitle, st.t);
+  swap(jA, st.a);
+  swap(jB, st.b);
+  jAc.innerHTML = st.ac + (st.acn ? ' <span>(' + st.acn + ')</span>' : '');
+  jBc.innerHTML = st.bc + (st.bcn ? ' <span>(' + st.bcn + ')</span>' : '');
+  Array.prototype.slice.call(jdots.children).forEach(function(d,k){
+    d.classList.toggle('on', k === i);
+    d.classList.toggle('done', k < i);
+  });
+}
+jr.addEventListener('input', paintJourney);
+paintJourney();
+
+/* ============================================================
+   WIDGET 2 — tool explorer
+   ============================================================ */
+var TOOLS = [
+  { n:'blueprint_search', k:'read', ico:'🔍',
+    obj:'Answer "what can I even deploy, and which one fits what I said?"',
+    why:'Ranks the entire catalog against a plain-language need and returns every blueprint with its full contract — required inputs, baseline monthly cost, permitted data classification, and maturity. It never filters results away, so a builder sees the whole shelf and the reason one thing outranked another. This is where every deployment starts.',
+    gov:'Read-only. Costs about nine GitHub API requests per search — the rate-limit constraint on the bottlenecks slide.' },
+  { n:'deployment_read', k:'read', ico:'📊',
+    obj:'Answer "where has my request got to?"',
+    why:'One view of the whole chain: the open registration pull request, then the pipeline stages, then the CloudFormation stack. Without it a builder has three different places to look and no idea which one is the true answer — the single most common source of "is it done?" support traffic.',
+    gov:'Read-only. Needs AWS credentials for the pipeline and stack halves; degrades to a clear error, never a false green.' },
+  { n:'deployment_health', k:'read', ico:'🩺',
+    obj:'Answer "why is it broken, and is it compliant?"',
+    why:'Stack status plus the actual failure events plus an audit of the four mandatory cornell:* tags. It turns an opaque AWS failure into something a non-expert can read and act on, and it catches the untagged resources that would otherwise be invisible to inventory and cost reporting.',
+    gov:'Read-only. The tag audit is what keeps the platform team\'s inventory honest.' },
+  { n:'spec_export', k:'read', ico:'📄',
+    obj:'Answer "write this up for whoever is asking"',
+    why:'Renders a written specification of a deployment for one of six audiences — coder, narrative, security, transfer, user, offboarding. A security reviewer, a stakeholder, and the research assistant inheriting the system in May all need a different document about the same thing, and none of them should have to write it themselves.',
+    gov:'Read-only. Generated from the deployment as it actually is, so it cannot drift out of date the way a hand-written doc does.' },
+  { n:'deployment_create', k:'write', ico:'🏗️',
+    obj:'Propose a new deployment for a human to approve',
+    why:'Produces the deployment record and the registration pull request that adds exactly one action to the deploy pipeline. Defaults to a dry run that returns the full plan — stack name, cost, what the pull request would change — so the person always sees what would happen before anything does.',
+    gov:'Opens a pull request. Never merges, never deploys. Merging is what deploys.' },
+  { n:'deployment_update', k:'write', ico:'✏️',
+    obj:'Propose a change to something already deployed',
+    why:'A set of file changes becomes a branch and a pull request. The point is what it refuses to do: there is no direct-push path, so a change to a live deployment goes through exactly the same review gate as its creation did.',
+    gov:'Branch plus pull request. Never a push to a tracked branch.' },
+  { n:'deployment_restart', k:'write', ico:'🔁',
+    obj:'Re-run a deployment that failed for a transient reason',
+    why:'Retries a failed pipeline stage, or re-runs the pipeline at the current version. It cannot change the version, so a restart can only ever re-attempt what the reviewed and merged branch already defines — no new behaviour can enter the system through a retry.',
+    gov:'The only two AWS writes in the entire system: start a pipeline execution, retry a stage. A cap on repeated restarts is agreed and not yet built.' },
+  { n:'deployment_delete', k:'write', ico:'🗑️',
+    obj:'Propose a teardown, with the same rigour as a build',
+    why:'Opens a deregistration pull request that removes the deployment\'s pipeline action — the exact mirror image of creation. Orphaned deployments whose owner has left are a named platform risk, and this is the governed path for retiring them.',
+    gov:'Never calls an AWS delete API. The platform removes the stack after the pull request merges. Deletion is as reviewed as creation.' }
+];
+
+var txlist = document.getElementById('txlist'), txdetail = document.getElementById('txdetail'), txSel = 0;
+
+TOOLS.forEach(function(t,i){
+  var b = document.createElement('button');
+  b.className = 'tx-item';
+  b.setAttribute('data-k', t.k);
+  b.innerHTML = '<span class="ico">' + t.ico + '</span><span class="nm">' + t.n + '</span>' +
+                '<span class="badge ' + (t.k === 'read' ? 'green' : 'amber') + '">' + (t.k === 'read' ? 'READ' : 'WRITE') + '</span>';
+  b.onclick = function(){ txSel = i; paintTools(); };
+  txlist.appendChild(b);
+});
+
+function paintTools(){
+  var t = TOOLS[txSel];
+  Array.prototype.slice.call(txlist.children).forEach(function(c,i){ c.classList.toggle('on', i === txSel); });
+  txdetail.innerHTML =
+    '<span class="badge ' + (t.k === 'read' ? 'green' : 'amber') + '">' +
+      (t.k === 'read' ? 'READ · answers a question' : 'WRITE · proposes a change for review') + '</span> ' +
+    '<span class="badge greyb">' + t.ico + ' ' + t.n + '</span>' +
+    '<div class="obj">' + t.obj + '</div>' +
+    '<div class="why">' + t.why + '</div>' +
+    '<div class="gov"><b>Governance:</b> ' + t.gov + '</div>';
+  txdetail.classList.remove('fade-swap'); void txdetail.offsetWidth; txdetail.classList.add('fade-swap');
+}
+
+Array.prototype.slice.call(document.querySelectorAll('[data-f]')).forEach(function(btn){
+  btn.onclick = function(){
+    var f = btn.getAttribute('data-f');
+    document.querySelectorAll('[data-f]').forEach(function(b){ b.classList.toggle('on', b === btn); });
+    var firstVisible = -1;
+    Array.prototype.slice.call(txlist.children).forEach(function(c,i){
+      var show = (f === 'all') || (c.getAttribute('data-k') === f);
+      c.classList.toggle('hide', !show);
+      if(show && firstVisible < 0) firstVisible = i;
+    });
+    if(txlist.children[txSel] && txlist.children[txSel].classList.contains('hide') && firstVisible >= 0){
+      txSel = firstVisible; paintTools();
+    }
+  };
+});
+paintTools();
+
+/* ============================================================
+   WIDGET 3 — AI-DLC maturity scorecard
+   ============================================================ */
+var STAGES = [
+  { id:'s1', n:'Stage 1', name:'Workspace Detection', score:'s',
+    one:'Strong — the workspace was correctly read as an existing brownfield codebase and the decision was logged, so every later stage started from what was really there rather than a blank page.',
+    detail:'The always-first stage. Its output is the audit trail and the state file under <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/docs/aidlc/builder-mcp">docs/aidlc/builder-mcp</a>, which recorded the project as brownfield and routed it into requirements rather than greenfield scaffolding.',
+    link:'docs/aidlc/builder-mcp/aidlc-state.md', href:'https://github.com/cu-aaii/ai-dlc-workshop/blob/main/docs/aidlc/builder-mcp/aidlc-state.md' },
+  { id:'s2', n:'Stage 2', name:'Requirements Analysis', score:'s',
+    one:'Strong — requirements were gathered, questioned and then hardened into eight numbered contracts that the code is measured against, which is a far more durable artefact than a requirements document nobody reads twice.',
+    detail:'This is the stage that paid off most. It produced a requirements document, explicit verification questions, and the security and resiliency extension opt-ins — and then those requirements were converted into contracts C1 through C8. The spec states plainly that where the code and the contract disagree, the contract wins and the code is the bug.',
+    link:'docs/aidlc/builder-mcp/inception/requirements/requirements.md', href:'https://github.com/cu-aaii/ai-dlc-workshop/blob/main/docs/aidlc/builder-mcp/inception/requirements/requirements.md' },
+  { id:'s3', n:'Stage 3', name:'Workflow Planning', score:'p',
+    one:'Partial — the execution plan and stage gates exist and were followed, but the recorded state has drifted behind the code: it still lists gates as open that were closed, and quotes a test count that is three retunes out of date.',
+    detail:'Planning happened and worked. Keeping the record current did not. This is a known, written-up problem: the roadmap has an explicit item to reconcile the AI-DLC record with the code, because a state file that contradicts itself next to a README apologising for it is worse than no state file. Nobody should read those artefacts as current until that lands.',
+    link:'packages/builder-mcp/ROADMAP.md', href:'https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/ROADMAP.md' },
+  { id:'s4', n:'Stage 4', name:'Code Generation', score:'s',
+    one:'Strong — the eight-tool server exists, works, and is decomposed into five owned units with a no-cross-imports rule, so the codebase can be worked on by several people without collisions.',
+    detail:'The always-execute construction stage. Output: the server itself, the frozen eight-tool surface, and a unit-ownership contract (C8) with boundaries verified by import analysis rather than asserted in prose. Each unit has a named owner and no unit may import another.',
+    link:'docs/aidlc/builder-mcp/inception/application-design/unit-of-work.md', href:'https://github.com/cu-aaii/ai-dlc-workshop/blob/main/docs/aidlc/builder-mcp/inception/application-design/unit-of-work.md' },
+  { id:'s5', n:'Stage 5', name:'Build and Test', score:'t',
+    one:'Thin — 77 tests pass and that is real, but not one of them is an end-to-end run through a genuine merge, pipeline and stack, and there are no performance targets at all because the NFR requirements stage was skipped.',
+    detail:'The honest weak point. Unit and property-based coverage is green and the tool surface is enforced by test. What has never happened is the thing the product actually promises: request to plan to pull request to merge to pipeline to live stack, measured, more than once, so the answer is a rate and not an anecdote. That work is blocked on AWS account access and is item three on the next-steps slide.',
+    link:'packages/builder-mcp/tests', href:'https://github.com/cu-aaii/ai-dlc-workshop/tree/main/packages/builder-mcp/tests', dir:true }
+];
+var LBL = { s:['Strong','green'], p:['Partial','amber'], t:['Thin','redb'] };
+
+var scgrid = document.getElementById('scgrid'), scdetail = document.getElementById('scdetail'), scSel = 0;
+
+STAGES.forEach(function(st,i){
+  var b = document.createElement('button');
+  b.className = 'sc-card';
+  b.setAttribute('data-s', st.score);
+  b.innerHTML =
+    '<span class="num">' + st.n.toUpperCase() + '</span>' +
+    '<span class="stg">' + st.name + '</span>' +
+    '<span class="bars ' + st.score + '"><i></i><i></i><i></i></span>' +
+    '<span class="badge ' + LBL[st.score][1] + '">' + LBL[st.score][0] + '</span>';
+  b.onclick = function(){ scSel = i; paintScore(); };
+  scgrid.appendChild(b);
+});
+
+function paintScore(){
+  var st = STAGES[scSel];
+  Array.prototype.slice.call(scgrid.children).forEach(function(c,i){ c.classList.toggle('on', i === scSel); });
+  scdetail.innerHTML =
+    '<span class="badge ' + LBL[st.score][1] + '">' + LBL[st.score][0] + '</span> ' +
+    '<span class="badge greyb">' + st.n + ' of 5 · always executes</span>' +
+    '<h3 style="margin-top:8px;">' + st.name + '</h3>' +
+    '<p class="verdict">' + st.one + '</p>' +
+    '<p class="small" style="margin:0 0 10px;">' + st.detail + '</p>' +
+    '<p class="tiny" style="margin:0;">Evidence: <a class="fl' + (st.dir ? ' dir' : '') + '" href="' + st.href + '">' + st.link + '</a></p>';
+  scdetail.classList.remove('fade-swap'); void scdetail.offsetWidth; scdetail.classList.add('fade-swap');
+}
+
+Array.prototype.slice.call(document.querySelectorAll('[data-sf]')).forEach(function(btn){
+  btn.onclick = function(){
+    var f = btn.getAttribute('data-sf');
+    document.querySelectorAll('[data-sf]').forEach(function(b){ b.classList.toggle('on', b === btn); });
+    var first = -1;
+    Array.prototype.slice.call(scgrid.children).forEach(function(c,i){
+      var show = (f === 'all') || (c.getAttribute('data-s') === f);
+      c.classList.toggle('dim', !show);
+      if(show && first < 0) first = i;
+    });
+    if(first >= 0 && scgrid.children[scSel].classList.contains('dim')){ scSel = first; paintScore(); }
+  };
+});
+paintScore();
+
+function animateMeter(){
+  var m = document.querySelector('.meter');
+  if(!m) return;
+  var w = [0,0,0];
+  m.children[0].style.width = '0%'; m.children[1].style.width = '0%'; m.children[2].style.width = '0%';
+  setTimeout(function(){
+    m.children[0].style.width = '60%';  // 3 of 5 strong
+    m.children[1].style.width = '20%';  // 1 of 5 partial
+    m.children[2].style.width = '20%';  // 1 of 5 thin
+  }, 220);
+}
+
+/* ============================================================
+   WIDGET 4 — appendix risk matrix
+   ============================================================ */
+var CATN = {1:'Natural language &amp; prompt robustness', 2:'Authentication, authorization &amp; identity',
+            3:'Fail-fast execution &amp; safe prototyping', 4:'Workflow hardening &amp; intent boundaries',
+            5:'Gaps we should also be naming'};
+var POST = { open:['OPEN','p-open'], seam:['SEAM EXISTS','p-seam'], built:['PARTLY BUILT','p-built'] };
+
+/* imp: 0 = Severe, 1 = High, 2 = Moderate   ·   lik: 0 = Lower, 1 = Moderate, 2 = Higher */
+var RISKS = [
+ {id:'R1', c:1, imp:2, lik:2, t:'Linguistic variability', p:'open',
+  d:'Resilience of the tool calls and prompt wrappers to typos, grammatical errors and non-native English — the language a student actually types, not the language the documentation is written in.'},
+ {id:'R2', c:1, imp:1, lik:2, t:'Prompt specificity battery', p:'open',
+  d:'No structured battery benchmarking reliability from vague to hyper-specific prompts. Until one exists, "it works" means "it worked for the phrasings we tried".'},
+ {id:'R3', c:2, imp:0, lik:1, t:'Access control scope per tier', p:'seam',
+  d:'Public student-facing and internal staff workflows should not carry the same auth posture. The institutional identity path is designed and stashed behind a switch; the per-tier decision has not been made.'},
+ {id:'R4', c:2, imp:0, lik:1, t:'Identity context passing', p:'seam',
+  d:'User identity and role must be verified before the server acts or retrieves restricted context. The production path currently carries application identity; per-user NetID identity is a named backlog item, not built.'},
+ {id:'R5', c:3, imp:2, lik:2, t:'Rapid-iteration sandbox', p:'seam',
+  d:'Non-technical staff need somewhere to fail fast with no downstream consequence. The dry-run plan and the local preview tool are the closest equivalents today, and both are developer-facing.'},
+ {id:'R6', c:3, imp:1, lik:1, t:'Cost &amp; vulnerability guardrails', p:'seam',
+  d:'Every blueprint declares a baseline monthly cost and what it scales with, and that is shown before anything is proposed — but there is no ceiling, no alerting threshold and no automatic stop.'},
+ {id:'R7', c:4, imp:0, lik:1, t:'Diverting / misaligned workflows', p:'built',
+  d:'The governance invariants put a hard floor under the worst case — no merge, no push, no CloudFormation write, no client credential. What they do not constrain is how far a request can wander inside those limits.'},
+ {id:'R8', c:4, imp:1, lik:1, t:'Scope locking', p:'open',
+  d:'An agent built for syllabus questions must not be manipulable into off-scope or privileged actions. Open question: should scope be a declared, reviewable blueprint field, like cost and data classification already are?'},
+ {id:'R9', c:5, imp:0, lik:1, t:'Data classification &amp; regulatory compliance', p:'built',
+  d:'FERPA for anything student-facing; HIPAA, export control or IRB for research workloads. The mechanism is built — every blueprint declares a data classification and the gate blocks anything above it. The institutional policy mapping onto it is not.'},
+ {id:'R10', c:5, imp:1, lik:0, t:'Auditability &amp; attribution', p:'built',
+  d:'Largely solved by construction: every deployment is a merged pull request, so who asked, who approved and why is permanent and attributable without anyone remembering to log it. The deployment-id tag joins the git record to the running resource.'},
+ {id:'R11', c:5, imp:2, lik:2, t:'Lifecycle, offboarding &amp; orphans', p:'seam',
+  d:'Grants end, students graduate, PIs leave, infrastructure keeps running. The spec-export tool already has offboarding and transfer audiences and deletion is a governed pull request — but nobody is scheduled to ask the question.'},
+ {id:'R12', c:5, imp:2, lik:2, t:'Cost attribution &amp; chargeback', p:'seam',
+  d:'Not "how do we stop runaway spend" but "whose budget is this?". The mandatory owner tag makes per-owner spend derivable today; the mapping from NetID to cost centre, and the agreement about who pays, do not exist.'},
+ {id:'R13', c:5, imp:1, lik:2, t:'Evaluation as continuous regression', p:'open',
+  d:'A prompt battery run once produces a number for a slide; run on every change it produces a guarantee. Without it robustness erodes silently. Scored evaluation tooling already exists, so this is wiring rather than invention.'},
+ {id:'R14', c:5, imp:2, lik:2, t:'Degradation UX / silent correctness', p:'open',
+  d:'Live example: with no GitHub token every write returns a dry-run plan instead of opening a pull request. Correct by contract, and it still reads as success. Correct-but-silent is a usability defect, not a documentation problem.'},
+ {id:'R15', c:5, imp:1, lik:2, t:'Support model &amp; escalation', p:'open',
+  d:'Who does a faculty member call at 9pm the night before term starts? Unowned support is how promising internal tools quietly stop being depended on.'},
+ {id:'R16', c:5, imp:1, lik:1, t:'Accessibility', p:'open',
+  d:'A legal obligation for anything student-facing, inherited by every blueprint that ships an interface. Far cheaper to put into the blueprint contract once than to retrofit forty deployments that copied the same starting point.'}
+];
+
+var LIKL = ['Lower','Moderate','Higher'], IMPL = ['Severe','High','Moderate'];
+var mx = document.getElementById('mx'), mxdetail = document.getElementById('mxdetail'), mxSel = 0;
+
+(function buildMatrix(){
+  if(!mx) return;
+  var corner = document.createElement('div');
+  corner.className = 'axl';
+  corner.innerHTML = '<span style="font-size:9px; opacity:.75;">impact&nbsp;↓&nbsp;/&nbsp;likelihood&nbsp;→</span>';
+  mx.appendChild(corner);
+  LIKL.forEach(function(l){
+    var d = document.createElement('div'); d.className = 'axl'; d.textContent = l; mx.appendChild(d);
+  });
+  IMPL.forEach(function(im, r){
+    var lab = document.createElement('div'); lab.className = 'axl v'; lab.textContent = im; mx.appendChild(lab);
+    for(var c = 0; c < 3; c++){
+      var cell = document.createElement('div');
+      cell.className = 'cell' + ((r === 0 && c >= 1) || (r === 1 && c === 2) ? ' hot' : (r + c <= 2 ? ' warm' : ''));
+      cell.setAttribute('data-cell', r + '-' + c);
+      mx.appendChild(cell);
+    }
+  });
+  RISKS.forEach(function(rk, i){
+    var cell = mx.querySelector('[data-cell="' + rk.imp + '-' + rk.lik + '"]');
+    if(!cell) return;
+    var b = document.createElement('button');
+    b.className = 'pip k' + rk.c;
+    b.setAttribute('data-c', rk.c);
+    b.textContent = rk.id;
+    b.title = rk.id + ' — ' + rk.t.replace(/&amp;/g,'&');
+    b.onclick = function(){ mxSel = i; paintRisk(); };
+    cell.appendChild(b);
+  });
+})();
+
+function pips(){ return Array.prototype.slice.call(mx.querySelectorAll('.pip')); }
+
+function paintRisk(){
+  var rk = RISKS[mxSel], po = POST[rk.p];
+  pips().forEach(function(p){ p.classList.toggle('on', p.textContent === rk.id); });
+  mxdetail.innerHTML =
+    '<span class="badge greyb">' + rk.id + '</span> ' +
+    '<span class="posture ' + po[1] + '">' + po[0] + '</span>' +
+    '<div class="obj">' + rk.t + '</div>' +
+    '<p class="small" style="margin:0 0 12px;">' + rk.d + '</p>' +
+    '<p class="tiny" style="margin:0;"><b>Category ' + rk.c + '</b> · ' + CATN[rk.c] +
+    '<br>Judged <b>' + IMPL[rk.imp].toLowerCase() + '</b> impact at <b>' + LIKL[rk.lik].toLowerCase() +
+    '</b> likelihood — team judgement, not measurement.</p>';
+  mxdetail.classList.remove('fade-swap'); void mxdetail.offsetWidth; mxdetail.classList.add('fade-swap');
+}
+
+Array.prototype.slice.call(document.querySelectorAll('[data-rf]')).forEach(function(btn){
+  btn.onclick = function(){
+    var f = btn.getAttribute('data-rf');
+    document.querySelectorAll('[data-rf]').forEach(function(b){ b.classList.toggle('on', b === btn); });
+    var firstId = null;
+    pips().forEach(function(p){
+      var show = (f === 'all') || (p.getAttribute('data-c') === f);
+      p.classList.toggle('dim', !show);
+      if(show && firstId === null) firstId = p.textContent;
+    });
+    if(firstId !== null && RISKS[mxSel] && String(RISKS[mxSel].c) !== f && f !== 'all'){
+      for(var i = 0; i < RISKS.length; i++){ if(RISKS[i].id === firstId){ mxSel = i; break; } }
+      paintRisk();
+    }
+  };
+});
+paintRisk();
+
+/* ---------------- boot ---------------- */
+go(0);
+
+/* touch swipe */
+var tx0 = null, ty0 = null;
+document.addEventListener('touchstart', function(e){ tx0 = e.touches[0].clientX; ty0 = e.touches[0].clientY; }, {passive:true});
+document.addEventListener('touchend', function(e){
+  if(tx0 === null) return;
+  var dx = e.changedTouches[0].clientX - tx0, dy = e.changedTouches[0].clientY - ty0;
+  if(Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy)*1.6){ dx < 0 ? next() : prev(); }
+  tx0 = null;
+}, {passive:true});
+
+})();
+</script>
+</body></html>
