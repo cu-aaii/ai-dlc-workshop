@@ -280,7 +280,11 @@ def deployment_create(
             results["pull_request"] = github.create_pull(
                 settings.workshop_repo_full,
                 branch,
-                f"Deploy {found.name} v{found.version} as {stack_name} for {owner_netid}",
+                # Prefixed so a reviewer scanning the PR list can tell a Builder-generated
+                # PR from one a developer opened by hand -- these arrive from a builder
+                # talking to a chatbot, not from someone who has read pipeline.yml.
+                f"(blueprint create)/{found.name}: {stack_name} for {owner_netid} "
+                f"(v{found.version})",
                 f"Registration PR opened by the Cornell Builder.\n\n"
                 f"- Blueprint: `{found.name}` v{found.version}\n- Stack: `{stack_name}`\n"
                 f"- Owner: `{owner_netid}`\n{shell_line}\n\n"
@@ -407,7 +411,11 @@ def deployment_update(
                     github.put_file(repo_full, path, content, f"{title}: {path}", branch, sha=sha)
                 )
                 completed_steps.append(f"wrote {path}")
-            pr = github.create_pull(repo_full, branch, title, description)
+            # Same reviewer signal as create/delete. The caller-supplied title is kept
+            # verbatim after the prefix; it was already bounded by title_description_problem.
+            pr = github.create_pull(
+                repo_full, branch, f"(blueprint update): {title}", description
+            )
             completed_steps.append("opened the PR")
     except Exception as error:
         return {
@@ -536,7 +544,7 @@ def deployment_delete(deployment_name: str, dry_run: bool = True) -> dict[str, A
             results["pull_request"] = github.create_pull(
                 settings.workshop_repo_full,
                 branch,
-                f"Undeploy {stack_name}",
+                f"(blueprint delete)/{deployment_name}: undeploy {stack_name}",
                 f"Deregistration PR opened by the Cornell Builder.\n\n"
                 f"- Deployment: `{deployment_name}`\n- Stack: `{stack_name}`\n"
                 f"{removes_line}\n\n"
