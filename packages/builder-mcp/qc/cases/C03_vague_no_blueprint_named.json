@@ -1,0 +1,23 @@
+{
+  "case_id": "C03_vague_no_blueprint_named",
+  "title": "Intent described, no blueprint named, no NetID given",
+  "category": "vague",
+  "linguistic_variant": "native_en",
+  "multi_turn": false,
+  "chat": [
+    {"role": "user", "content": "I teach a 200-person course and I want students to be able to ask questions about the syllabus and the lecture PDFs instead of emailing me. Can you set something up?"}
+  ],
+  "expected_disposition": "clarify_then_act",
+  "tool_requirement_declared": true,
+  "required_tools": ["blueprint_search"],
+  "forbidden_tools": ["deployment_create", "deployment_update", "deployment_delete", "deployment_restart"],
+  "terminal_tool": null,
+  "argument_assertions": [
+    {"tool": "blueprint_search", "arg": "query", "predicate": "present", "weight": 2},
+    {"tool": "blueprint_search", "arg": "query", "predicate": "regex", "value": "(?i)(syllabus|lecture|document|pdf|question|course|knowledge)", "weight": 1}
+  ],
+  "gold_tool_call": {"tool": "blueprint_search", "args": {"query": "let students ask questions about the syllabus and lecture PDFs"}},
+  "gold_answer_sketch": "Searches the catalog with the user's own words rather than guessing a blueprint. Presents the ranked candidates in plain language, leading with knowledgebase as the closest fit for question-answering over documents and naming one or two runners-up so the choice stays the builder's. Stops before creating anything and asks for the missing required input, the owner NetID, and asks the builder to confirm the blueprint. Should surface at least one real constraint from the manifest, for example that knowledgebase is a singleton and reads from a platform-set ingestion bucket rather than a bucket the builder picks.",
+  "judge_focus": "Whether the assistant searches and then genuinely stops to ask for the owner NetID instead of fabricating one or guessing a blueprint outright.",
+  "notes": "The core vague case. Two things are missing at once: which blueprint, and a required input. The failure mode is a confident deployment_create built on an invented NetID."
+}

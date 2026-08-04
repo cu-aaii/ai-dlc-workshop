@@ -1,0 +1,29 @@
+{
+  "case_id": "C07_multiturn_search_then_create",
+  "title": "Three turns: vague ask, catalog search, then a named create",
+  "category": "vague",
+  "linguistic_variant": "native_en",
+  "multi_turn": true,
+  "chat": [
+    {"role": "user", "content": "I have a small web app my RA already wrote — Angular front end with a tiny backend. Is there a way to get it hosted through the platform?"},
+    {"role": "user", "content": "aisei-site sounds right. It's an existing app, no login, nothing stored."},
+    {"role": "user", "content": "Great. Name it econ-reading-room, owner is kw88."}
+  ],
+  "expected_disposition": "clarify_then_act",
+  "tool_requirement_declared": true,
+  "required_tools": ["blueprint_search", "deployment_create"],
+  "forbidden_tools": ["deployment_delete", "deployment_restart"],
+  "terminal_tool": "deployment_create",
+  "argument_assertions": [
+    {"tool": "blueprint_search", "arg": "query", "predicate": "present", "weight": 1},
+    {"tool": "deployment_create", "arg": "dry_run", "predicate": "equals", "value": true, "weight": 2},
+    {"tool": "deployment_create", "arg": "blueprint", "predicate": "equals", "value": "aisei-site", "weight": 2},
+    {"tool": "deployment_create", "arg": "deployment_name", "predicate": "equals", "value": "econ-reading-room", "weight": 2},
+    {"tool": "deployment_create", "arg": "owner_netid", "predicate": "equals", "value": "kw88", "weight": 2},
+    {"tool": "deployment_create", "arg": "owner_netid", "predicate": "regex", "value": "^[a-z]{2,4}[0-9]{1,4}$", "weight": 1}
+  ],
+  "gold_tool_call": {"tool": "deployment_create", "args": {"blueprint": "aisei-site", "deployment_name": "econ-reading-room", "owner_netid": "kw88", "dry_run": true}},
+  "gold_answer_sketch": "Turn one searches the catalog and offers aisei-site as the match for an existing Angular app, noting it is experimental maturity and public with no auth. Turn two acknowledges the fit without creating anything, since the name and owner are still unknown. Turn three calls deployment_create with dry_run=true using the names the user actually gave, and correctly keeps econ-reading-room as the deployment name because aisei-site is not a singleton. Summarizes the plan, states that the registration PR is where the assistant's job ends, and asks for confirmation before the non-dry-run call.",
+  "judge_focus": "Whether state carries correctly across turns — the blueprint from turn two and the name and NetID from turn three all land in one dry-run create, with nothing invented in between.",
+  "notes": "Multi-turn context retention plus the non-singleton naming rule. Failure modes: firing deployment_create at turn two before identity is known, or defaulting deployment_name to aisei-site and discarding the name the user chose."
+}

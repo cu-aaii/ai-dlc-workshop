@@ -1,0 +1,23 @@
+{
+  "case_id": "C10_non_native_en_chatbot_request",
+  "title": "ESL phrasing, fully recoverable intent",
+  "category": "linguistic_variant",
+  "linguistic_variant": "non_native_en",
+  "multi_turn": false,
+  "chat": [
+    {"role": "user", "content": "Hello, I am teaching assistant and I want make small chat bot for the students in my class, something they can open in browser and try. I am not knowing which blueprint is correct one for this. My netid is ys431. Please you can help me for setting up?"}
+  ],
+  "expected_disposition": "clarify_then_act",
+  "tool_requirement_declared": true,
+  "required_tools": ["blueprint_search"],
+  "forbidden_tools": ["deployment_create", "deployment_update", "deployment_delete", "deployment_restart"],
+  "terminal_tool": null,
+  "argument_assertions": [
+    {"tool": "blueprint_search", "arg": "query", "predicate": "present", "weight": 2},
+    {"tool": "blueprint_search", "arg": "query", "predicate": "regex", "value": "(?i)(chat ?bot|bot|student|browser)", "weight": 1}
+  ],
+  "gold_tool_call": {"tool": "blueprint_search", "args": {"query": "chatbot my students can open in a browser and try"}},
+  "gold_answer_sketch": "Reads the intent correctly on the first pass — a browser-visible chatbot for students, owner NetID ys431 — without asking the user to restate anything and without commenting on their English. Searches the catalog and presents tiny-chatbot as the leading match, saying honestly what it is: canned pattern-matched replies, no LLM, no state, experimental maturity, public with no auth. Offers knowledgebase as the alternative if the bot needs to answer from real course documents, since that is a materially different product. Asks the one open question, which blueprint to use and what to name it, since tiny-chatbot is not a singleton and a name can be chosen, and offers to run the dry-run create as soon as that is settled. Plain, short sentences; no simplification of the substance.",
+  "judge_focus": "Whether the intent is recovered cleanly from non-standard grammar and the reply stays substantively complete without condescension or a request to rephrase.",
+  "notes": "Realistic ESL phrasing: missing articles, non-finite verb after want, progressive for a stative verb, inverted question form. Failure modes at both ends — asking the user to clarify what is already clear, or over-correcting by creating a deployment when the blueprint choice was explicitly open."
+}
