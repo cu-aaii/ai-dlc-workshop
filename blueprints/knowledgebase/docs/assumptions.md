@@ -70,12 +70,11 @@ happens at real volume.
 Both of these are true for one PDF and neither survives contact with a real document set. Growing
 the corpus means revisiting the timeout and probably making the smoke query less specific.
 
-## The SharePoint source, only when it is enabled
+## The SharePoint source — now live, so these are hard prerequisites
 
-None of this is assumed by the deployed `main` stack: `EnableSharePointSource` is `false`, and with
-the flag off the template makes no SharePoint claims at all. Everything here becomes a deploy
-prerequisite the moment it is `true` — and a prerequisite for **every track's merges**, since they
-share the stage. Detail and the how in `sharepoint-source.md`.
+`EnableSharePointSource` is `true`, so every item below is a prerequisite for **every track's
+merges**, not a hypothetical. They were all satisfied during the rehearsal that preceded turning it
+on; what follows is what has to stay true. Detail and the how in `sharepoint-source.md`.
 
 **The knowledge base is `Type: MANAGED`.** Not a preference in this context: a customer-managed
 knowledge base supports S3 and Custom data sources only, and attaching SharePoint to one fails at
@@ -97,9 +96,10 @@ own grants nothing. The grant is a Graph `POST` issued by a principal holding
 parameter holds one site; the template renders `siteUrls` as a one-element list, so more than one
 site is a `ConnectorParameters` edit rather than a parameter value.
 
-**The certificate has not expired.** This is a date, not a configuration, and nothing in this repo
-watches it. It is the most likely cause of a SharePoint failure that appears without anyone
-changing anything.
+**The certificate has not expired.** A date, not a configuration, and nothing in this repo watches
+it — the Entra side is managed by hand by the platform team, so the date lives with them. This is the
+most likely cause of a SharePoint failure appearing without anyone changing anything, and now that
+the flag is on it takes every track's merges with it.
 
 **The `.p12` is at `s3://<SharePointCertificateBucket>/<SharePointCertificateKey>`, under a
 prefix.** The connector fetches it itself and also probes for a sibling `<key>.metadata.json`, so
@@ -112,9 +112,9 @@ make that probe a denied call.
 client-secret credential and is read by nothing here.
 
 **`SharePointSmokeQuery` is answerable from the SharePoint corpus and *not* from the S3 bucket.**
-Retrieval spans the whole knowledge base, so a question both corpora answer makes the retrieval
-assertion prove nothing. The current default fails this test on purpose-visible grounds — it is a
-placeholder. See `warnings.md`.
+Retrieval spans the whole knowledge base, so a question both corpora answer makes the assertion prove
+nothing. `What do the ECE 4960 handouts cover?` was measured at 5/5 SharePoint chunks. If the handouts
+change substantially, re-measure it. See `warnings.md`.
 
 ## Scheduled re-sync, only when it is enabled
 

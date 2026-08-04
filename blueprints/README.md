@@ -35,7 +35,7 @@ wrong for anything finished — the "Manifest" column below is the catalog, not 
 |---|---|---|
 | `hello-world` | yes | Fully deploys. Proves the pipeline and the tagging convention, and is the reference for every convention below. |
 | `notify-topic` | yes | Fully deploys. One SNS topic with an optional email subscription — the simplest "tell me when X happens" channel, with no compute. |
-| `knowledgebase` | yes | Bedrock managed knowledge base over an existing S3 document bucket, plus a SharePoint source and scheduled re-sync that are both built, verified and **gated off by default**. Verifies its own ingestion at deploy time, so a green deploy is the acceptance test. Web source not built. |
+| `knowledgebase` | yes | Bedrock managed knowledge base over an S3 document bucket **and** a SharePoint site library, both verified at deploy time — a green deploy means every source is indexed and answerable. Scheduled re-sync is built and off. Web source not built. |
 | `entra-probe` | no | Fully deploys. Proves the Terraform-from-CodeBuild path reaches the Entra tenant. Terraform only — no AWS resources, so there is no CloudFormation template to advertise. |
 | `tiny-chatbot` | yes | Registered `deployed_by: manual` and parked. Flipped to `pipeline` in the PR that wires its Build stage action. |
 | `aisei-site` | yes | Parked. The public AI-SEI landing page as a Lambda container. |

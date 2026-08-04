@@ -20,10 +20,9 @@ summary: >-
   bucket. AWS owns the storage, the index and the embedding model, so there is no vector store
   to provision. Ingests and verifies on every deploy -- a green deploy means the documents are
   indexed and the knowledge base answered a real question -- and hands off the identifiers
-  through SSM plus a retrieval managed policy for a chatbot to consume. A SharePoint site library
-  can be a second source, and the sources can re-sync on a schedule -- both are built and verified
-  but shipped OFF, because each makes every merge depend on something outside AWS. Turning either
-  on is a PR against this blueprint, not a builder input.
+  through SSM plus a retrieval managed policy for a chatbot to consume. A SharePoint site library is
+  indexed as a second source alongside S3. Scheduled re-sync between deploys is built but shipped
+  off. Changing either is a PR against this blueprint, not a builder input.
 matches:
   - "knowledge base over my documents"
   - "let students ask questions about the syllabus"
@@ -63,13 +62,13 @@ pipeline_parameters:
   # builder inputs: EnableSharePointSource makes every merge depend on an Entra certificate nobody
   # watches, and EnableScheduledSync adds a re-sync that structurally cannot report whether it
   # worked. The SharePoint values below are references, not secrets -- see docs/sharepoint-source.md.
-  EnableSharePointSource: "false"
+  EnableSharePointSource: "true"
   SharePointSiteUrl: "https://8chzbf.sharepoint.com/sites/kb"
   SharePointTenantId: "3ce7e7fb-ef51-4972-bfd5-f43f6668ccca"
   SharePointConnectorSecretArn: "arn:aws:secretsmanager:us-east-1:890349359349:secret:bedrock/sharepoint-cert-connector-eK6OLN"
   SharePointCertificateBucket: "bedrock-sharepoint-certs-890349359349"
   SharePointCertificateKey: "certs/certificate.p12"
-  SharePointSmokeQuery: "What does the syllabus say about attendance?"
+  SharePointSmokeQuery: "What do the ECE 4960 handouts cover?"
   EnableScheduledSync: "false"
   SyncScheduleExpression: "cron(0 7 ? * MON *)"
   SharePointSyncScheduleExpression: "cron(0 8 ? * MON *)"

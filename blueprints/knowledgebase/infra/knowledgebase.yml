@@ -53,20 +53,20 @@ Parameters:
     Description: 'Question the deploy-time verifier asks the knowledge base. The deploy fails if this returns no results, so it has to be answerable from the documents in IngestionBucketName.'
     Type: 'String'
 
-  # SharePoint source - optional second data source. Off by default: enabling it makes every
-  # track's merge depend on an Entra app registration, admin consent on BOTH Graph and the
-  # SharePoint REST API, a per-site grant, and an unexpired certificate. Flip it on in its own PR
-  # after an Environment=test rehearsal. Prerequisites, order of operations and the Entra half:
-  # docs/sharepoint-source.md.
+  # SharePoint source - ON, rehearsed first: 25 of 25 ECE 4960 handouts indexed, zero failures, clean
+  # incremental re-sync, SharePoint-only smoke query answered, both verifiers passed.
   #
-  # The defaults are a configuration observed ingesting in this account on 2026-08-04 (KB
-  # sharepoint-kb / KANPIZQSGD). None is a secret - a tenant id, site URL, bucket, key and secret
-  # ARN are all references; the certificate and its password stay in S3 and Secrets Manager.
+  # Every track's merge now depends on the Entra app's consent (Graph AND SharePoint REST), the
+  # per-site grant, and an unexpired certificate. A lapse fails the verifier and reddens
+  # BlueprintDeploy for everyone. Entra is managed by hand by the platform team; nothing here watches
+  # the expiry. docs/warnings.md, docs/sharepoint-source.md.
+  #
+  # No value below is a secret - tenant id, site URL, bucket, key and secret ARN are references.
 
   EnableSharePointSource:
-    Default: 'false'
+    Default: 'true'
     AllowedValues: ['true', 'false']
-    Description: 'Whether to add the SharePoint data source. Off by default because it couples the deploy to Entra consent and certificate expiry, and a failure there reddens the shared pipeline for every track.'
+    Description: 'Whether to add the SharePoint data source. ON, rehearsed at 25 of 25 documents indexed with zero failures. It couples every deploy to Entra consent and certificate expiry, so a lapse there reddens the shared pipeline for every track.'
     Type: 'String'
 
   SharePointSiteUrl:
@@ -100,9 +100,9 @@ Parameters:
     Type: 'String'
 
   SharePointSmokeQuery:
-    Default: 'What does the syllabus say about attendance?'
+    Default: 'What do the ECE 4960 handouts cover?'
     AllowedPattern: '.{1,512}'
-    Description: 'Question the verifier asks after ingesting SharePoint. Must be answerable ONLY from SharePoint: retrieval spans the whole knowledge base, so a question the S3 corpus also answers proves nothing.'
+    Description: 'Question the verifier asks after ingesting SharePoint. Must be answerable ONLY from SharePoint - retrieval spans the whole knowledge base. This one returns 5/5 chunks from the ECE 4960 handouts, measured; the S3 corpus is CS1112 and cannot answer it.'
     Type: 'String'
 
   # Scheduled re-sync - deliberately fire-and-forget, unlike everything else here.

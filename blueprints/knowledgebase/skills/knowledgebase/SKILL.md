@@ -48,7 +48,7 @@ do not delete reasoning, and do not reach for `--s3-bucket` as the first answer.
 | Create the ingestion bucket | Seeding objects needs write access nobody here has, so it would be empty forever and every deploy would fail. |
 | Add a `Tags` block to `AWS::Bedrock::DataSource` | The resource has no `Tags` property. cfn-lint will reject it. Use the SSM mirror. |
 | Copy a `Key`/`Value` tag list onto `AWS::Bedrock::KnowledgeBase` | Its `Tags` is a **map**, like `AWS::SSM::Parameter`. |
-| Enable `EnableSharePointSource` as part of another change | It makes every track's merge depend on Entra consent, a per-site grant and an unexpired certificate. Own PR, after an `Environment=test` rehearsal. |
+| Turn a gated source on without an `Environment=test` rehearsal first | SharePoint is on because a rehearsal proved 25/25 documents indexed with zero failures. `EnableScheduledSync` is still off because its trust-policy fix is untested. Rehearse, then flip, in its own PR. |
 | Wire SharePoint with `dev/workshop/entra/sharepoint` | That is the old client-secret credential; `ENTRA_ID_APP_ONLY` needs a certificate. The connector's secret is `bedrock/sharepoint-cert-connector`, holding exactly `clientId` and `certificatePassword`. |
 | Set `aclEnabled: true` | Bedrock then demands `GroupMember.Read.All` and `User.Read.All` — tenant-wide profile reads. It is why the account's earlier SharePoint data source failed every job it ran. |
 | Change SharePoint's `DataDeletionPolicy` to `RETAIN` for consistency with S3 | SharePoint has no document-level deletion, so deleting the data source is the only purge that exists. `RETAIN` makes stale chunks permanent. |
@@ -90,10 +90,16 @@ a builder asks for *verified* scheduled ingestion, the answer is Scheduler → S
 (`startExecution` is allowed, and SFN's SDK integrations can call the read APIs), which is written up
 in `docs/decisions.md` as evaluated and deferred. Do not improvise it into the inline Lambda.
 
-Turn SharePoint on → read `docs/sharepoint-source.md`. It is a checklist in dependency order, and
-step 3 (verify the Entra half standalone, before Bedrock is involved) is the one that saves the day.
-The Entra app, its certificate and the per-site grant are prerequisites that live outside this repo;
-nothing in `tools/check` can see any of them.
+SharePoint is **on**, indexing the ECE 4960 handouts in `sites/kb`. `docs/sharepoint-source.md` is the
+dependency-ordered account of what it rests on; `docs/sharepoint-runbook.md` is the generalized
+validated walkthrough. The Entra app, its certificate and the per-site grant live outside this repo and
+`tools/check` cannot see any of them, so a SharePoint failure that appears without a code change is
+almost always one of those three.
+
+Point it at a different site → change `SharePointSiteUrl` in the template, `pipeline/pipeline.yml` and
+`blueprint.yaml`, **get a per-site Graph grant for the new site** (`Sites.Selected` grants nothing
+without one), and re-measure `SharePointSmokeQuery` against the new corpus. Indexing a second site as
+well is a `ConnectorParameters` edit, not a parameter change.
 
 Change chunking → **you can't, and adding a `ChunkingConfiguration` back will fail the deploy.** A
 managed embedding model owns chunking; the API rejects any chunking strategy specified alongside it.

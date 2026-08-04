@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-DLC at Cornell — Opening Deck</title>
+<style>
+  :root {
+    --ink:        #2c3444;
+    --ink-soft:   #55607a;
+    --muted:      #7d879c;
+    --cornell:    #b31b1b;
+    --lav:        #b3a4e0;
+    --lav-deep:   #8b76c9;
+    --mint:       #9ecf9a;
+    --mint-deep:  #6aab6f;
+    --sand:       #e0c489;
+    --sand-deep:  #c9a253;
+    --sky:        #8fb6d8;
+    --sky-deep:   #5d8fb8;
+    --slate:      #b9bfc9;
+    --card:       rgba(255,255,255,0.72);
+    --card-line:  rgba(255,255,255,0.9);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: #0e1018;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- stage / scaling ---------- */
+  #stage {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #deck {
+    width: 1280px; height: 720px;
+    position: relative;
+    transform-origin: center center;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.55);
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  /* ---------- slide chrome ---------- */
+  .slide {
+    position: absolute; inset: 0;
+    padding: 62px 76px 74px;
+    display: none;
+    /* the AWS pastel wash */
+    background:
+      radial-gradient(120% 90% at 88% 6%,  rgba(150,222,232,0.55) 0%, rgba(150,222,232,0) 55%),
+      radial-gradient(95%  80% at 8%  12%, rgba(180,166,226,0.48) 0%, rgba(180,166,226,0) 58%),
+      radial-gradient(110% 95% at 30% 100%, rgba(168,214,166,0.42) 0%, rgba(168,214,166,0) 60%),
+      radial-gradient(85%  70% at 100% 78%, rgba(232,214,166,0.40) 0%, rgba(232,214,166,0) 62%),
+      linear-gradient(160deg, #fdfdff 0%, #f6f9fb 100%);
+  }
+  .slide.active { display: block; }
+
+  h1.title {
+    font-size: 40px; font-weight: 300; letter-spacing: -0.6px;
+    color: var(--ink); line-height: 1.12;
+  }
+  .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--cornell); margin-bottom: 12px;
+  }
+  .rule { width: 62px; height: 3px; border-radius: 2px; margin: 18px 0 30px;
+          background: linear-gradient(90deg, var(--cornell), var(--sand-deep)); }
+
+  .body { font-size: 19px; line-height: 1.62; color: var(--ink-soft); font-weight: 300; }
+  .body strong { font-weight: 600; color: var(--ink); }
+  .accent { color: var(--sand-deep); font-weight: 400; }
+  .accent-l { color: var(--lav-deep); font-weight: 400; }
+  .accent-m { color: var(--mint-deep); font-weight: 400; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 54px; }
+  .cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; }
+  .split { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
+  .divider-v { border-left: 1px solid rgba(120,130,150,0.22); padding-left: 46px; }
+
+  /* ---------- cards ---------- */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: 14px;
+    padding: 24px 26px;
+    box-shadow: 0 2px 5px rgba(60,70,95,0.05), 0 14px 32px rgba(60,70,95,0.07);
+    backdrop-filter: blur(6px);
+  }
+  .card h3 { font-size: 17px; font-weight: 600; color: var(--ink); margin-bottom: 9px; letter-spacing: -0.2px; }
+  .card p  { font-size: 15px; line-height: 1.55; color: var(--ink-soft); font-weight: 300; }
+  .card .num {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+    display: block; margin-bottom: 10px; color: var(--muted);
+  }
+  .card.t-lav  { border-top: 3px solid var(--lav-deep); }
+  .card.t-mint { border-top: 3px solid var(--mint-deep); }
+  .card.t-sand { border-top: 3px solid var(--sand-deep); }
+  .card.t-sky  { border-top: 3px solid var(--sky-deep); }
+  .card.t-red  { border-top: 3px solid var(--cornell); }
+
+  ul.ticks { list-style: none; }
+  ul.ticks li {
+    position: relative; padding-left: 27px; margin-bottom: 15px;
+    font-size: 18px; line-height: 1.5; color: var(--ink-soft); font-weight: 300;
+  }
+  ul.ticks li::before {
+    content: ""; position: absolute; left: 3px; top: 10px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--lav-deep), var(--sky-deep));
+  }
+  ul.ticks li strong { font-weight: 600; color: var(--ink); }
+
+  .quote {
+    font-size: 30px; font-weight: 300; line-height: 1.35; color: var(--ink);
+    letter-spacing: -0.4px;
+  }
+  .quote .dim { color: var(--muted); }
+
+  .kicker {
+    position: absolute; left: 76px; right: 76px; bottom: 46px;
+    font-size: 15px; font-weight: 400; color: var(--ink-soft);
+    border-top: 1px solid rgba(120,130,150,0.2); padding-top: 16px;
+  }
+  .kicker b { color: var(--cornell); font-weight: 600; }
+
+  /* ---------- footer / nav ---------- */
+  .foot {
+    position: absolute; left: 76px; right: 76px; bottom: 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(120,130,150,0.28); }
+  .dots i.on { background: var(--cornell); }
+
+  /* ---------- title slide ---------- */
+  .slide.cover { display: none; padding: 0; }
+  .slide.cover.active { display: flex; }
+  .cover-inner { margin: auto; text-align: center; padding: 0 90px; }
+  .cover h1 { font-size: 66px; font-weight: 200; letter-spacing: -2px; line-height: 1.04; color: var(--ink); }
+  .cover h1 b { font-weight: 500; }
+  .cover .sub { font-size: 21px; font-weight: 300; color: var(--ink-soft); margin-top: 26px; }
+  .cover .meta { font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+                 color: var(--muted); margin-top: 40px; font-weight: 600; }
+  .cover .bar {
+    width: 118px; height: 4px; border-radius: 3px; margin: 34px auto 0;
+    background: linear-gradient(90deg, var(--cornell) 0%, var(--sand-deep) 34%, var(--mint-deep) 68%, var(--lav-deep) 100%);
+  }
+
+  /* ---------- nested circles (maturity) ---------- */
+  .rings { display: block; margin: 0 auto; }
+  .ring-label { font-size: 15px; font-weight: 600; fill: var(--ink); }
+  .ring-label.sm { font-size: 14px; }
+
+  /* ---------- SDLC -> AI-DLC ---------- */
+  .phasemap { display: grid; grid-template-columns: 1fr 44px 1fr; gap: 0; align-items: stretch; }
+  .colhead { font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+             color: var(--muted); margin-bottom: 14px; }
+  .sdlc { display: grid; gap: 9px; }
+  .bar {
+    border-radius: 7px; padding: 13px 18px; color: #fff;
+    font-size: 14px; font-weight: 500; letter-spacing: 0.1px;
+    display: flex; align-items: center;
+    box-shadow: 0 2px 8px rgba(60,70,95,0.10);
+  }
+  .bar.b1 { background: linear-gradient(100deg, #a897dd, #bcaee6); }
+  .bar.b2 { background: linear-gradient(100deg, #93c68f, #aed6a8); }
+  .bar.b3 { background: linear-gradient(100deg, #d9bd7e, #e6d09b); }
+  .bar.b4 { background: linear-gradient(100deg, #85adcf, #a3c4de); }
+  .bar.b5 { background: linear-gradient(100deg, #a8aeb9, #c2c8d1); }
+
+  .aidlc { display: grid; gap: 12px; }
+  .pcard {
+    border-radius: 16px; padding: 18px 22px; color: #fff;
+    display: flex; flex-direction: column; justify-content: center;
+    box-shadow: 0 3px 10px rgba(60,70,95,0.12), 0 12px 28px rgba(60,70,95,0.10);
+  }
+  .pcard .pname { font-size: 26px; font-weight: 600; letter-spacing: -0.4px; }
+  .pcard .pnote { font-size: 13px; font-weight: 300; opacity: 0.94; margin-top: 5px; line-height: 1.4; }
+  .pcard.p1 { background: linear-gradient(135deg, #dcbe80, #e9d6a6); }
+  .pcard.p2 { background: linear-gradient(135deg, #7fa8cc, #a9c8e0); }
+  .pcard.p3 { background: linear-gradient(135deg, #b0a0dd, #c9bde9); }
+
+  .arrows { display: flex; align-items: center; justify-content: center; }
+  .arrows svg { opacity: 0.4; }
+
+  /* ---------- pipeline flow ---------- */
+  .flow { display: grid; gap: 10px; margin-top: 6px; }
+  .step {
+    display: grid; grid-template-columns: 34px 1fr; gap: 16px; align-items: center;
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 11px;
+    padding: 13px 18px; box-shadow: 0 8px 22px rgba(60,70,95,0.06);
+  }
+  .step .bullet {
+    width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; color: #fff;
+  }
+  .step .n1 { background: var(--lav-deep); }
+  .step .n2 { background: var(--sand-deep); }
+  .step .n3 { background: var(--sky-deep); }
+  .step .n4 { background: var(--mint-deep); }
+  .step .lbl { font-size: 16px; font-weight: 600; color: var(--ink); }
+  .step .desc { font-size: 13.5px; font-weight: 300; color: var(--muted); margin-top: 2px; }
+
+  .badge {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 5px 11px; border-radius: 20px;
+    background: rgba(179,27,27,0.09); color: var(--cornell); border: 1px solid rgba(179,27,27,0.2);
+  }
+  .badge.g { background: rgba(106,171,111,0.12); color: var(--mint-deep); border-color: rgba(106,171,111,0.28); }
+
+  .vs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-radius: 14px; overflow: hidden;
+        border: 1px solid var(--card-line); box-shadow: 0 14px 34px rgba(60,70,95,0.08); }
+  .vs > div { padding: 26px 28px; background: rgba(255,255,255,0.6); }
+  .vs > div:first-child { background: rgba(179,27,27,0.045); border-right: 1px solid rgba(120,130,150,0.16); }
+  .vs h4 { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 14px; font-weight: 700; }
+  .vs > div:first-child h4 { color: var(--cornell); }
+  .vs > div:last-child h4 { color: var(--mint-deep); }
+  .vs p { font-size: 16px; line-height: 1.5; color: var(--ink-soft); font-weight: 300; margin-bottom: 11px; }
+  .vs p:last-child { margin-bottom: 0; }
+
+  /* ---------- speaker notes ---------- */
+  #notes {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: rgba(10,12,18,0.94); color: #d8dde8;
+    font-size: 14px; line-height: 1.55; padding: 16px 26px;
+    border-top: 2px solid var(--cornell);
+    display: none; z-index: 40; max-height: 34vh; overflow-y: auto;
+  }
+  #notes.on { display: block; }
+  #notes b { color: #fff; }
+  #notes .hd { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+               color: #8b93a6; margin-bottom: 7px; font-weight: 700; }
+
+  #hint {
+    position: fixed; right: 14px; top: 12px; z-index: 40;
+    font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+    color: rgba(255,255,255,0.4); font-weight: 600;
+    transition: opacity .5s; pointer-events: none;
+  }
+
+  @media print {
+    html, body { overflow: visible; background: #fff; }
+    #stage { position: static; display: block; }
+    #deck { transform: none !important; width: 100%; height: auto; box-shadow: none; }
+    .slide { display: block !important; position: relative; page-break-after: always;
+             width: 1280px; height: 720px; }
+    #notes, #hint { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="hint">← → navigate · N notes · F fullscreen</div>
+
+<div id="stage">
+<div id="deck">
+
+  <!-- ============ 1. COVER ============ -->
+  <section class="slide cover active"
+    data-notes="Set the frame: this is not a tools demo. Two days, one repo, one shared AWS account. By Wednesday we want a governed path from &quot;I need an app&quot; to a deployed, tagged, auditable service — with no one touching the AWS console.">
+    <div class="cover-inner">
+      <div class="eyebrow" style="color:var(--cornell)">Cornell University &nbsp;·&nbsp; AI Platform</div>
+      <h1>AI-DLC<br><b>at Cornell</b></h1>
+      <div class="sub">Governing how we build with AI — not just what we build</div>
+      <div class="bar"></div>
+      <div class="meta">Workshop &nbsp;·&nbsp; August 3&ndash;4, 2026</div>
+    </div>
+  </section>
+
+  <!-- ============ 2. WHY ARE WE IN THE ROOM ============ -->
+  <section class="slide"
+    data-notes="Lead with the reframe. Everyone in this room can already ship code with an agent, alone, tonight. That is not the constraint anymore. The constraint is agreement — on interfaces, on ownership, on what &quot;done and safe&quot; means. That is the only thing a room full of people is actually better at than a model.">
+    <div class="eyebrow">Slide 01</div>
+    <h1 class="title">Why are we in the room?</h1>
+    <div class="rule"></div>
+    <div class="cols">
+      <div>
+        <div class="quote">
+          Building is <span class="dim">no longer</span> the expensive part.
+        </div>
+        <p class="body" style="margin-top:22px">
+          An agent will write the Lambda, the template and the tests while you read this slide.
+          The cost has moved somewhere else: <strong>deciding what to build, agreeing on the
+          seams between our systems, and being able to prove afterwards what was deployed and
+          by whom.</strong>
+        </p>
+      </div>
+      <div class="divider-v">
+        <p class="body" style="margin-bottom:20px">
+          Which is exactly why <span class="accent-l">coming together</span> matters more, not less.
+        </p>
+        <ul class="ticks">
+          <li><strong>Alignment</strong> doesn't parallelise. One shared repo, one shared account, one green <code>main</code>.</li>
+          <li><strong>Design intent</strong> lives in people's heads until we write it down where an agent can read it.</li>
+          <li><strong>Trust</strong> is built once, in a room, then encoded — not renegotiated per team.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot"><span>AI-DLC at Cornell</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 3. DISCOVERY COMPRESSED ============ -->
+  <section class="slide"
+    data-notes="This is the joke that isn't a joke. Discovery used to be the natural brake on a bad idea — months of it. Agents compress it to a single sentence, so the brake is gone. The prompt is now the requirements document, and nobody reviews prompts. Land the point: speed did not remove the need for intent, it removed the time we used to accidentally spend forming it.">
+    <div class="eyebrow">Slide 02</div>
+    <h1 class="title">Discovery just got compressed to nothing</h1>
+    <div class="rule"></div>
+    <div class="split">
+      <div>
+        <div class="card t-red" style="padding:30px 32px">
+          <div class="num">The prompt we're all afraid of</div>
+          <div class="quote" style="font-size:27px">
+            &ldquo;Build me an ERP.<br><span class="dim">Make no mistakes.&rdquo;</span>
+          </div>
+        </div>
+        <p class="body" style="margin-top:24px; font-size:18px">
+          Eighteen months of discovery, collapsed into eleven words &mdash; and every assumption
+          that used to surface in those eighteen months is now made silently, by the model,
+          in a fraction of a second.
+        </p>
+      </div>
+      <div>
+        <ul class="ticks">
+          <li>Requirements gathering was <strong>slow enough to be a control</strong>. It isn't anymore.</li>
+          <li>The agent will happily invent a data model, an auth story and a region. All plausible. None of them ours.</li>
+          <li>Nothing is <em>wrong</em> in the output &mdash; it's just <strong>unaware of Cornell</strong>.</li>
+          <li>Speed didn't remove the need for intent. It removed the time we used to spend accidentally forming it.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot"><span>AI-DLC at Cornell</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 4. DESIGN INTENT ============ -->
+  <section class="slide"
+    data-notes="Here is the load-bearing idea of the whole workshop. As a campus architecture, our job is no longer to review each build — we cannot review at agent speed. Our job is to make design intent machine-readable, so the agent reads the instructions and builds following the instructions. Point at the repo: CLAUDE.md, the four cornell:* tags, stacks.yml, tools/check. That IS the architecture practice now.">
+    <div class="eyebrow">Slide 03</div>
+    <h1 class="title">The architecture job is now <span style="color:var(--sand-deep);font-weight:400">stating intent</span></h1>
+    <div class="rule"></div>
+    <p class="body" style="max-width:960px; margin-bottom:30px">
+      We cannot review every build at agent speed. So we stop reviewing outputs one by one and
+      start <strong>encoding design intent where the agent will read it</strong> &mdash;
+      then let it read the instructions and build following the instructions.
+    </p>
+    <div class="cols-3">
+      <div class="card t-sand">
+        <span class="num">Written down</span>
+        <h3>Intent as a file</h3>
+        <p>Constraints live in the repo, in prose the agent loads on every session &mdash; not in a
+        wiki page nobody opens and no model ever sees.</p>
+      </div>
+      <div class="card t-lav">
+        <span class="num">Reusable</span>
+        <h3>Intent as a blueprint</h3>
+        <p>Governed building blocks a builder composes. The safe choice is also the fastest
+        one available, so nobody has to be talked into it.</p>
+      </div>
+      <div class="card t-mint">
+        <span class="num">Enforced</span>
+        <h3>Intent as a check</h3>
+        <p>Tags, stack naming, registry mirroring, <code>tools/check</code>. If it isn't
+        enforced by a gate, it is a preference, not an architecture.</p>
+      </div>
+    </div>
+    <div class="kicker">
+      In this repo that's <b>CLAUDE.md</b>, the four <b>cornell:*</b> tags,
+      <b>pipeline/stacks.yml</b> and the <b>validate</b> check &mdash; the whole design intent
+      of the platform, in a form an agent obeys.
+    </div>
+    <div class="foot"><span>AI-DLC at Cornell</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 5. GOVERN THE BUILDER AGENT ============ -->
+  <section class="slide"
+    data-notes="The counter-intuitive one, and worth pausing on. Everyone's instinct is to govern the AI applications people ship — the chatbots, the RAG systems. That surface is enormous and grows daily. But every one of those is produced BY a builder agent. Govern the factory, not the products: one chokepoint, and it is the same chokepoint for all of them. This is why the MCP builder in this repo matters more than any single blueprint.">
+    <div class="eyebrow">Slide 04</div>
+    <h1 class="title">Govern the <span style="color:var(--lav-deep);font-weight:400">builder</span> agent, not just the agents it builds</h1>
+    <div class="rule"></div>
+    <div class="vs" style="margin-bottom:26px">
+      <div>
+        <h4>The instinct</h4>
+        <p><strong>Govern every AI app we ship.</strong> Review each chatbot, each RAG pipeline,
+        each assistant, one at a time.</p>
+        <p>The surface grows faster than the review capacity. Policy arrives after the deploy.
+        You are permanently behind.</p>
+      </div>
+      <div>
+        <h4>The leverage</h4>
+        <p><strong>Govern the agent that does the building.</strong> One place where design intent,
+        permissions and guardrails are applied.</p>
+        <p>Every application it produces inherits them &mdash; tagged, IaC, PR-only, auditable
+        &mdash; without asking the builder to care.</p>
+      </div>
+    </div>
+    <p class="body" style="font-size:18px">
+      There is <strong>one</strong> builder agent and <strong>many</strong> applications. Governing the
+      narrow end of the funnel is the only version of this that scales &mdash; and it's the version
+      where the builder never needs an AWS account, a console login, or a security review to move.
+    </p>
+    <div class="foot"><span>AI-DLC at Cornell</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 6. MATURITY RINGS ============ -->
+  <section class="slide"
+    data-notes="This is the AWS framing and it's a genuinely useful ladder. Most people in the room are at the innermost ring — AI-assisted, autocomplete-plus. AI-DLC targets the outer ring: the AI orchestrates the process itself — planning, decomposition, architectural suggestion — not just the typing. Say the last line out loud: developers retain ultimate responsibility for validation, decisions and oversight. That sentence is what makes the outer ring acceptable to a university.">
+    <div class="eyebrow">Slide 05</div>
+    <h1 class="title">An approach that works</h1>
+    <div class="rule"></div>
+    <div class="split" style="align-items:center">
+      <div>
+        <p class="body" style="margin-bottom:34px">
+          AI <span class="accent-l">orchestrates the development process</span> with
+          <span class="accent">planning</span>, <span class="accent-m">task decomposition</span>,
+          architectural suggestions &mdash; not just the typing.
+        </p>
+        <div style="border-top:1px solid rgba(120,130,150,0.22); padding-top:26px">
+          <p class="body">
+            Developers retain the <strong>ultimate responsibility</strong> for validation,
+            decision&#8209;making and oversight.
+          </p>
+        </div>
+      </div>
+      <div>
+        <svg class="rings" width="440" height="470" viewBox="0 0 440 470">
+          <defs>
+            <linearGradient id="gOuter" x1="0" y1="0" x2="0.85" y2="1">
+              <stop offset="0%"   stop-color="#e0c489"/>
+              <stop offset="45%"  stop-color="#c8b7e4"/>
+              <stop offset="100%" stop-color="#9ecf9a"/>
+            </linearGradient>
+            <linearGradient id="gMid" x1="0" y1="0" x2="0.9" y2="1">
+              <stop offset="0%"   stop-color="#b3a4e0"/>
+              <stop offset="55%"  stop-color="#8fb6d8"/>
+              <stop offset="100%" stop-color="#e0c489"/>
+            </linearGradient>
+            <linearGradient id="gIn" x1="0" y1="0" x2="0.9" y2="1">
+              <stop offset="0%"   stop-color="#9ecf9a"/>
+              <stop offset="100%" stop-color="#b3a4e0"/>
+            </linearGradient>
+            <linearGradient id="fOuter" x1="0" y1="0" x2="0.6" y2="1">
+              <stop offset="0%" stop-color="rgba(224,196,137,0.20)"/>
+              <stop offset="100%" stop-color="rgba(224,196,137,0.02)"/>
+            </linearGradient>
+            <linearGradient id="fIn" x1="0" y1="0" x2="0.6" y2="1">
+              <stop offset="0%" stop-color="rgba(158,207,154,0.24)"/>
+              <stop offset="100%" stop-color="rgba(158,207,154,0.04)"/>
+            </linearGradient>
+          </defs>
+
+          <!-- outer -->
+          <ellipse cx="220" cy="205" rx="150" ry="196" fill="url(#fOuter)" stroke="url(#gOuter)" stroke-width="2.4"/>
+          <!-- middle -->
+          <ellipse cx="220" cy="272" rx="112" ry="146" fill="rgba(255,255,255,0.55)" stroke="url(#gMid)" stroke-width="2.2"/>
+          <!-- inner -->
+          <ellipse cx="220" cy="330" rx="76"  ry="100" fill="url(#fIn)" stroke="url(#gIn)" stroke-width="2.2"/>
+
+          <!-- outer icon: nodes / graph -->
+          <g stroke="#a9925c" stroke-width="1.7" fill="none">
+            <rect x="196" y="44"  width="13" height="13" rx="1.5"/>
+            <rect x="235" y="44"  width="13" height="13" rx="1.5"/>
+            <rect x="196" y="83"  width="13" height="13" rx="1.5"/>
+            <rect x="235" y="83"  width="13" height="13" rx="1.5"/>
+            <path d="M209 50.5 h26 M209 89.5 h26 M202.5 57 v26 M241.5 57 v26"/>
+            <path d="M215 63 h15 v14 h-15 z" stroke-width="1.3"/>
+          </g>
+          <text class="ring-label" x="220" y="122" text-anchor="middle">AI-Managed Development</text>
+
+          <!-- middle icon: brain/chip -->
+          <g stroke="#6f7fa8" stroke-width="1.7" fill="none" transform="translate(0,4)">
+            <path d="M212 152 c-8 0 -12 5 -12 11 c-5 1 -7 5 -7 9 c0 5 4 9 9 9 c1 5 5 8 10 8 v-37 z"/>
+            <path d="M228 152 c8 0 12 5 12 11 c5 1 7 5 7 9 c0 5 -4 9 -9 9 c-1 5 -5 8 -10 8 v-37 z"/>
+            <path d="M220 152 v37"/>
+            <path d="M220 192 v9" stroke-width="1.2"/>
+          </g>
+          <text class="ring-label sm" x="220" y="222" text-anchor="middle">AI-Driven Development</text>
+
+          <!-- inner icon: doc + code -->
+          <g stroke="#5f8c62" stroke-width="1.7" fill="none">
+            <rect x="199" y="262" width="30" height="38" rx="2.5"/>
+            <path d="M205 271 h16 M205 279 h16 M205 287 h10"/>
+            <circle cx="234" cy="296" r="9" fill="rgba(255,255,255,0.9)"/>
+            <path d="M231 293 l-3 3 l3 3 M237 293 l3 3 l-3 3" stroke-width="1.4"/>
+          </g>
+          <text class="ring-label sm" x="220" y="332" text-anchor="middle">AI-Assisted</text>
+          <text class="ring-label sm" x="220" y="352" text-anchor="middle">Development</text>
+        </svg>
+      </div>
+    </div>
+    <div class="foot"><span>AI-DLC at Cornell</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 7. SDLC -> AI-DLC ============ -->
+  <section class="slide"
+    data-notes="Map the familiar onto the new. Five traditional phases collapse into three. Inception absorbs requirements — and it is where the human judgement concentrates now. Construction absorbs design AND development, because with an agent those stop being separate activities. Operation absorbs deployment and support. The important part is not the boxes, it's that the ratio of thinking-to-typing inverts.">
+    <div class="eyebrow">Slide 06</div>
+    <h1 class="title">SDLC &rarr; AI-DLC</h1>
+    <div class="rule"></div>
+    <div class="phasemap">
+      <div>
+        <div class="colhead">Traditional SDLC phases</div>
+        <div class="sdlc">
+          <div class="bar b1">Requirements Gathering and Analysis</div>
+          <div class="bar b2">Design and Planning</div>
+          <div class="bar b3">Development</div>
+          <div class="bar b4">Deployment</div>
+          <div class="bar b5">Support and Maintenance</div>
+        </div>
+      </div>
+      <div class="arrows">
+        <svg width="26" height="150" viewBox="0 0 26 150">
+          <g stroke="#8b93a6" stroke-width="1.6" fill="none">
+            <path d="M2 40 h16 M12 34 l6 6 l-6 6"/>
+            <path d="M2 75 h16 M12 69 l6 6 l-6 6"/>
+            <path d="M2 110 h16 M12 104 l6 6 l-6 6"/>
+          </g>
+        </svg>
+      </div>
+      <div>
+        <div class="colhead" style="text-align:right">AI-DLC phases</div>
+        <div class="aidlc" style="grid-template-rows: 1fr 1.55fr 1.15fr">
+          <div class="pcard p1">
+            <span class="pname">Inception</span>
+            <span class="pnote">Intent, decomposition, units of work &mdash; where the human judgement concentrates.</span>
+          </div>
+          <div class="pcard p2">
+            <span class="pname">Construction</span>
+            <span class="pnote">Design and build stop being separate activities. Logical &rarr; code &rarr; IaC, in one loop.</span>
+          </div>
+          <div class="pcard p3">
+            <span class="pname">Operation</span>
+            <span class="pnote">Deploy, observe, maintain. Tagged and inventoried from the first resource.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="kicker">
+      Not a two-week sprint cadence with a copilot bolted on. The phases themselves change shape
+      &mdash; and the <b>ratio of thinking to typing inverts</b>.
+    </div>
+    <div class="foot"><span>AI-DLC at Cornell</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 8. NOT REGULAR AGILE ============ -->
+  <section class="slide"
+    data-notes="Pre-empt the objection: &quot;this is just agile with extra steps.&quot; It isn't. A sprint is a batching strategy for expensive change — you batch because re-planning costs more than being slightly wrong. When change is nearly free, batching is pure latency. The unit shrinks from a two-week sprint to a bolt, and the ceremony has to shrink with it or it becomes the bottleneck.">
+    <div class="eyebrow">Slide 07</div>
+    <h1 class="title">This is not agile with a copilot</h1>
+    <div class="rule"></div>
+    <div class="cols">
+      <div>
+        <p class="body" style="margin-bottom:24px">
+          A sprint is a <strong>batching strategy for expensive change</strong>. You batch two weeks
+          of work because re-planning costs more than being slightly wrong for a fortnight.
+        </p>
+        <p class="body">
+          When change is nearly free, batching is <strong>pure latency</strong>. The ceremony that
+          protected you becomes the thing slowing you down.
+        </p>
+      </div>
+      <div class="divider-v">
+        <ul class="ticks">
+          <li><strong>The unit shrinks.</strong> From a two-week sprint to a single bolt of work, completed in a sitting.</li>
+          <li><strong>Plans are cheap and disposable.</strong> Re-derive rather than defend a stale plan.</li>
+          <li><strong>The human moves upstream.</strong> Less &ldquo;is this implemented right&rdquo;, more &ldquo;is this the right thing, and can we prove it&rdquo;.</li>
+          <li><strong>The gate replaces the ritual.</strong> Automated checks, not a status meeting, decide what ships.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot"><span>AI-DLC at Cornell</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 9. WILD WEST ============ -->
+  <section class="slide"
+    data-notes="Be honest and non-judgemental here. People across campus are ALREADY building AI applications — with keys in notebooks, in personal accounts, on shadow subscriptions. They are not being reckless; they are being unblocked, because we did not offer them a fast, safe road. The answer to shadow IT has never been a stricter policy. It is a better default.">
+    <div class="eyebrow">Slide 08</div>
+    <h1 class="title">Meanwhile: people are already building</h1>
+    <div class="rule"></div>
+    <div class="cols-3" style="margin-bottom:28px">
+      <div class="card t-red">
+        <span class="num">Today, without us</span>
+        <h3>Keys in notebooks</h3>
+        <p>Credentials pasted into a Colab cell, a personal account, an unmanaged subscription.
+        No rotation, no owner, no inventory.</p>
+      </div>
+      <div class="card t-red">
+        <span class="num">Today, without us</span>
+        <h3>No paper trail</h3>
+        <p>Nothing tagged, nothing in IaC. Nobody can answer what is running, who owns it,
+        or what data it can reach.</p>
+      </div>
+      <div class="card t-red">
+        <span class="num">Today, without us</span>
+        <h3>Cost and risk invisible</h3>
+        <p>Spend appears on a card statement. Exposure appears in an incident.
+        Both after the fact.</p>
+      </div>
+    </div>
+    <p class="body" style="font-size:19px">
+      This isn't recklessness &mdash; it's people getting unblocked because we never offered them a
+      fast, safe road. <strong>The answer to shadow IT has never been a stricter policy.
+      It's a better default.</strong>
+    </p>
+    <div class="foot"><span>AI-DLC at Cornell</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 10. WHAT WE'RE BUILDING ============ -->
+  <section class="slide"
+    data-notes="Now the concrete offer. Three products, and they are the same product from three angles: a catalog of AI services, governance and security delivered AS a service, and a builder path where the builder never touches AWS. Emphasise the last one — PR-only write access, no console, no account. That constraint is what makes the other two enforceable rather than aspirational.">
+    <div class="eyebrow">Slide 09</div>
+    <h1 class="title">What Cornell's AI Platform is actually building</h1>
+    <div class="rule"></div>
+    <div class="cols-3" style="margin-bottom:30px">
+      <div class="card t-sand">
+        <span class="num">01</span>
+        <h3>An AI service catalog</h3>
+        <p>A <strong>blueprint layer</strong>: reusable, governed building blocks that campus builders
+        compose into working applications &mdash; knowledge bases, chat frontends, retrieval,
+        identity.</p>
+      </div>
+      <div class="card t-sky">
+        <span class="num">02</span>
+        <h3>Governance &amp; security as a service</h3>
+        <p>Tagging, secrets handling, least&#8209;privilege roles, inventory and cost attribution
+        arrive <strong>inside the blueprint</strong> &mdash; not as a checklist a builder has to pass.</p>
+      </div>
+      <div class="card t-mint">
+        <span class="num">03</span>
+        <h3>A builder path, not an AWS account</h3>
+        <p>Builders describe what they want in Claude Code. The pipeline deploys it into an account
+        the platform team controls. <strong>PR&#8209;only write access &mdash; no console, no keys.</strong></p>
+      </div>
+    </div>
+    <div style="display:flex; gap:12px; align-items:center">
+      <span class="badge">Serverless-first · us-east-1</span>
+      <span class="badge">Everything is IaC</span>
+      <span class="badge">Secrets only in Secrets Manager</span>
+      <span class="badge g">All four cornell:* tags, every resource</span>
+    </div>
+    <div class="foot"><span>AI-DLC at Cornell</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 11. THE PATH ============ -->
+  <section class="slide"
+    data-notes="Show the machine so it stops being abstract. A merge to main is a deployment — within seconds. There is no manual step, no console, no approval gate after the merge. That is the whole point AND the whole risk, which is why the validate check is the only automated gate between a branch and a shared account. Say plainly: main staying green matters more here than usual.">
+    <div class="eyebrow">Slide 10</div>
+    <h1 class="title">How a merge becomes a deployment</h1>
+    <div class="rule"></div>
+    <div class="split" style="align-items:start">
+      <div class="flow">
+        <div class="step">
+          <div class="bullet n1">1</div>
+          <div><div class="lbl">Source</div>
+          <div class="desc">Webhook on merge to <code>main</code> &mdash; starts within seconds</div></div>
+        </div>
+        <div class="step">
+          <div class="bullet n2">2</div>
+          <div><div class="lbl">PipelineDeploy</div>
+          <div class="desc">The pipeline deploys itself from <code>pipeline/pipeline.yml</code></div></div>
+        </div>
+        <div class="step">
+          <div class="bullet n3">3</div>
+          <div><div class="lbl">BlueprintDeploy</div>
+          <div class="desc">One CloudFormation action per blueprint stack</div></div>
+        </div>
+        <div class="step">
+          <div class="bullet n4">4</div>
+          <div><div class="lbl">Terraform</div>
+          <div class="desc">Azure / Entra modules &mdash; plan, then apply, unattended</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="card t-red" style="margin-bottom:18px">
+          <span class="num">The thing to internalise</span>
+          <h3>Every merge to <code>main</code> deploys to a shared AWS account.</h3>
+          <p style="margin-top:8px">No console step. No post-merge approval. Everyone works in this
+          one repo for two days, so <strong>a red <code>main</code> blocks every other track</strong>
+          &mdash; and a hung stack is worse than a failed one.</p>
+        </div>
+        <p class="body" style="font-size:17px">
+          Branch protection means PR-only, <code>validate</code> must pass, and a team member merges
+          their own work. <strong>That check is the only automated gate</strong> between a branch and
+          a live account &mdash; so run <code>tools/check</code> before you push.
+        </p>
+      </div>
+    </div>
+    <div class="foot"><span>AI-DLC at Cornell</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 12. CLOSE ============ -->
+  <section class="slide"
+    data-notes="Close on the ask, not the tech. Two days. What we want to leave with is not a demo — it's a path a builder outside this room can walk on Wednesday without us. Invite the disagreement now: if a constraint is wrong, say so in the room, today, rather than working around it in a PR.">
+    <div class="eyebrow">Slide 11</div>
+    <h1 class="title">What we want to leave with</h1>
+    <div class="rule"></div>
+    <div class="cols">
+      <div>
+        <ul class="ticks">
+          <li><strong>A path, not a demo.</strong> Something a builder outside this room can walk on Wednesday, without us in the loop.</li>
+          <li><strong>Design intent written down</strong> where an agent reads it &mdash; and a check that fails when it's ignored.</li>
+          <li><strong>One decision per file</strong> in <code>docs/decisions/</code>, so the next team inherits reasoning instead of archaeology.</li>
+        </ul>
+      </div>
+      <div class="divider-v">
+        <div class="quote" style="font-size:26px; margin-bottom:22px">
+          If a constraint here is <span class="dim">wrong</span>, say so in the room.
+        </div>
+        <p class="body">
+          Today, out loud &mdash; not by working around it in a PR at 4pm tomorrow. The constraints
+          are deliberate, and they are also <strong>ours to change</strong> while we're all still
+          sitting here.
+        </p>
+      </div>
+    </div>
+    <div class="kicker">
+      <b>Cornell AI-DLC Workshop</b> &nbsp;·&nbsp; August 3&ndash;4, 2026 &nbsp;·&nbsp;
+      one repo, one shared account, one green <code>main</code>.
+    </div>
+    <div class="foot"><span>AI-DLC at Cornell</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+</div>
+</div>
+
+<div id="notes"><div class="hd">Speaker notes &mdash; press N to hide</div><div id="notes-body"></div></div>
+
+<script>
+(function () {
+  var deck   = document.getElementById('deck');
+  var slides = Array.prototype.slice.call(deck.querySelectorAll('.slide'));
+  var notes  = document.getElementById('notes');
+  var nbody  = document.getElementById('notes-body');
+  var hint   = document.getElementById('hint');
+  var i = 0;
+
+  // build dot indicators + page numbers
+  slides.forEach(function (s) {
+    var dots = s.querySelector('.dots');
+    if (dots) {
+      slides.forEach(function () { dots.appendChild(document.createElement('i')); });
+    }
+  });
+
+  function fit() {
+    var pad = notes.classList.contains('on') ? 0.66 : 0.94;
+    var k = Math.min(window.innerWidth / 1280, (window.innerHeight * pad) / 720);
+    deck.style.transform = 'scale(' + k + ')';
+    if (notes.classList.contains('on')) {
+      deck.style.marginBottom = '0';
+      document.getElementById('stage').style.alignItems = 'flex-start';
+      document.getElementById('stage').style.paddingTop = '14px';
+    } else {
+      document.getElementById('stage').style.alignItems = 'center';
+      document.getElementById('stage').style.paddingTop = '0';
+    }
+  }
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function (s, k) { s.classList.toggle('active', k === i); });
+    var s = slides[i];
+    var pg = s.querySelector('.pg');
+    if (pg) pg.textContent = (i + 1) + ' / ' + slides.length;
+    var dots = s.querySelector('.dots');
+    if (dots) {
+      Array.prototype.forEach.call(dots.children, function (d, k) {
+        d.classList.toggle('on', k === i);
+      });
+    }
+    nbody.innerHTML = s.getAttribute('data-notes') || '<i>No notes for this slide.</i>';
+    location.hash = i + 1;
+  }
+
+  document.addEventListener('keydown', function (e) {
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown' || k === 'Enter') {
+      show(i + 1); e.preventDefault();
+    } else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp' || k === 'Backspace') {
+      show(i - 1); e.preventDefault();
+    } else if (k === 'Home') { show(0); }
+    else if (k === 'End')  { show(slides.length - 1); }
+    else if (k === 'n' || k === 'N') { notes.classList.toggle('on'); fit(); }
+    else if (k === 'f' || k === 'F') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    }
+  });
+
+  deck.addEventListener('click', function (e) {
+    show(e.clientX < window.innerWidth * 0.28 ? i - 1 : i + 1);
+  });
+
+  window.addEventListener('resize', fit);
+  window.addEventListener('hashchange', function () {
+    var n = parseInt(location.hash.slice(1), 10);
+    if (!isNaN(n) && n - 1 !== i) show(n - 1);
+  });
+
+  var start = parseInt(location.hash.slice(1), 10);
+  fit();
+  show(isNaN(start) ? 0 : start - 1);
+  setTimeout(function () { hint.style.opacity = '0'; }, 4200);
+})();
+</script>
+</body>
+</html>

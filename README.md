@@ -289,7 +289,7 @@ both observed rather than assumed:
 |---|---|
 | Indexed today | One syllabus PDF from `aidlc-kb-ingestion-890349359349`. **One document is not a corpus** — expect mediocre relevance, and scores that don't track it. |
 | Freshness | A merge re-ingests and re-verifies. Nothing else does: `EnableScheduledSync` exists and is off, and a scheduled sync cannot report its own result anyway. |
-| SharePoint | Built and verified against a real site, **off by default** (`EnableSharePointSource`). On, it would make every team's merge depend on an Entra certificate nobody watches. |
+| SharePoint | **On.** The ECE 4960 handouts in `sites/kb` — 25 documents, rehearsed at zero failures before the flag flipped. Every team's merge now depends on the Entra consent, the per-site grant and an unexpired certificate; the platform team manages that side by hand. |
 | Proof it works | A green `BlueprintDeploy` asserts the documents are indexed **and** answerable — the stack fails otherwise. `DocumentsIndexed` and `SmokeQueryResult` are stack outputs. |
 | Costs while idle | Per-GB stored plus per-retrieve. It does not stop when the workshop ends, and no OpenSearch collection exists to add an hourly floor. |
 

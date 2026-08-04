@@ -884,16 +884,19 @@ Resources:
                 # BlueprintVersion is duplicated from the template's default on purpose: bump
                 # both in the same PR, or the cornell:blueprint-version tag will lie.
                 #
-                # EnableSharePointSource is "false" here, which is what makes the deployed stack
-                # S3-only. Flipping it to "true" makes every merge to main depend on Entra consent,
-                # a per-site grant and an unexpired certificate -- when any of those lapses the
-                # SharePoint ingestion job fails, the verifier fails the stack, and BlueprintDeploy
-                # is red for every track. Flip it in its own PR, after an Environment=test
-                # rehearsal, and read blueprints/knowledgebase/docs/sharepoint-source.md first.
+                # EnableSharePointSource is "true": this stack indexes the ECE 4960 handouts in
+                # sites/kb alongside the S3 syllabus. Rehearsed as Environment=test before the flag
+                # flipped -- 25 of 25 documents, zero failures, SharePoint-only smoke query answered.
                 #
-                # The SharePoint values are passed even while disabled, per the pass-everything
-                # rule: a tenant id, a site URL, a bucket, an object key and a secret ARN are all
-                # references. The certificate and its password live in the secret and in S3.
+                # So every merge to main, by every track, now depends on the Entra app's consent, the
+                # per-site grant and an unexpired certificate. When one lapses the verifier fails the
+                # stack and BlueprintDeploy is red for everyone. The Entra side is managed by hand by
+                # the platform team. To roll back, set this to "false": the SharePoint resources all
+                # hang off one Condition and the stack renders exactly as it did before.
+                #
+                # None of the SharePoint values is a secret -- a tenant id, a site URL, a bucket, an
+                # object key and a secret ARN are references. The certificate and its password live
+                # in the secret and in S3.
                 #
                 # EnableScheduledSync is also "false". It creates EventBridge Scheduler schedules
                 # that start ingestion jobs between deploys -- fire-and-forget, because Scheduler
@@ -908,13 +911,13 @@ Resources:
                   "BlueprintVersion": "0.2.0",
                   "IngestionBucketName": "aidlc-kb-ingestion-890349359349",
                   "SmokeQuery": "What is the late homework policy?",
-                  "EnableSharePointSource": "false",
+                  "EnableSharePointSource": "true",
                   "SharePointSiteUrl": "https://8chzbf.sharepoint.com/sites/kb",
                   "SharePointTenantId": "3ce7e7fb-ef51-4972-bfd5-f43f6668ccca",
                   "SharePointConnectorSecretArn": "arn:aws:secretsmanager:us-east-1:890349359349:secret:bedrock/sharepoint-cert-connector-eK6OLN",
                   "SharePointCertificateBucket": "bedrock-sharepoint-certs-890349359349",
                   "SharePointCertificateKey": "certs/certificate.p12",
-                  "SharePointSmokeQuery": "What does the syllabus say about attendance?",
+                  "SharePointSmokeQuery": "What do the ECE 4960 handouts cover?",
                   "EnableScheduledSync": "false",
                   "SyncScheduleExpression": "cron(0 7 ? * MON *)",
                   "SharePointSyncScheduleExpression": "cron(0 8 ? * MON *)",
