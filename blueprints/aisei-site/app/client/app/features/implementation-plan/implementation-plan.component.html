@@ -1,0 +1,87 @@
+<div class="page-header">
+  <h1>Implementation Plan</h1>
+  <p>
+    Rebuild <a href="https://innovationhub.ai.cornell.edu/" target="_blank" rel="noopener">innovationhub.ai.cornell.edu</a>
+    on this repo's Angular + Hono stack — visually identical, full real content, no
+    WordPress/plugin maintenance burden.
+  </p>
+  <p class="demo-note">
+    This app is a scoped demo: admin removed, four static pages (Home, Component
+    Library, Style Guide, this plan) shipped as a slice of Phase 2 below. The data
+    layer (Phases 3–4) and the remaining Phase 5 pages have not been started.
+  </p>
+</div>
+
+<section class="demo-section">
+  <h2>Architecture decisions</h2>
+  <ul class="bullet-list">
+    <li><strong>No CMS, no auth.</strong> Public site reads from a read-only SQLite DB via GET-only routes — no login/session/auth anywhere in the app.</li>
+    <li><strong>Dynamic without an editor.</strong> Content updates are a re-run, not an edit: <code>npm run import:wp</code> re-fetches WordPress's REST API and upserts by slug.</li>
+    <li><strong>Static vs. DB-backed.</strong> Hand-authored copy (About/Hub Model, Get Involved, Tools intro text) lives directly in Angular templates. List/detail content goes through the DB.</li>
+    <li><strong>Events</strong> — native module, not a port. WP's calendar is a 3rd-party Localist/Concept3D embed and isn't portable.</li>
+    <li><strong>Fonts</strong> — keep linking Cornell's Typekit kit (<code>nwp2wku</code>). Cornell is entitled to its own kit; don't vendor licensed font files.</li>
+  </ul>
+</section>
+
+<section class="demo-section">
+  <h2>Page inventory</h2>
+  <table class="plan-table">
+    <thead>
+      <tr><th>WP page</th><th>New route</th><th>data.menu</th></tr>
+    </thead>
+    <tbody>
+      @for (row of pageInventory; track row.route) {
+        <tr>
+          <td>{{ row.wpPage }}</td>
+          <td><code>{{ row.route }}</code></td>
+          <td>{{ row.menu }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</section>
+
+<section class="demo-section">
+  <h2>Content types</h2>
+  <table class="plan-table">
+    <thead>
+      <tr><th>Type</th><th>Source endpoint</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      @for (row of contentTypes; track row.type) {
+        <tr>
+          <td>{{ row.type }}</td>
+          <td><code>{{ row.endpoint }}</code></td>
+          <td>{{ row.notes }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</section>
+
+<section class="demo-section">
+  <h2>Phased order</h2>
+  <ol class="phase-list">
+    @for (phase of phases; track phase.num) {
+      <li [class]="'status-' + phase.status">
+        <div class="phase-head">
+          <span class="phase-num">{{ phase.num }}</span>
+          <span class="phase-title">{{ phase.title }}</span>
+          <span class="phase-status">{{ phase.status }}</span>
+        </div>
+        <p>{{ phase.detail }}</p>
+      </li>
+    }
+  </ol>
+</section>
+
+<section class="demo-section">
+  <h2>Verification</h2>
+  <ul class="bullet-list">
+    <li><code>npm run check</code> after each phase (typecheck + prod build).</li>
+    <li><code>npm run dev</code>; load every route from the page inventory table in-browser and visually diff against the live WP page.</li>
+    <li>Re-run <code>npm run import:wp</code> twice in a row — row counts and asset file counts must be stable (idempotency).</li>
+    <li><code>grep -r "passport\|jwt\|session" server/</code> stays empty — GET-only, no auth anywhere.</li>
+    <li>Mobile breakpoint check (&lt;768px) for nav collapse and card stacking.</li>
+  </ul>
+</section>

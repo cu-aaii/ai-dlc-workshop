@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Innovation Hub — Component Library (WordPress → Angular migration)</title>
+<link rel="stylesheet" href="https://use.typekit.net/nwp2wku.css">
+<style>
+  :root {
+    --color-primary: #2d668e;
+    --color-accent: #b31b1b;
+    --color-accent-dark: #a01114;
+    --color-hero-bg: #1a1a1a;
+    --color-hero-accent-1: #a66dd5;
+    --color-hero-accent-2: #c6b20f;
+    --color-footer-bg: #333333;
+    --color-footer-text: #bbbbbb;
+    --color-link: #1176ac;
+    --color-border: #e0e0e0;
+    --heading-font: "freight-sans-pro", Georgia, serif;
+    --body-font: "freight-sans-pro", Verdana, Geneva, Tahoma, sans-serif;
+    --max-width: 1280px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--body-font); color: #222; }
+  img { max-width: 100%; display: block; }
+
+  /* ---- catalog scaffolding (not part of the shipped site) ---- */
+  .catalog-toc { position: sticky; top: 0; background: #fff; border-bottom: 1px solid var(--color-border); padding: 10px 24px; font-size: 13px; z-index: 50; display: flex; gap: 16px; flex-wrap: wrong; overflow-x: auto; }
+  .catalog-toc a { color: var(--color-link); text-decoration: none; white-space: nowrap; }
+  .catalog-section { padding: 32px 24px 8px; border-top: 8px solid #f2f2f2; }
+  .catalog-section h2 { font-family: var(--heading-font); font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: #999; margin: 0 0 16px; }
+  .catalog-frame { border: 1px dashed #ccc; }
+
+  /* ================= MASTHEAD ================= */
+  .cu-utility-bar { background: #f2f2f2; padding: 6px 24px; font-size: 12px; display: flex; justify-content: flex-end; gap: 16px; }
+  .cu-masthead { background: var(--color-accent); color: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+  .cu-masthead .brand { display: flex; flex-direction: column; }
+  .cu-masthead .brand small { font-size: 13px; opacity: .9; }
+  .cu-masthead .brand strong { font-family: var(--heading-font); font-size: 24px; }
+  .cu-masthead img.seal { height: 56px; }
+
+  /* ================= PRIMARY NAV ================= */
+  nav.primary-nav { background: #a01114; }
+  nav.primary-nav ul { list-style: none; display: flex; margin: 0; padding: 0 24px; }
+  nav.primary-nav li { position: relative; }
+  nav.primary-nav a, nav.primary-nav button { display: block; padding: 12px 16px; color: #fff; text-decoration: none; font-size: 14px; background: none; border: none; font-family: var(--body-font); cursor: pointer; }
+  nav.primary-nav li:hover > a, nav.primary-nav li:hover > button { background: rgba(255,255,255,.12); }
+  nav.primary-nav .this-thursday { background: #fff; color: var(--color-accent); font-weight: 700; }
+  nav.primary-nav .dropdown { display: none; position: absolute; top: 100%; left: 0; background: #fff; min-width: 200px; box-shadow: 0 4px 10px rgba(0,0,0,.15); }
+  nav.primary-nav li:hover .dropdown { display: block; }
+  nav.primary-nav .dropdown a { color: #222; }
+  nav.primary-nav .dropdown a:hover { background: #f2f2f2; }
+
+  .mobile-nav-demo { display: flex; align-items: center; justify-content: space-between; background: var(--color-accent); color: #fff; padding: 12px 16px; }
+  .mobile-nav-demo .veggie { width: 28px; height: 20px; display: flex; flex-direction: column; justify-content: space-between; }
+  .mobile-nav-demo .veggie span { display: block; height: 3px; background: #fff; }
+  .mobile-menu-panel { background: #a01114; }
+  .mobile-menu-panel a { display: block; padding: 12px 16px; color: #fff; text-decoration: none; border-top: 1px solid rgba(255,255,255,.15); font-size: 14px; }
+
+  /* ================= HERO ================= */
+  .hero { background: linear-gradient(135deg, var(--color-hero-bg) 0%, #2a2a2a 100%); color: #fff; padding: 56px 24px; }
+  .hero-inner { max-width: var(--max-width); margin: 0 auto; }
+  .hero h1 { font-family: var(--heading-font); font-size: 42px; margin: 0 0 16px; line-height: 1.15; }
+  .hero h1 em.accent-1 { color: var(--color-hero-accent-1); font-style: italic; font-weight: 900; }
+  .hero h1 em.accent-2 { color: var(--color-hero-accent-2); font-style: italic; font-weight: 900; }
+  .hero p { max-width: 560px; opacity: .85; font-size: 16px; }
+
+  /* ================= DECORATIVE CARD (3-up) ================= */
+  .decorative-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; max-width: var(--max-width); margin: -40px auto 0; position: relative; }
+  .decorative-card { background: #fff; border-bottom: 3px solid var(--color-accent); box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+  .decorative-card img { height: 140px; width: 100%; object-fit: cover; }
+  .decorative-card .body { padding: 20px; }
+  .decorative-card h3 { margin: 0 0 8px; font-family: var(--heading-font); }
+  .decorative-card h3 a { color: var(--color-accent); text-decoration: underline; }
+  .decorative-card p { font-size: 14px; color: #444; margin: 0 0 12px; }
+  .decorative-card ul { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+  .decorative-card ul a { color: var(--color-accent); text-decoration: none; }
+  .decorative-card ul a:before { content: "↗ "; }
+
+  /* ================= QUOTE BLOCK ================= */
+  .quote-block { max-width: var(--max-width); margin: 40px auto; display: flex; gap: 0; align-items: stretch; }
+  .quote-block img { width: 260px; object-fit: cover; }
+  .quote-block .quote-body { background: #fff; box-shadow: 0 6px 18px rgba(0,0,0,.1); padding: 32px; flex: 1; display: flex; align-items: center; }
+  .quote-block blockquote { margin: 0; font-size: 20px; font-family: var(--heading-font); }
+  .quote-block cite { display: block; margin-top: 16px; font-size: 14px; font-style: normal; border-left: 3px solid var(--color-accent); padding-left: 10px; }
+
+  /* ================= CARDS: article / project / event / person / tool ================= */
+  .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: var(--max-width); margin: 0 auto; }
+  .card-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+  .article-card img { height: 160px; object-fit: cover; border-radius: 2px; }
+  .article-card h3 { font-family: var(--heading-font); font-size: 18px; margin: 12px 0 4px; }
+  .article-card h3 a { color: #222; text-decoration: none; }
+  .article-card .meta { font-size: 12px; color: #888; }
+  .article-card .tags { margin: 6px 0; }
+  .article-card .tag { display: inline-block; background: #f2f2f2; color: #555; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-right: 4px; }
+  .article-card p.excerpt { font-size: 14px; color: #444; margin: 8px 0 0; }
+
+  .project-card { border: 1px solid var(--color-border); border-radius: 4px; overflow: hidden; }
+  .project-card img { height: 130px; object-fit: cover; }
+  .project-card .body { padding: 16px; }
+  .project-card h3 { font-family: var(--heading-font); font-size: 16px; margin: 0 0 6px; }
+  .project-card h3 a { color: var(--color-primary); text-decoration: none; }
+  .project-card .cohort { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: .04em; }
+
+  .event-card { display: flex; border: 1px solid var(--color-border); border-radius: 4px; overflow: hidden; }
+  .event-card .thumb { width: 140px; flex-shrink: 0; position: relative; background: #eee; }
+  .event-card .thumb img { height: 100%; object-fit: cover; }
+  .event-card .badge { position: absolute; top: 8px; right: 8px; background: var(--color-accent); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+  .event-card .body { padding: 16px; flex: 1; }
+  .event-card h3 { font-family: var(--heading-font); font-size: 17px; margin: 0 0 6px; color: var(--color-accent); }
+  .event-card .when, .event-card .where, .event-card .who { font-size: 13px; color: #555; margin: 2px 0; }
+  .event-card .btn-join { display: inline-block; margin-top: 10px; background: var(--color-accent); color: #fff; padding: 8px 16px; font-size: 13px; text-decoration: none; border-radius: 2px; }
+
+  .person-card { text-align: center; }
+  .person-card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 50%; margin-bottom: 8px; }
+  .person-card .name { font-weight: 700; font-size: 14px; }
+  .person-card .title { font-size: 12px; color: #666; }
+  .person-name-list { list-style: none; padding: 0; margin: 0; columns: 3; font-size: 14px; line-height: 2; }
+
+  .tool-card { border: 1px solid var(--color-border); border-radius: 4px; padding: 16px; }
+  .tool-card .badge-row { margin-bottom: 8px; }
+  .tool-card .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-right: 4px; }
+  .tool-card .badge.pilot { background: #fdf1e0; color: var(--color-warning, #F8981D); }
+  .tool-card .badge.general { background: #e6f0e9; color: #2e7d4f; }
+  .tool-card .badge.review { background: #f2e6e6; color: var(--color-accent); }
+  .tool-card h3 { font-family: var(--heading-font); font-size: 16px; margin: 0 0 6px; }
+  .tool-card p { font-size: 13px; color: #444; margin: 0; }
+
+  /* ================= BUTTONS ================= */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 2px; font-weight: 700; font-size: 14px; text-decoration: none; border: none; cursor: pointer; font-family: var(--body-font); }
+  .btn-primary { background: var(--color-accent); color: #fff; }
+  .btn-secondary { background: transparent; color: var(--color-accent); border: 2px solid var(--color-accent); }
+  .btn-link { background: none; color: var(--color-accent); padding: 0; text-decoration: underline; }
+
+  /* ================= FOOTER ================= */
+  footer.site-footer { background: var(--color-footer-bg); color: var(--color-footer-text); }
+  .footer-cols { max-width: var(--max-width); margin: 0 auto; display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 24px; padding: 40px 24px; }
+  .footer-cols h4 { color: #fff; font-family: var(--heading-font); font-size: 14px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .footer-cols ul { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+  .footer-cols li { margin-bottom: 8px; }
+  .footer-cols a { color: var(--color-footer-text); text-decoration: none; }
+  .footer-cols a:before { content: "↗ "; }
+  .footer-org strong { display: block; color: #fff; font-family: var(--heading-font); font-size: 16px; }
+  .footer-org .btn-contact { display: inline-block; margin-top: 12px; background: #555; color: #fff; padding: 8px 16px; font-size: 13px; text-decoration: none; }
+  .footer-legal { border-top: 1px solid #444; padding: 12px 24px; display: flex; justify-content: space-between; max-width: var(--max-width); margin: 0 auto; font-size: 12px; }
+  .footer-legal a { color: var(--color-footer-text); }
+
+  @media (max-width: 767px) {
+    .decorative-cards, .card-grid, .card-grid.cols-4 { grid-template-columns: 1fr; }
+    .footer-cols { grid-template-columns: 1fr; }
+    nav.primary-nav ul { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="catalog-toc">
+  <strong>Component Library —</strong>
+  <a href="#masthead">Masthead</a>
+  <a href="#nav">Nav</a>
+  <a href="#mobile-nav">Mobile nav</a>
+  <a href="#hero">Hero</a>
+  <a href="#decorative-cards">Decorative cards</a>
+  <a href="#quote">Quote block</a>
+  <a href="#article-card">Article card</a>
+  <a href="#project-card">Project card</a>
+  <a href="#event-card">Event card</a>
+  <a href="#person-card">Person card</a>
+  <a href="#tool-card">Tool card</a>
+  <a href="#buttons">Buttons</a>
+  <a href="#footer">Footer</a>
+</div>
+
+<section class="catalog-section" id="masthead">
+  <h2>Masthead + utility bar</h2>
+  <div class="catalog-frame">
+    <div class="cu-utility-bar">🔍 Search</div>
+    <div class="cu-masthead">
+      <div class="brand">
+        <small>Cornell University</small>
+        <strong>AI Innovation Hub</strong>
+      </div>
+      <img class="seal" src="assets/cornell_seal.svg" alt="Cornell seal">
+    </div>
+  </div>
+</section>
+
+<section class="catalog-section" id="nav">
+  <h2>Primary nav (desktop, with dropdown)</h2>
+  <div class="catalog-frame">
+    <nav class="primary-nav">
+      <ul>
+        <li><a href="#">Home</a></li>
+        <li>
+          <button>About Us ▾</button>
+          <div class="dropdown">
+            <a href="#">The Hub Model</a>
+            <a href="#">People</a>
+          </div>
+        </li>
+        <li><a href="#">Blog</a></li>
+        <li><a href="#">Tools &amp; Resources</a></li>
+        <li>
+          <button>Projects ▾</button>
+          <div class="dropdown">
+            <a href="#">Project Catalog</a>
+            <a href="#">Project Workflow</a>
+          </div>
+        </li>
+        <li><a class="this-thursday" href="#">Workshops &amp; Events — This Thursday</a></li>
+        <li><a href="#">Get Involved</a></li>
+      </ul>
+    </nav>
+  </div>
+</section>
+
+<section class="catalog-section" id="mobile-nav">
+  <h2>Mobile nav (collapsed &lt;768px)</h2>
+  <div class="catalog-frame" style="max-width:375px;">
+    <div class="mobile-nav-demo">
+      <strong>AI Innovation Hub</strong>
+      <div class="veggie"><span></span><span></span><span></span></div>
+    </div>
+    <div class="mobile-menu-panel">
+      <a href="#">Home</a>
+      <a href="#">About Us</a>
+      <a href="#">Blog</a>
+      <a href="#">Tools &amp; Resources</a>
+      <a href="#">Projects</a>
+      <a href="#">Workshops &amp; Events</a>
+      <a href="#">Get Involved</a>
+    </div>
+  </div>
+</section>
+
+<section class="catalog-section" id="hero">
+  <h2>Hero (dark, italic accent headline)</h2>
+  <div class="catalog-frame">
+    <div class="hero">
+      <div class="hero-inner">
+        <h1><em class="accent-1">Empowering</em> Cornell with <em class="accent-2">Responsible AI</em></h1>
+        <p>The AI Hub empowers Cornellians and drives innovation in workflows, teaching, and research in an ethical and scalable way.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="catalog-section" id="decorative-cards">
+  <h2>Decorative cards (3-up, image + link list)</h2>
+  <div class="catalog-frame" style="padding-bottom:40px; background:#f7f7f7;">
+    <div class="decorative-cards">
+      <div class="decorative-card">
+        <img src="assets/about-lab.jpg" alt="">
+        <div class="body">
+          <h3><a href="#">About</a></h3>
+          <p>Imagine a space where researchers, students, faculty, and staff leave their silos to collaborate.</p>
+          <ul><li><a href="#">The Hub Model</a></li><li><a href="#">People</a></li><li><a href="#">Project Workflow</a></li></ul>
+        </div>
+      </div>
+      <div class="decorative-card">
+        <img src="assets/tools-1.jpg" alt="">
+        <div class="body">
+          <h3><a href="#">Tools</a></h3>
+          <p>Your central hub for Cornell-supported AI platforms and how to use them effectively.</p>
+          <ul><li><a href="#">Cornell AI Platform</a></li></ul>
+        </div>
+      </div>
+      <div class="decorative-card">
+        <img src="assets/blog.jpg" alt="">
+        <div class="body">
+          <h3><a href="#">Blog</a></h3>
+          <p>Insights, updates, and real stories from our work at the intersection of AI and campus life.</p>
+          <ul><li><a href="#">How Cornell Recovered $100,000 With AI</a></li></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="catalog-section" id="quote">
+  <h2>Quote block</h2>
+  <div class="catalog-frame">
+    <div class="quote-block">
+      <img src="assets/quote-person.jpg" alt="">
+      <div class="quote-body">
+        <div>
+          <blockquote>At Cornell, we are combining our multidisciplinary world-class AI research with our IT and HR expertise to innovate and automate our work and processes across the university.</blockquote>
+          <cite>Provost Kavita Bala</cite>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="catalog-section" id="article-card">
+  <h2>Article / blog card</h2>
+  <div class="catalog-frame" style="padding:24px;">
+    <div class="card-grid">
+      <div class="article-card">
+        <img src="assets/article-1.jpg" alt="">
+        <div class="tags"><span class="tag">Articles</span></div>
+        <h3><a href="#">How Cornell Recovered $100,000 in Unidentified Payments With AI</a></h3>
+        <div class="meta">June 15, 2026</div>
+        <p class="excerpt">This is the story of how a two-semester collaboration between the Cornell AI Innovation Hub, graduate students, and the Treasury team...</p>
+      </div>
+      <div class="article-card">
+        <img src="assets/event-1.jpg" alt="">
+        <div class="tags"><span class="tag">Starter articles</span></div>
+        <h3><a href="#">Improving Your Code with Skills: Security and Accessibility Audits</a></h3>
+        <div class="meta">June 11, 2026</div>
+        <p class="excerpt">As developers we have to do so much more than just write code...</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="catalog-section" id="project-card">
+  <h2>Project card</h2>
+  <div class="catalog-frame" style="padding:24px;">
+    <div class="card-grid">
+      <div class="project-card">
+        <img src="assets/tools-1.jpg" alt="">
+        <div class="body">
+          <div class="cohort">Spring 2026</div>
+          <h3><a href="#">Invoices That Process Themselves</a></h3>
+        </div>
+      </div>
+      <div class="project-card">
+        <img src="assets/about-lab.jpg" alt="">
+        <div class="body">
+          <div class="cohort">Spring 2026</div>
+          <h3><a href="#">Unlocking Institutional Memory</a></h3>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="catalog-section" id="event-card">
+  <h2>Event card</h2>
+  <div class="catalog-frame" style="padding:24px;">
+    <div class="event-card" style="max-width:600px;">
+      <div class="thumb"><img src="assets/event-1.jpg" alt=""><span class="badge">Virtual</span></div>
+      <div class="body">
+        <h3>AI Explorations</h3>
+        <div class="when">📅 Thursday, July 9, 2026 · 2:00 PM</div>
+        <div class="where">📍 Online event</div>
+        <div class="who">👤 Ayham Boucher, Fermin Romero, Jai Chandnani</div>
+        <a class="btn-join" href="#">Join meeting</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="catalog-section" id="person-card">
+  <h2>Person card — leadership/tech-lead (photo) vs. cohort (name-only)</h2>
+  <div class="catalog-frame" style="padding:24px;">
+    <div class="card-grid cols-4" style="margin-bottom:24px;">
+      <div class="person-card">
+        <img src="assets/quote-person.jpg" alt="">
+        <div class="name">Ayham Boucher</div>
+        <div class="title">Director, AI Innovation Hub</div>
+      </div>
+      <div class="person-card">
+        <img src="assets/event-1.jpg" alt="">
+        <div class="name">Jai Chandnani</div>
+        <div class="title">AI Engineer Fellow</div>
+      </div>
+    </div>
+    <p style="font-size:13px;color:#888;margin:0 0 8px;">Spring 2026 Cohort (name-only, no photo/title)</p>
+    <ul class="person-name-list">
+      <li>Adem Abdelhadi</li><li>Jordan Lee</li><li>Priya Shah</li>
+      <li>Marcus Chen</li><li>Sofia Diaz</li><li>Ravi Patel</li>
+    </ul>
+  </div>
+</section>
+
+<section class="catalog-section" id="tool-card">
+  <h2>Tool card (audience/type badges)</h2>
+  <div class="catalog-frame" style="padding:24px;">
+    <div class="card-grid">
+      <div class="tool-card">
+        <div class="badge-row"><span class="badge pilot">Pilot</span></div>
+        <h3>Cornell AI Platform</h3>
+        <p>A secure, private sandbox for accessing and experimenting with AI tools — AI Gateway + AI Agent Studio.</p>
+      </div>
+      <div class="tool-card">
+        <div class="badge-row"><span class="badge general">General purpose</span></div>
+        <h3>Microsoft Copilot Basic</h3>
+        <p>Enterprise-grade AI assistant available to all faculty and staff.</p>
+      </div>
+      <div class="tool-card">
+        <div class="badge-row"><span class="badge review">Under Review</span></div>
+        <h3>Claude</h3>
+        <p>Currently being evaluated for broader campus availability.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="catalog-section" id="buttons">
+  <h2>Buttons</h2>
+  <div class="catalog-frame" style="padding:24px; display:flex; gap:16px; align-items:center;">
+    <a class="btn btn-primary" href="#">See All →</a>
+    <a class="btn btn-secondary" href="#">Join meeting</a>
+    <button class="btn btn-link">Contact Us</button>
+  </div>
+</section>
+
+<section class="catalog-section" id="footer" style="padding-bottom:0;">
+  <h2>Footer (4-col + legal bar)</h2>
+  <div class="catalog-frame">
+    <footer class="site-footer">
+      <div class="footer-cols">
+        <div class="footer-org">
+          <strong>AI Innovation Hub</strong>
+          Bowers College of Computing and Information Science Building<br>
+          127 Hoy Rd., Room 245<br>
+          Ithaca, NY 14850
+          <a class="btn-contact" href="#">Contact Us</a>
+        </div>
+        <div>
+          <h4>Latest articles</h4>
+          <ul>
+            <li><a href="#">How Cornell Recovered $100,000 With AI</a></li>
+            <li><a href="#">Improving Your Code with Skills</a></li>
+            <li><a href="#">Faster Writing, Same Voice</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Selected projects</h4>
+          <ul>
+            <li><a href="#">Invoices That Process Themselves</a></li>
+            <li><a href="#">Unlocking Institutional Memory</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Featured tools</h4>
+          <ul><li><a href="#">Cornell AI Platform</a></li></ul>
+          <p style="margin-top:16px;">Part of the <a href="#">Cornell AI Initiative</a></p>
+        </div>
+      </div>
+      <div class="footer-legal">
+        <span>Cornell University © 2026</span>
+        <span><a href="#">University Privacy</a> · <a href="#">Web Accessibility Assistance</a></span>
+      </div>
+    </footer>
+  </div>
+</section>
+
+</body>
+</html>
