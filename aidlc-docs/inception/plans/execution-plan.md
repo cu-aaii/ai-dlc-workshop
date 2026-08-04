@@ -84,8 +84,10 @@
 
 **Why High rather than Medium:**
 
-1. **The container build path has never executed.** ECR holds zero images; the
-   `CONTAINER_TARGET`/`DATE_TAG` in, `CONTAINER_DIGEST` out contract is unproven.
+1. ~~**The container build path has never executed.**~~ **RETIRED 2026-08-04** — upstream wired the
+   ARM64 `Build` stage and two components build through it. The `CONTAINER_TARGET`/`DATE_TAG` in,
+   `CONTAINER_DIGEST` out contract is now proven by working examples. **This was the biggest reason
+   for the HIGH rating; re-assess.** See `aidlc-docs/inception/upstream-reconciliation-2026-08-04.md`.
 2. **The pipeline self-deploys and its recovery path is undocumented.** A merge that breaks
    `pipeline.yml` can leave the pipeline unable to deploy the fix.
 3. **`main` deploys to a shared account** used by every workshop team, so a bad merge affects others.

@@ -18,11 +18,18 @@ venv/
 *.tfplan
 tfplan
 
-# Claude Code personal settings and MCP server config. Never commit: this repo is public, and
-# these files hold machine-specific paths, per-user permission grants, and — in .mcp.json —
-# the access tokens MCP servers are configured with.
+# Claude Code personal settings. Never commit: this repo is public, and these files hold
+# machine-specific paths and per-user permission grants.
+#
+# .mcp.json is deliberately NOT listed. It is a tracked file (it declares the cornell-builder
+# server), so a gitignore entry for it would be inert -- ignore rules do not apply to tracked
+# paths. To keep a personal copy with extra servers or credentials in it, mark it local-only
+# instead, which git actually honours:
+#
+#     git update-index --skip-worktree .mcp.json
+#
+# Never put a token in it without that flag set: an ignore entry will not save you.
 .claude/settings.local.json
-.mcp.json
 
 # Local working notes and workshop handouts. Untracked but not ignored is how these get swept
 # up by `git add -A`.

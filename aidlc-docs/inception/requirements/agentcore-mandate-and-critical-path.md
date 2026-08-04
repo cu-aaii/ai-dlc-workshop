@@ -273,7 +273,9 @@ blueprint is caught at review time rather than deploying nothing silently.
 ### Honest assessment of the size of this
 
 Steps 1, 2, 4 and 6 are mechanical and small. Step 3 is small if the agent is simple. Step 5 is the
-real work. **The risk is not volume, it is that steps 1-4 have never executed even once** — the
+real work. **SUPERSEDED 2026-08-04 — steps 1-4 are done upstream; see
+`aidlc-docs/inception/upstream-reconciliation-2026-08-04.md`.** As originally written:
+**The risk is not volume, it is that steps 1-4 have never executed even once** — the
 `CONTAINER_TARGET`/`DATE_TAG` in, `CONTAINER_DIGEST` out contract is unproven, and the ECR repository
 in the account contains zero images. Budget debugging time for the first image to land, and prove
 that path with a trivial container before wiring the real agent to it.

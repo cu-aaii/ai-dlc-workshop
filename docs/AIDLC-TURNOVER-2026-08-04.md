@@ -11,6 +11,14 @@
 
 ## 1. Start here — the one thing to do next
 
+> 🛑 **STOP — this document was written against a checkout 28 commits behind `upstream/main`.**
+> Merged 2026-08-04 at `318e92f`. The Terraform stage, the ARM64 container Build stage, `builder-mcp`
+> and the Knowledge Base blueprint all **exist** now; several statements below say they do not, and
+> §10 told you not to build one of them. **Read
+> `aidlc-docs/inception/upstream-reconciliation-2026-08-04.md` first** — it lists every corrected fact
+> and the three decisions that gate Units Generation Part 2. Where the two disagree, that document
+> wins.
+
 **Everything through INCEPTION is done and approved except the final step of Units Generation.**
 
 The user's exact words ending day one: *"We're ready to proceed to generation. But I'll do that in the
@@ -181,11 +189,12 @@ account; multiple teams merge into one repo in parallel; nearly everything is a 
 
 ### Repository / pipeline
 
-- **`ContainerBuildProject` is x86_64** (`pipeline/pipeline.yml:203-208`: `Type: 'LINUX_CONTAINER'`,
-  `Image: 'aws/codebuild/amazonlinux2-x86_64-standard:4.0'`). AgentCore requires **ARM64**. Two-line change.
-- **There is no Build stage.** The pipeline is `Source → PipelineDeploy → BlueprintDeploy`. All the build
-  machinery exists (`codebuild.yml`, `ContainerBuildProject`, `ContainerRepository` — deployed, live, and
-  holding zero images) but nothing invokes it. ~15 lines of `Stages:` entry.
+- ~~**`ContainerBuildProject` is x86_64**~~ / ~~**There is no Build stage**~~ — **BOTH OBSOLETE
+  2026-08-04.** Upstream added a second, ARM64 build project (`ARM_CONTAINER`,
+  `amazonlinux2-aarch64-standard:3.0`) *and* a `Build` stage that invokes it, with `CONTAINER_CONTEXT`
+  added alongside `CONTAINER_TARGET` so each component names its own build context. `tiny-chatbot` and
+  `builder-mcp` both build through it, so the digest contract is proven by example rather than
+  theory. Model this blueprint's Build action on one of those instead of writing it from scratch.
 - **`codebuild.yml` needs `CONTAINER_TARGET` and `DATE_TAG`** (usually `#{GitRepository.AuthorDate}`) supplied
   by the Build action. It exports `CONTAINER_DIGEST` as a full `<repo>@sha256:…` reference.
 - **The pipeline only runs on `main`.** `Environment` is the branch name and Source tracks
@@ -382,8 +391,14 @@ the `az ad sp create` gotcha.
 - **Do not propose Bedrock-direct inference.** All model traffic routes through the gateway — hard constraint.
 - **Do not propose `AWS::Bedrock::KnowledgeBase`** for retrieval. It embeds the user's query via a direct
   Bedrock call with no way to redirect it, which the gateway mandate forbids. The KB team owns that anyway.
-- **Do not build a Terraform stage.** Argued against on evidence: ~4 resources created once, and
-  `azuread_application_password` would write the secret into Terraform state.
+- ~~**Do not build a Terraform stage.**~~ **WITHDRAWN 2026-08-04 — the stage exists.** Marty built it
+  (PR #12) and `CLAUDE.md` now makes Terraform the *required* path for Azure/Entra, at
+  `blueprints/<name>/infra/azure/`. The secret-in-state objection is answered by the repo's own
+  pattern: declare the secret resource in CloudFormation, inject the value out of band, never generate
+  it in Terraform. **What Terraform still cannot do is catalog publish and availability scoping** — no
+  provider covers them, and the generic msgraph provider is app-only-mode only. See decision **D1** in
+  `aidlc-docs/inception/upstream-reconciliation-2026-08-04.md`; note `azurerm` is blocked today for
+  want of an Azure subscription and RBAC assignment, so the Bot Service half cannot be Terraform yet.
 - **Do not suggest ROPC** (a no-MFA admin service account) for Teams catalog automation. It is a *worse*
   posture than a manual step.
 - **Do not write a credential into any file.**

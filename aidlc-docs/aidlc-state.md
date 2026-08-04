@@ -83,8 +83,20 @@ knowledge of them.
 - **Lifecycle Phase**: INCEPTION
 - **Current Stage**: Units Generation — Part 1 (Planning), **at the answer gate**
 - **Next Stage**: Units Generation Part 2, then CONSTRUCTION
-- **Status**: ⏸️ **PAUSED overnight at the user's request.** Part 1 plan **APPROVED**; Part 2 generation
-  **not started**.
+- **Status**: 🛑 **BLOCKED on upstream reconciliation, 2026-08-04.** Part 1 plan **APPROVED**; Part 2
+  generation **must not start yet**.
+
+  The branch was **28 commits behind `upstream/main`** while INCEPTION was written. Merged at
+  `318e92f`. Several recorded decisions are now contradicted by merged work — the **Terraform stage
+  exists** (built by Marty, the nominated reviewer), the **container Build stage is wired and ARM64**,
+  **`builder-mcp` is built**, and the **KB blueprint shipped**. Facts have been corrected in place;
+  contradicted decisions are collected in
+  **`aidlc-docs/inception/upstream-reconciliation-2026-08-04.md`**.
+
+  **Read that document before generating unit artifacts.** Running Part 2 now would re-plan work
+  already merged (U1 is largely delivered) and would specify a Dockerfile layout the repo has moved
+  away from. Decisions **D1** (Terraform's scope in U0), **D2** (one Dockerfile or one per component)
+  and **D5** (`aidlc-docs/` tracked or untracked) gate it.
 - **Resume with**: `docs/AIDLC-TURNOVER-2026-08-04.md` — written for a fresh session, covering the next action,
   every decision made, the accumulated gotchas, and what not to reopen.
 - **Next action**: read `aidlc-docs/inception/plans/unit-of-work-plan.md`, then generate the three unit
@@ -242,7 +254,10 @@ Q13 no house style
       + aarch64, (2) add a namespaced Build stage — none exists today, (3) Dockerfile with a named
       target, arm64, port 8080, `/ping` + `/invocations`, (4) plumb `CONTAINER_DIGEST` via
       `ParameterOverrides`, (5) blueprint template, (6) register in `stacks.yml` **and**
-      `pipeline.yml`. **Steps 1-4 have never executed; ECR holds zero images.**
+      `pipeline.yml`. ~~**Steps 1-4 have never executed; ECR holds zero images.**~~ **SUPERSEDED
+      2026-08-04 — steps 1-4 are done upstream.** ARM64 compute, a `Build` stage, `CONTAINER_CONTEXT`
+      and `CONTAINER_DIGEST` plumbing all exist and are exercised by `tiny-chatbot` and `builder-mcp`.
+      Only steps 5-6 (this blueprint's template, and its registration plus a Build action) remain.
 - [x] Critical path steps 1, 4, 5, 6 **approved**. Step 2 clarified: the build *machinery* is all in
       this repo (`codebuild.yml`, `ContainerBuildProject`, `ContainerRepository` — live as ECR
       `aidlc-main`); only the ~15-line `Stages:` entry is missing. Step 3 best practices researched —

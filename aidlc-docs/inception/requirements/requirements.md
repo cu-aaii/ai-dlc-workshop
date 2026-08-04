@@ -320,7 +320,7 @@ unqualified.**
 
 | # | Risk | Mitigation |
 | --- | --- | --- |
-| R-1 | The container build path has **never executed** — ECR holds zero images and the digest contract is unproven | Prove it with a trivial container before wiring the real agent |
+| R-1 | ~~The container build path has never executed~~ — **RETIRED 2026-08-04.** Upstream wired a `Build` stage with `ARM_CONTAINER` / `amazonlinux2-aarch64-standard:3.0`, plus `CONTAINER_CONTEXT` alongside `CONTAINER_TARGET`, and `tiny-chatbot` and `builder-mcp` both build through it | None needed. This was the **largest single contributor to the HIGH risk rating**; the risk posture should be re-assessed. What remains is adding an action for this blueprint's component, modelled on an existing one — not proving the path |
 | R-2 | `pipeline.yml` is high-contention and **self-deploying**; a bad merge can leave the pipeline unable to deploy its own fix, and the recovery path is undocumented | Review; someone should know the manual deployment procedure |
 | R-3 | Entra client secrets expire | Rotation out of scope for v1; expiry tracked by a person. **A certificate instead of a secret would remove this risk entirely** — cost is that `TokenProvider` must sign a client assertion rather than send a secret. Worth an explicit decision at Infrastructure Design rather than defaulting to a secret because that is what the prototype used. |
 | R-4 | Four live credentials remain exposed in the working tree and one config file | Rotate; gitignore `.mcp.json`; scrub the research document |
