@@ -16,8 +16,19 @@ requires-python = ">=3.11"
 
 # U-01 Domain Core has NO runtime dependencies and must keep none -- see NFR-M5. That is not an
 # accident of a small codebase: a dependency appearing under src/dashboard/core/ is a signal the
-# AWS-free boundary has been crossed, not a dependency decision. boto3 arrives with U-02.
+# AWS-free boundary has been crossed, not a dependency decision.
+#
+# boto3 arrives with U-02, but as an OPTIONAL extra (below), never a top-level dependency. That
+# keeps U-01's wheel dependency-free: `pip install dashboard` pulls nothing, `pip install
+# dashboard[aws]` pulls boto3 for the collector/api images. The AWS-free boundary is enforced by
+# the tools/check grep under src/dashboard/core/, not by the dependency graph -- but keeping boto3
+# out of the base dependencies means the graph agrees with the grep rather than contradicting it.
 dependencies = []
+
+[project.optional-dependencies]
+# The two Lambda container images install `.[aws]`. Only the collector and the read API import
+# boto3; core never does.
+aws = ["boto3>=1.34"]
 
 [dependency-groups]
 dev = [
@@ -27,6 +38,9 @@ dev = [
     # default, which changes what an unconfigured run means -- so a floor spanning both majors
     # would make strictness depend on when the environment was resolved. Verified against 2.3.
     "mypy>=2,<3",
+    # boto3 in the dev group so the collector/api tests can construct real clients and drive them
+    # with botocore's Stubber (part of botocore -- no moto, no extra dependency). U-02.
+    "boto3>=1.34",
 ]
 
 [build-system]
@@ -56,14 +70,40 @@ files = ["src", "tests"]
 module = "dashboard.core.*"
 strict = true
 
+# boto3/botocore ship no type information (no py.typed), so an unignored import is a spurious
+# "missing stubs" error, not a real finding. Scoped to those modules only -- our own code stays
+# checked. Stubs (boto3-stubs) were rejected: a large dev dependency for a two-call SDK surface,
+# against Q11 = B's supply-chain posture.
+[[tool.mypy.overrides]]
+module = ["boto3.*", "botocore.*"]
+ignore_missing_imports = true
+
 # The tests are type-checked for real type errors but NOT for annotation completeness.
 #
 # NFR-M3 scoped strict mode to the core package only. mypy 2.x defaults `disallow_untyped_defs`
 # to on, so without this the 37 test functions would each need a `-> None` that documents nothing
 # -- churn that buys no safety and dilutes the signal from the core package, which is where
 # strictness is nearly free and actually pays.
+# All test modules (U-01's named suites plus U-02's test_api_*/test_collector_* files). Enumerated
+# rather than wildcarded: mypy per-module patterns require `*` to be a whole dotted component, and
+# these are single-component top-level modules, so `test_*` would not match. Checked for real type
+# errors but not annotation completeness, for the reason recorded above. Add new test files here.
 [[tool.mypy.overrides]]
-module = ["conftest", "test_properties", "test_examples"]
+module = [
+    "conftest",
+    "test_properties",
+    "test_examples",
+    "test_collector_pagination",
+    "test_collector_config",
+    "test_collector_deadline",
+    "test_collector_logging",
+    "test_collector_metrics",
+    "test_api_states",
+    "test_api_loading",
+    "test_api_routing",
+    "test_api_boundary",
+    "test_template_invariants",
+]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 disallow_untyped_decorators = false

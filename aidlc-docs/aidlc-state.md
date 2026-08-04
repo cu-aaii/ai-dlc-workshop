@@ -3,8 +3,11 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - U-02 Infrastructure Design
-- **NFR Design U-02 Complete (awaiting approval)**: 2026-08-03 — "choose defaults and proceed" (Q1–Q6 all A)
+- **Current Stage**: **OPERATIONS** (entering — U-02 Build and Test approved)
+- **Build and Test U-02 Approved**: 2026-08-04 — "approve and proceed". **U-02 COMPLETE END TO END (pre-deploy).**
+- **Code Generation U-02 Approved**: 2026-08-04 — "approved" (docker build verified after daemon came up)
+- **Infrastructure Design U-02 Approved**: 2026-08-04 — "approve and continue" (Q1–Q7 all A)
+- **NFR Design U-02 Approved**: 2026-08-04 — "approve and continue" (Q1–Q6 all A)
 - **NFR Requirements U-02 Approved**: 2026-08-03 — "Continue to next stage"
 - **Functional Design U-02 Approved**: 2026-08-03 — "Continue to next stage"
 - **Build and Test U-01 Approved**: 2026-08-03 — "Approve". **U-01 COMPLETE END TO END.**
@@ -564,6 +567,40 @@ them. -14 remains satisfied at U-01's NFR Design (the property suite).
 scope) · notify-topic ARN mechanism · API reserved-concurrency number (S-2) · exact CSP string · two-template
 split shape.
 
+## Infrastructure Design U-02 — outputs
+`construction/u-02-dashboard-platform/infrastructure-design/` — `infrastructure-design.md`,
+`deployment-architecture.md`. Q1-Q7 all **A** ("choose defaults and proceed"). All six routed items resolved.
+
+**Two templates** (Q1): `dashboard-storage.yml` (the two S3 buckets = stateful data) + `dashboard.yml` (everything
+else). Cross-refs by **naming convention** (`!Sub`), never `Fn::ImportValue` — the repo has **no exports**.
+
+**The whole serving layer is net-new to the repo.** No CloudFront, WAFv2, API Gateway HTTP API, OAC,
+ResponseHeadersPolicy, or `s3 sync` exists anywhere — only the Lambda/IAM/tag/`HasImage` skeleton copies from
+`tiny-chatbot.yml`. Each serving resource is specified from the AWS reference, not a local precedent.
+
+Resolutions: **Q2** site `BucketPolicy` in the *app* stack (breaks the OAC→distribution cycle with no export) ·
+**Q3** one net-new `SiteBuildProject` CodeBuild action, `npm build` + `s3 sync` **without `--delete`**, at
+`RunOrder 2` · **Q4** notify-topic ARN reconstructed via `!Sub` from the fixed convention name · **Q5** two WAF
+IPSets (IPv4 + IPv6, IPv6 may start empty) · **Q6** API reserved concurrency **10** · **Q7** strict CSP
+(`default-src 'none'`…, no `unsafe-inline`) + HSTS/nosniff/Referrer-Policy, imposing a no-inline-styles UI
+constraint on Code Generation.
+
+### The OAC cross-stack cycle (Q2) — a finding this stage surfaced, not a routed item
+OAC needs the site bucket to trust the distribution, but the bucket is in the storage stack and the distribution
+in the app stack, with no exports. Resolved by placing the (non-stateful) **bucket policy in the app stack**,
+referencing the convention-named bucket + the local distribution ARN.
+
+### Q2 ordering correction (recorded, not a rewrite of an approved doc)
+Q2-A's phrasing said the two stacks "deploy in parallel at `RunOrder 1`." Wrong: the app-stack site `BucketPolicy`
+calls `PutBucketPolicy` on the named bucket, so the bucket must exist first. **Correct ordering: `dashboard-storage`
+`RunOrder 1`; `dashboard` + site-sync `RunOrder 2`.** The decision is unchanged — only the deploy step is serialized
+by one `RunOrder`. Recorded in Part A2 finding 1 of the plan and `deployment-architecture.md` §1.
+
+### Marker flip queued for Code Generation (DR-02)
+`dashboard-marker` flips `deployed_by: manual` → `pipeline` in the **same PR** as its BlueprintDeploy action (legal
+only because `HasImage` makes a real deployable action possible). `stacks.yml` gains `dashboard-storage` + `dashboard`
+(both `pipeline`). `shared-infrastructure.md` **not warranted** — U-02 consumes shared infra, creates none.
+
 ## Stage Progress
 ### 🔵 INCEPTION PHASE
 - [x] Workspace Detection
@@ -589,7 +626,7 @@ split shape.
 - [ ] NFR Design — **U-01 complete (awaiting approval)**; U-02 pass follows
       - [x] U-01 — **APPROVED 2026-08-03** — 9 patterns, zero infrastructure components. **RESILIENCY-14 SATISFIED**;
             **RESILIENCY-04/-15 ASSIGNED to U-02's NFR Design (2nd deferral)**
-      - [x] U-02 — **COMPLETE 2026-08-03 (awaiting approval)**. Q1–Q6 all A. Two artifacts:
+      - [x] U-02 — **APPROVED 2026-08-04** — "approve and continue". Q1–Q6 all A. Two artifacts:
             `nfr-design-patterns.md` (9 sections), `logical-components.md` (12-component inventory + 2
             dependencies). **Note: RESILIENCY-04/-15 were NOT re-deferred to here** — they were already
             discharged at U-02 NFR Requirements (R-9/R-10); deferral count stopped at 2. See below.
@@ -602,17 +639,51 @@ split shape.
             already in TSD-1/2/7; the stage's own justification is entirely U-02's. **2nd skip in the
             workflow** (first: Reverse Engineering). `u-01-domain-core/infrastructure-design/` will not
             exist — see `construction/plans/u-01-infrastructure-design-applicability.md`
-      - [ ] U-02 — full pass under every option; carries §6.4
+      - [x] U-02 — **COMPLETE 2026-08-04 (awaiting approval)**. Q1–Q7 all A. Two artifacts:
+            `infrastructure-design.md` (L-1..L-12 → CFN across two templates), `deployment-architecture.md`
+            (pipeline wiring). Resolved all six routed items; surfaced + resolved the OAC cross-stack cycle
+            (Q2). **The entire serving layer is net-new to the repo** (no CloudFront/WAFv2/HTTP API/OAC/s3-sync
+            precedent). See below.
 - [ ] Code Generation — **U-01 complete (awaiting approval)**; U-02 follows
       - [x] U-01 — 8 Python files + README, `tools/check` extended, template repurposed & registered.
             **~45 behavioural assertions actually executed and passing**; one real bug found and fixed
+      - [x] U-02 — **Part 1 + Part 2 COMPLETE 2026-08-04 (awaiting approval)**. collector (C-01) + read API
+            (C-03) + shared logging/EMF; Vite/React UI (C-06); two-target Dockerfile; `dashboard-storage.yml` +
+            `dashboard.yml`; `blueprint.yaml`; pipeline wiring (SiteBuildProject, 2 Build + 4 BlueprintDeploy
+            actions) + `stacks.yml` (marker flipped manual→pipeline, DR-02). **`tools/check` exit 0**: cfn-lint
+            clean on all 11 templates, **101 dashboard pytest** pass, mypy clean, boundary clean, terraform clean.
+            **UI**: 8 vitest pass, `npm run build` clean, **no inline script** in the bundle. **docker build NOT
+            run** (daemon down) — the one gap, closed at Build & Test. Four `deployed`-only reqs remain.
 - [ ] Build and Test — **U-01 complete (awaiting approval)**; U-02 follows
       - [x] U-01 — **APPROVED 2026-08-03**. 60 tests passing (17 property, 43 example), mypy clean,
             boundary clean, **mutation score 9/9**. Three defects found by running things.
-      - [ ] U-02
+      - [x] U-02 — **COMPLETE 2026-08-04 (awaiting approval)**. `tools/check` exit 0: **101 Python
+            tests** (60 U-01 + 41 U-02), **8 UI vitest**, mypy clean, boundary clean, cfn-lint clean on
+            all 11 templates, contract (import boundary) clean. **Both arm64 images build + handlers
+            import**; UI bundle builds with no inline script. 3/3 targeted mutations caught. Residual:
+            four `deployed`-only reqs (SEC-7/A-4/P-6/R-8), closable only by a merge to `main`.
 
 ### 🟡 OPERATIONS PHASE
-- [ ] Operations — PLACEHOLDER
+- [x] Operations — **PLACEHOLDER; workflow ends here (2026-08-04).** The vendored
+      `operations/operations.md` states plainly: "The AI-DLC workflow currently ends after the Build and
+      Test phase in CONSTRUCTION." There are **no defined OPERATIONS stages to execute**, and `CLAUDE.md`
+      forbids pre-building `observability/` or deployment/monitoring scaffolding unasked. So this phase is
+      acknowledged, not worked.
+      - **Real next step (NOT an AI-DLC stage, and the user's call):** open a PR and merge to `main`; the
+        pipeline's BlueprintDeploy stage deploys `dashboard-storage` → `dashboard` (+ site sync) → and the
+        flipped `dashboard-marker`, on the **shared account**. Set real `AllowedIpv4Cidrs` first, or the
+        WAF fails closed. That deploy is what finally verifies the four `deployed`-only requirements
+        (SEC-7, A-4, P-6, R-8).
+
+## 🏁 AI-DLC workflow status: COMPLETE (2026-08-04)
+Both units through every applicable CONSTRUCTION stage; OPERATIONS is a methodology placeholder.
+- **U-01 Domain Core** — complete end to end: 60 tests, 9/9 mutation, mypy strict clean.
+- **U-02 Dashboard Platform** — complete pre-deploy: collector/api/UI/edge/marker/observability built,
+  `tools/check` green, both images build, UI builds CSP-clean; 4 `deployed`-only reqs pending a merge.
+- **Still open, non-blocking (tracked, not part of this workflow's completion):**
+  - Task #7 — telemetry amendment (2nd Requirements→Stories pass), needs team-d + `docs/aidlc/dashboard/design/`.
+  - Q12/Q13 — whether `requirements.md` §4.6 gains a 5th exception, and whether US-09's 4th acceptance
+    criterion narrows to match Q11 = B (51 Dependabot findings context).
 
 ## Application Design decisions (Q1–Q11, all resolved)
 See `inception/plans/application-design-plan.md` Part A2 (Q1–Q8) and Part A3 (Q9–Q11).

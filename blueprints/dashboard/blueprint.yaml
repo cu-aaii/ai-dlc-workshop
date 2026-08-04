@@ -1,0 +1,58 @@
+# Blueprint manifest -- the contract the Cornell Builder MCP reads. Not a CloudFormation template
+# (it declares no template format version, so validate_stacks.py and cfn-lint ignore it by design).
+# It points at the APPLICATION template dashboard.yml, which is registered in pipeline/stacks.yml.
+# The stateful dashboard-storage.yml and the dashboard-marker.yml are separate stacks with their own
+# registry entries and no manifest of their own (a template with no manifest is fine and normal).
+apiVersion: builder.cornell.edu/v1
+kind: Blueprint
+metadata:
+  name: dashboard
+  version: 0.1.0        # keep in lockstep with BlueprintVersion default in the templates
+  maintainer: ai-sei@cornell.edu
+  maturity: supported
+summary: >-
+  Cornell cost & usage dashboard: an hourly collector snapshots every resource carrying cornell:*
+  tags, and a read-only web UI shows the inventory, groupings, tag gaps and freshness -- behind a
+  WAF allowlist and a strict CSP. Serverless: two arm64 Lambda images, two S3 buckets, an HTTP API,
+  and a CloudFront edge.
+matches:
+  - "cost and usage dashboard"
+  - "tag inventory"
+  - "what resources are missing cornell tags"
+  - "show me untagged resources"
+  - "resource inventory dashboard"
+inputs:
+  owner_netid:
+    type: string
+    required: true
+    description: NetID of the person who owns the deployment (cornell:owner)
+  allowed_ipv4_cidrs:
+    type: string
+    required: true
+    description: >-
+      Comma-separated IPv4 CIDRs allowed through the WAF (Cornell campus ranges). Required: the
+      template default is a placeholder that admits no one, so the dashboard is unreachable until
+      real ranges are supplied.
+  allowed_ipv6_cidrs:
+    type: string
+    required: false
+    description: Comma-separated IPv6 CIDRs allowed through the WAF. Optional; may start empty.
+template: blueprints/dashboard/infra/dashboard.yml
+# CodePipeline-level parameters, resolved by the pipeline at deploy time (not by the MCP). The image
+# digests come from the two Build actions; the commit is the marker.
+pipeline_parameters:
+  SourceCommitId: "#{GitRepository.CommitId}"
+  CollectorImageUri: "#{DashboardCollectorContainer.CONTAINER_DIGEST}"
+  ApiImageUri: "#{DashboardApiContainer.CONTAINER_DIGEST}"
+# Takes a DeploymentName parameter, so more than one dashboard can exist per application/environment.
+singleton: false
+cost:
+  baseline_monthly_usd: 15
+  scales_with:
+    - "WAF web ACL (the dominant fixed cost)"
+    - "CloudFront requests and data transfer"
+    - "Lambda invocations (hourly collector + on-demand reads)"
+# The stored snapshot is derived -- fully rebuildable by re-running the collector, so nothing here
+# needs backing up (stateless | derived | authoritative).
+state: [derived]
+data_classification: [internal]

@@ -1,0 +1,215 @@
+/* Cornell dashboard UI styles. Every colour is measured against the surface it appears on (see the
+   cornell-ui-compliance skill); tokens below carry the passing values. No inline styles anywhere --
+   the strict CSP (style-src 'self', no unsafe-inline) is served by CloudFront, so all CSS lives
+   here. System font stack: no external webfont, so no Typekit JS loader and nothing inline. */
+
+:root {
+  --carnelian: #b31b1b;
+  --ink: #222222;
+  --white: #ffffff;
+  --gray-bg: #f7f7f7;
+  --border: #767676;          /* 4.54:1 on white, 4.24:1 on #f7f7f7 -- valid as a boundary (>=3) */
+  --accent-blue: #006699;     /* 6.25:1 on white -- the single grouping-bar accent */
+  --fresh: #4b7b2b;           /* 5.04:1 text on white */
+  --stale: #d47500;           /* 3.31:1 graphic on white; paired with ink text */
+  --error: #df1e12;           /* 4.85:1 text on white */
+  --focus: #b31b1b;           /* 6.80:1 on white -- surface-aware ring (see :focus-visible) */
+
+  --heading-font: "Georgia", "Times New Roman", serif;
+  --body-font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { color-scheme: light; }
+
+body {
+  margin: 0;
+  font-family: var(--body-font);
+  color: var(--ink);
+  background: var(--white);
+  line-height: 1.5;
+}
+
+/* Focus is never removed; the ring is surface-aware and >=3:1 on every surface it lands on. */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.masthead :focus-visible {
+  outline-color: var(--white); /* on carnelian, white ring (6.80:1) */
+}
+
+/* --- masthead: carnelian band, official white logo at a fixed 45px (holds at all breakpoints) --- */
+.masthead {
+  background: var(--carnelian);
+  color: var(--white);
+}
+.masthead-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-inline-size: 1100px;
+  margin: 0 auto;
+  padding: 14px 24px;
+}
+.masthead-logo {
+  block-size: 45px;   /* the "reduced logo -- exactly 45px" band; fixed, not fluid */
+  inline-size: auto;
+  padding-inline-end: 12px; /* >= 1/4 seal diameter clear space, as fixed padding */
+}
+.masthead-divider {
+  inline-size: 1px;
+  block-size: 28px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.masthead-title {
+  font-family: var(--heading-font);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.container {
+  max-inline-size: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+h1 {
+  font-family: var(--heading-font);
+  font-size: 28px;
+  margin: 0 0 16px;
+}
+h2 { font-family: var(--heading-font); font-size: 20px; margin: 0 0 8px; }
+
+/* --- tabs --- */
+.view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-block-end: 2px solid var(--border);
+  margin-block-end: 20px;
+}
+.view-tab {
+  font: inherit;
+  padding: 10px 18px;
+  min-block-size: 44px;      /* >=24px target; comfortable */
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  border-block-end: 3px solid transparent;
+  margin-block-end: -2px;
+}
+.view-tab.is-active {
+  border-block-end-color: var(--carnelian);
+  font-weight: 700;
+}
+
+/* --- status strip --- */
+.status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 16px;
+  margin: 0 0 20px;
+  background: var(--gray-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.status-item dt { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.status-item dd { margin: 2px 0 0; font-size: 18px; font-weight: 600; }
+
+.freshness { display: inline-flex; align-items: center; gap: 6px; }
+.freshness-fresh { color: var(--fresh); }
+.freshness-stale { color: var(--stale); }
+.freshness-error { color: var(--error); }
+.status-glyph { font-weight: 700; }
+
+/* --- notices (the six states) --- */
+.notice {
+  display: flex;
+  gap: 12px;
+  padding: 20px;
+  background: var(--gray-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.notice h2 { margin-block-start: 0; }
+.notice-error {
+  border-color: var(--error);
+  border-inline-start: 4px solid var(--error);
+  color: var(--ink);
+}
+.notice-error .status-glyph { color: var(--error); }
+
+.banner-stale {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-block-end: 16px;
+  background: #fdf3e7;                 /* pale wash; ink text sits on it at AA */
+  border-inline-start: 4px solid var(--stale);
+  color: var(--ink);
+}
+.banner-stale .status-glyph { color: var(--stale); }
+
+/* --- tables --- */
+.view-toolbar { display: flex; align-items: center; gap: 12px; margin-block-end: 12px; }
+.field-label { font-weight: 600; }
+.select, .btn {
+  font: inherit;
+  min-block-size: 40px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+}
+.data-table { inline-size: 100%; border-collapse: collapse; }
+.data-table caption { text-align: start; font-style: italic; margin-block-end: 8px; }
+.data-table th, .data-table td {
+  text-align: start;
+  padding: 8px 10px;
+  border-block-end: 1px solid var(--border);
+  vertical-align: top;
+}
+.data-table thead th { border-block-end: 2px solid var(--border); }
+.mono { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 13px; word-break: break-all; }
+.summary { font-weight: 600; }
+
+/* --- proportional bar (grouping): width from a bucket class, never an inline style --- */
+.bar {
+  display: block;
+  block-size: 14px;
+  min-inline-size: 2px;
+  background: var(--accent-blue);
+  border-radius: 2px;
+}
+.bar-w-0 { inline-size: 2px; }
+.bar-w-5 { inline-size: 5%; }
+.bar-w-10 { inline-size: 10%; }
+.bar-w-15 { inline-size: 15%; }
+.bar-w-20 { inline-size: 20%; }
+.bar-w-25 { inline-size: 25%; }
+.bar-w-30 { inline-size: 30%; }
+.bar-w-35 { inline-size: 35%; }
+.bar-w-40 { inline-size: 40%; }
+.bar-w-45 { inline-size: 45%; }
+.bar-w-50 { inline-size: 50%; }
+.bar-w-55 { inline-size: 55%; }
+.bar-w-60 { inline-size: 60%; }
+.bar-w-65 { inline-size: 65%; }
+.bar-w-70 { inline-size: 70%; }
+.bar-w-75 { inline-size: 75%; }
+.bar-w-80 { inline-size: 80%; }
+.bar-w-85 { inline-size: 85%; }
+.bar-w-90 { inline-size: 90%; }
+.bar-w-95 { inline-size: 95%; }
+.bar-w-100 { inline-size: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

@@ -299,6 +299,134 @@ Resources:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
 
+  # Static-site builder (U-02 dashboard C-06). Builds the Vite bundle and syncs it to the
+  # dashboard site bucket. NOT a container build -- no privileged mode, a standard image with
+  # node. Sync runs WITHOUT --delete (TSD-11): deleting at sync time would break a browser
+  # mid-rollout holding a cached index.html; the site bucket's 30-day lifecycle is the cleanup.
+  # The action runs at RunOrder 2 in BlueprintDeploy, after the storage stack creates the bucket.
+
+  SiteBuildLogs:
+    Type: 'AWS::Logs::LogGroup'
+    DeletionPolicy: 'Delete'
+    UpdateReplacePolicy: 'Delete'
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${Application}-${Environment}-site'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'log-group-build-project-site'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  SiteBuildRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-site-build'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'codebuild.${AWS::URLSuffix}'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'site-build'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Application}-${Environment}-site*'
+              - Effect: 'Allow'
+                # Read the source artifact CodePipeline hands the build.
+                Action:
+                  - 's3:GetObject'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::deployment-artifacts-${AWS::AccountId}-*/*'
+              - Effect: 'Allow'
+                # Write the built bundle to any dashboard site bucket in this account (the
+                # DeploymentName is not known to the pipeline stack, so scoped by the -site- shape).
+                # No s3:DeleteObject on purpose -- the sync runs without --delete.
+                Action:
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-*-site-${AWS::AccountId}/*'
+              - Effect: 'Allow'
+                Action:
+                  - 's3:ListBucket'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-*-site-${AWS::AccountId}'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'iam-role-build-project-site-build'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  SiteBuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-site'
+      Description: !Sub 'Builds and syncs the dashboard static site for the ${Application}-${Environment} pipeline'
+      ServiceRole: !GetAtt 'SiteBuildRole.Arn'
+      TimeoutInMinutes: 20
+      Visibility: 'PRIVATE'
+      Artifacts:
+        Type: 'CODEPIPELINE'
+      Cache:
+        Type: 'NO_CACHE'
+      Environment:
+        ComputeType: 'BUILD_GENERAL1_SMALL'
+        Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
+        ImagePullCredentialsType: 'CODEBUILD'
+        Type: 'LINUX_CONTAINER'
+        EnvironmentVariables:
+          - Name: 'APPLICATION'
+            Value: !Ref 'Application'
+          - Name: 'ENVIRONMENT'
+            Value: !Ref 'Environment'
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref 'SiteBuildLogs'
+          Status: 'ENABLED'
+      Source:
+        Type: 'CODEPIPELINE'
+        GitCloneDepth: 0
+        # Inline buildspec: build the Vite bundle, sync to the site bucket WITHOUT --delete.
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 20
+              commands:
+                - cd blueprints/dashboard/ui
+                - npm ci
+            build:
+              commands:
+                - npm run build
+                - aws s3 sync dist/ "s3://${SITE_BUCKET}/" --no-progress
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'codebuild-project-site'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
   # Terraform Runner
   #
   # Non-AWS resources (Azure/Entra only) are Terraform executed from CodeBuild. One project
@@ -695,6 +823,45 @@ Resources:
                   {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
                   ]
 
+            # Dashboard (U-02) ships two arm64 Lambda images from one Dockerfile with two targets.
+            # Both build from the blueprints/dashboard context; each exports CONTAINER_DIGEST under
+            # its own namespace, consumed by the Dashboard CloudFormation action below.
+            - Name: 'DashboardCollectorContainer'
+              Namespace: 'DashboardCollectorContainer'
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'ArmContainerBuildProject'
+                EnvironmentVariables: >-
+                  [
+                  {"name": "CONTAINER_TARGET", "value": "collector", "type": "PLAINTEXT"},
+                  {"name": "CONTAINER_CONTEXT", "value": "blueprints/dashboard", "type": "PLAINTEXT"},
+                  {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
+                  ]
+
+            - Name: 'DashboardApiContainer'
+              Namespace: 'DashboardApiContainer'
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'ArmContainerBuildProject'
+                EnvironmentVariables: >-
+                  [
+                  {"name": "CONTAINER_TARGET", "value": "api", "type": "PLAINTEXT"},
+                  {"name": "CONTAINER_CONTEXT", "value": "blueprints/dashboard", "type": "PLAINTEXT"},
+                  {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
+                  ]
+
         # One action per blueprint stack. Register the template in pipeline/stacks.yml and
         # add an action here; the stack name convention is <application>-<environment>-<name>
         # so it stays inside the BuildPipelineRole's CloudFormation resource scope.
@@ -826,6 +993,111 @@ Resources:
                   "SmokeQuery": "What is the late homework policy?",
                   "SourceCommitId": "#{GitRepository.CommitId}"
                   }
+
+            # Dashboard (U-02), deployed as three stacks with an ordered site sync:
+            #   RunOrder 1: dashboard-storage (buckets) + dashboard-marker (commit marker)
+            #   RunOrder 2: dashboard (app: Lambdas/API/CloudFront/WAF, by digest) + site sync
+            # The app-stack site BucketPolicy needs the bucket to exist, so storage goes first;
+            # the site sync needs the bucket too, so it also waits for RunOrder 1.
+
+            - Name: 'DashboardStorageCloudFormation'
+              Namespace: 'DashboardStorageCloudFormation'
+              RunOrder: 1
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-dashboard-storage'
+                TemplatePath: 'GitRepositoryArtifact::blueprints/dashboard/infra/dashboard-storage.yml'
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "BlueprintVersion": "0.1.0"
+                  }
+
+            - Name: 'DashboardMarkerCloudFormation'
+              Namespace: 'DashboardMarkerCloudFormation'
+              RunOrder: 1
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-dashboard-marker'
+                TemplatePath: 'GitRepositoryArtifact::blueprints/dashboard/infra/dashboard-marker.yml'
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "BlueprintVersion": "0.1.0",
+                  "SourceCommitId": "#{GitRepository.CommitId}"
+                  }
+
+            - Name: 'DashboardCloudFormation'
+              Namespace: 'DashboardCloudFormation'
+              RunOrder: 2
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-dashboard'
+                TemplatePath: 'GitRepositoryArtifact::blueprints/dashboard/infra/dashboard.yml'
+                # The two image digests come from the Build stage. AllowedIpv4Cidrs MUST be set to
+                # real campus ranges for the dashboard to be reachable -- the template default is a
+                # placeholder that admits no one (deny-by-default fails closed). Set the real value
+                # here per environment.
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "BlueprintVersion": "0.1.0",
+                  "CollectorImageUri": "#{DashboardCollectorContainer.CONTAINER_DIGEST}",
+                  "ApiImageUri": "#{DashboardApiContainer.CONTAINER_DIGEST}",
+                  "AllowedIpv4Cidrs": "192.0.2.0/24",
+                  "LogLevel": "INFO",
+                  "SourceCommitId": "#{GitRepository.CommitId}"
+                  }
+
+            - Name: 'DashboardSiteSync'
+              Namespace: 'DashboardSiteSync'
+              RunOrder: 2
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'SiteBuildProject'
+                EnvironmentVariables: !Sub >-
+                  [
+                  {"name": "SITE_BUCKET", "value": "${Application}-${Environment}-dashboard-site-${AWS::AccountId}", "type": "PLAINTEXT"}
+                  ]
 
         # Non-AWS resources (Azure/Entra). One action per Terraform module, each supplying its
         # own working directory and state key so a single CodeBuild project serves all of them.
