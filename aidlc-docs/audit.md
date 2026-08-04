@@ -421,3 +421,12 @@
 **Context**: CONSTRUCTION — Build and Test complete for U-01. Awaiting approval. U-02 remains entirely unbuilt.
 
 ---
+
+## Build and Test U-01 — Approval. U-01 COMPLETE END TO END.
+**Timestamp**: 2026-08-03T00:00:00Z
+**Approval Prompt**: "# ✅ Build and Test Complete - U-01 Domain Core … ✅ **Approve** — U-01 is then complete end to end" — presented with the 60 passing tests, the 9/9 mutation score, the three defects found only by executing, the two self-inflicted harness failures, the five N/A test types with reasons, and the three outstanding items (`tools/check` end to end, `cfn-lint`, `uv.lock`).
+**User Input**: "Approve"
+**Decision**: **APPROVED** — Build and Test closed for U-01. **U-01 Domain Core is complete through every executed CONSTRUCTION stage**: Functional Design, NFR Requirements, NFR Design, Code Generation, Build and Test. Infrastructure Design was skipped for this unit by recorded decision.
+**Context**: CONSTRUCTION — all remaining work is **U-02 Dashboard Platform**. Next: U-02 Functional Design.
+
+---

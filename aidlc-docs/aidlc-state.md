@@ -3,7 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - Build and Test U-01 complete, awaiting approval
+- **Current Stage**: **CONSTRUCTION** - U-02 Dashboard Platform, Functional Design
+- **Build and Test U-01 Approved**: 2026-08-03 — "Approve". **U-01 COMPLETE END TO END.**
 - **Code Generation U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
 - **NFR Design U-01 Approved**: 2026-08-03 — user response "approve and proceed"
 - **NFR Requirements U-01 Approved**: 2026-08-03 — user response "approve and proceed"
@@ -434,8 +435,8 @@ cleanup — deliberately not done.
       - [x] U-01 — 8 Python files + README, `tools/check` extended, template repurposed & registered.
             **~45 behavioural assertions actually executed and passing**; one real bug found and fixed
 - [ ] Build and Test — **U-01 complete (awaiting approval)**; U-02 follows
-      - [x] U-01 — **60 tests passing** (17 property, 43 example), mypy clean, boundary clean,
-            **mutation score 9/9**. Three defects found by running things.
+      - [x] U-01 — **APPROVED 2026-08-03**. 60 tests passing (17 property, 43 example), mypy clean,
+            boundary clean, **mutation score 9/9**. Three defects found by running things.
       - [ ] U-02
 
 ### 🟡 OPERATIONS PHASE
