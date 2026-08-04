@@ -346,6 +346,94 @@ tbody tr:hover{background:var(--code);}
   .mx .axl.v{writing-mode:horizontal-tb; transform:none;}
 }
 /* ============================================================
+   USER JOURNEYS — real captured conversations, stepped through
+   ============================================================ */
+.jy{display:grid; grid-template-columns:minmax(0,290px) minmax(0,1fr); gap:clamp(10px,1.4vw,20px); align-items:start;}
+.jy-meta{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:clamp(13px,1.5vw,18px); box-shadow:var(--shadow);}
+.jy-meta.warn{background:var(--cream); border-color:var(--cream-line);}
+.jy-who{font:700 clamp(15px,1.5vw,19px)/1.25 var(--serif); margin:6px 0 2px;}
+.jy-role{font-size:12px; color:var(--mut); line-height:1.4; margin-bottom:12px;}
+.jy-lab{font:700 9.5px/1 var(--sans); letter-spacing:.14em; text-transform:uppercase; color:var(--mut-2); display:block; margin-bottom:4px;}
+.jy-meta .blk{margin-bottom:11px; font-size:13px; line-height:1.5; color:var(--ink-2);}
+.jy-meta .blk:last-child{margin-bottom:0;}
+.jy-steps{display:flex; align-items:center; gap:8px; margin-top:13px; padding-top:12px; border-top:1px dashed #ded8ce; flex-wrap:wrap;}
+.jy-steps button{border:1px solid var(--line); background:var(--card); border-radius:8px; width:38px; height:38px;
+  cursor:pointer; font-size:15px; color:var(--ink); transition:all .16s ease;}
+.jy-steps button:hover:not(:disabled){background:var(--red); color:#fff; border-color:var(--red);}
+.jy-steps button:disabled{opacity:.35; cursor:default;}
+.jy-steps .all{width:auto; padding:0 12px; font:600 11px/1 var(--sans); letter-spacing:.05em;}
+.jy-pos{font:600 12px/1 var(--mono); color:var(--mut); min-width:52px; text-align:center;}
+
+.jy-chat{display:flex; flex-direction:column; gap:10px; max-height:56vh; overflow-y:auto; padding:2px 4px 2px 2px;}
+.msg{display:flex; gap:9px; align-items:flex-start; animation:swap .3s ease;}
+.msg .av{flex:none; width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+  font:700 10px/1 var(--sans); letter-spacing:.03em;}
+.msg.user .av{background:var(--ink); color:#fff;}
+.msg.bot .av{background:var(--red-soft); color:var(--red-dk); border:1px solid #eccaca;}
+.msg .bub{border-radius:11px; padding:10px 13px; font-size:clamp(13px,1.12vw,14.5px); line-height:1.55; max-width:100%;}
+.msg.user .bub{background:var(--code); border:1px solid var(--line); color:var(--ink); font-weight:500;}
+.msg.bot .bub{background:var(--card); border:1px solid var(--line); box-shadow:var(--shadow); color:var(--ink-2);}
+.msg.bot.refuse .bub{background:#fdf2f2; border-color:#eccaca;}
+
+/* the side diagram: what actually happened between turns */
+.jy-act{display:flex; gap:9px; align-items:stretch; margin-left:37px;}
+.jy-act .spine{flex:none; width:2px; background:linear-gradient(180deg,#e6ded3,#cfc4b5); border-radius:2px; margin-left:12px;}
+.jy-act .node{flex:1; min-width:0; background:var(--cream); border:1px solid var(--cream-line); border-radius:10px; padding:10px 12px;}
+.jy-act .node .hd{display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:5px;}
+.jy-act .node .tl{font:700 10.5px/1 var(--mono); color:var(--red-dk); background:#fff; border:1px solid var(--cream-line);
+  border-radius:99px; padding:4px 8px;}
+.jy-act .node .cap{font-size:12.5px; line-height:1.5; color:var(--ink-2);}
+.jy-act .node .exc{margin-top:8px;}
+.jy-note{margin-top:8px; font-size:11.5px; line-height:1.45; color:var(--amber-fg); background:var(--amber-bg);
+  border:1px dashed #d9ab5e; border-radius:7px; padding:7px 9px;}
+.jy-refuse-tag{font:700 9.5px/1 var(--sans); letter-spacing:.1em; background:var(--red-soft); color:var(--red-dk);
+  border-radius:99px; padding:4px 8px;}
+.jy-prov{font-size:11px; color:var(--mut-2); line-height:1.5; margin-top:10px;}
+
+@media(max-width:1080px){ .jy{grid-template-columns:1fr;} .jy-chat{max-height:none;} }
+
+/* ============================================================
+   PROGRESSIVE DISCLOSURE — collapsed by default, opens on click.
+   The visible layer is the leadership version; detail lives in here.
+   ============================================================ */
+details.more{
+  margin-top:12px; border:1px solid var(--line); border-radius:9px;
+  background:var(--code); overflow:hidden;
+}
+details.more+details.more{margin-top:8px;}
+details.more>summary{
+  list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px;
+  padding:12px 14px; min-height:44px;
+  font:600 12px/1.35 var(--sans); letter-spacing:.03em; color:var(--red-dk);
+  transition:background .16s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+details.more>summary::-webkit-details-marker{display:none;}
+details.more>summary::marker{content:"";}
+details.more>summary:hover{background:#efece7;}
+details.more>summary::before{
+  content:"+"; flex:none; width:20px; height:20px; border-radius:5px;
+  background:var(--red); color:#fff; font:700 13px/20px var(--mono);
+  text-align:center; transition:transform .2s ease;
+}
+details.more[open]>summary::before{content:"–";}
+details.more[open]>summary{background:#efece7; border-bottom:1px solid var(--line);}
+details.more .md{padding:13px 14px 14px; background:var(--card);}
+details.more .md>*:first-child{margin-top:0;}
+details.more .md>*:last-child{margin-bottom:0;}
+.divider details.more, .divider details.more .md{background:#2c2c2c; border-color:#454545;}
+.divider details.more>summary{color:#f0b9b9;}
+.divider details.more>summary:hover, .divider details.more[open]>summary{background:#383838;}
+.appx-hero details.more{background:#fff8ee; border-color:var(--cream-line);}
+
+/* raw output / long JSON — always inside a toggle, always scrollable */
+pre.raw{
+  margin:0; padding:11px 12px; background:#fbf9f6; border:1px solid var(--line);
+  border-radius:7px; font:500 11.5px/1.5 var(--mono); color:var(--ink-2);
+  max-height:260px; overflow:auto; white-space:pre; -webkit-overflow-scrolling:touch;
+}
+
+/* ============================================================
    MOBILE / TOUCH — additive only. Desktop + projector untouched.
    ============================================================ */
 .hscroll{overflow-x:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain;}
@@ -425,6 +513,9 @@ tbody tr:hover{background:var(--code);}
   .mx .axl{font-size:10.5px;}
 
   /* --- misc cramping --- */
+  details.more>summary{font-size:12.5px; padding:13px 14px; min-height:48px;}
+  details.more .md{font-size:14px;}
+  pre.raw{font-size:11px; max-height:200px;}
   .scrub-head{gap:10px;}
   .byline{gap:14px;}
   .stat .num{font-size:34px;}
@@ -465,21 +556,41 @@ tbody tr:hover{background:var(--code);}
   <div class="rule" data-r></div>
   <div class="kicker" data-r>Cornell AI-DLC · Track A · <span class="badge redb">Progress review</span></div>
   <h1 data-r>The Cornell&nbsp;Builder</h1>
-  <p class="sub" data-r style="font-size:clamp(16px,1.85vw,25px); color:var(--ink-2); max-width:34ch;">
-    Plain-language infrastructure requests, turned into a pull request a human reviews and merges.
+  <p class="sub" data-r style="font-size:clamp(16px,1.85vw,25px); color:var(--ink-2); max-width:36ch;">
+    Ask for the cloud service you need in your own words. A person reviews the request and approves it.
   </p>
   <div class="grid g4" style="margin-top:clamp(14px,2.4vh,28px); max-width:820px;">
-    <div class="card stat" data-r><span class="num" data-count="8">0</span><span class="lab">Tools, frozen</span></div>
-    <div class="card stat" data-r><span class="num" data-count="77">0</span><span class="lab">Tests green</span></div>
-    <div class="card stat" data-r><span class="num" data-count="7">0</span><span class="lab">Blueprints</span></div>
-    <div class="card stat" data-r><span class="num" data-count="3">0</span><span class="lab">Delivery surfaces</span></div>
+    <div class="card stat" data-r><span class="num" data-count="8">0</span><span class="lab">Things it can do</span></div>
+    <div class="card stat" data-r><span class="num" data-count="77">0</span><span class="lab">Tests passing</span></div>
+    <div class="card stat" data-r><span class="num" data-count="5">0</span><span class="lab">Ready-made services</span></div>
+    <div class="card stat" data-r><span class="num" data-count="3">0</span><span class="lab">Ways to use it</span></div>
   </div>
   <div class="byline">
-    <div data-r><b>What this is</b>An MCP server + the surfaces that wrap it</div>
-    <div data-r><b>Repository</b><a href="https://github.com/cu-aaii/ai-dlc-workshop">cu-aaii/ai-dlc-workshop</a> · public</div>
-    <div data-r><b>Contracts</b><a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a></div>
-    <div data-r><b>Audience</b>Leadership first · engineering detail at the end</div>
+    <div data-r><b>Who it helps</b>Cornell researchers and staff who need a small cloud service</div>
+    <div data-r><b>Where it lives</b><a href="https://github.com/cu-aaii/ai-dlc-workshop">cu-aaii/ai-dlc-workshop</a> · public</div>
+    <div data-r><b>Today's ask</b>Trained reviewers, a support owner, permission to pilot</div>
+    <div data-r><b>This deck</b>Leadership first · engineering detail behind the toggles</div>
   </div>
+
+  <details class="more" data-r style="max-width:820px;">
+    <summary>For the engineering team — what the four numbers mean</summary>
+    <div class="md">
+      <p class="small" style="margin-bottom:8px;"><b>8 things it can do</b> — the tool surface is frozen by contract C3 in
+        <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a>.
+        Renaming one is a formal cross-team contract change.</p>
+      <p class="small" style="margin-bottom:8px;"><b>77 tests passing</b> — unit and property-based, in
+        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/packages/builder-mcp/tests">packages/builder-mcp/tests</a>.
+        None is an end-to-end run against real AWS. That gap is named on the bottlenecks slide.</p>
+      <p class="small" style="margin-bottom:8px;"><b>5 ready-made services</b> — <code>aisei-site</code>, <code>hello-world</code>,
+        <code>knowledgebase</code>, <code>notify-topic</code>, <code>tiny-chatbot</code>. Two further directories exist,
+        <code>course-chatbot</code> and <code>entra-probe</code>, but neither ships a <code>blueprint.yaml</code> manifest.
+        The catalog search globs <code>blueprints/*/blueprint.yaml</code>, so it cannot surface them and nobody can deploy them today.
+        We count 5, not 7. Index at
+        <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/blueprints/README.md">blueprints/README.md</a>.</p>
+      <p class="small" style="margin:0;"><b>3 ways to use it</b> — the MCP server itself, a browser devtools console, and a
+        Claude Code / Cowork plugin. All three call the same server.</p>
+    </div>
+  </details>
  </div>
 </section>
 
@@ -487,10 +598,10 @@ tbody tr:hover{background:var(--code);}
 <section class="slide" data-title="The problem today">
  <div class="inner">
   <div class="kicker" data-r>02 · What this replaces</div>
-  <h2 data-r>Today, getting cloud infrastructure is a project of its own</h2>
+  <h2 data-r>Getting a small cloud service takes weeks. The waiting is the cost.</h2>
   <p class="sub" data-r>
-    A Cornell researcher who needs a small AWS service does not have an infrastructure problem — they have a
-    <strong>procedural</strong> problem. Drag the scrubber to walk one request down both paths.
+    The researcher usually knows what they want. What stops them is the queue: who to ask, who signs off,
+    who writes the technical parts. Drag the slider to follow one request down both paths.
   </p>
 
   <div class="scrub" data-r>
@@ -522,10 +633,24 @@ tbody tr:hover{background:var(--code);}
   </div>
 
   <div class="grid g3" style="margin-top:14px;">
-    <div class="card hov" data-r><h3>The expertise wall</h3><p class="small">CloudFormation, tagging conventions, pipeline registration and stack naming are all prerequisites before the first useful thing exists. Most researchers stop here.</p></div>
-    <div class="card hov" data-r><h3>The queue</h3><p class="small">Every step above is somebody else's ticket. The waiting, not the typing, is where the calendar goes.</p></div>
-    <div class="card hov" data-r><h3>The silent failure</h3><p class="small">A request that looks approved and deploys nothing is the worst outcome, and it happens. The <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints">blueprints</a> conventions exist because of it.</p></div>
+    <div class="card hov" data-r><h3>You need to be an expert first</h3><p class="small">A pile of technical setup has to be right before anything useful exists. Most researchers stop here.</p></div>
+    <div class="card hov" data-r><h3>Every step is someone else's queue</h3><p class="small">The waiting, not the typing, is where the weeks go.</p></div>
+    <div class="card hov" data-r><h3>It can look approved and do nothing</h3><p class="small">A request that appears to succeed but deploys nothing is the worst outcome. It happens.</p></div>
   </div>
+
+  <details class="more" data-r>
+    <summary>For the engineering team — what the setup actually involves</summary>
+    <div class="md">
+      <p class="small" style="margin-bottom:8px;">The prerequisites before a first useful deployment: authoring a CloudFormation
+        template, getting the four mandatory <code>cornell:*</code> tags right, registering the template with the deploy pipeline,
+        and following the stack-naming convention. Any one of them wrong produces a green process that deploys nothing —
+        which is why the conventions in
+        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints">blueprints</a> exist.</p>
+      <p class="small" style="margin:0;"><b>On the durations:</b> the numbers in the slider are estimates from the team's
+        experience of comparable requests. They have not been measured at Cornell. Treat them as the shape of the problem,
+        not as data.</p>
+    </div>
+  </details>
  </div>
 </section>
 
@@ -533,155 +658,210 @@ tbody tr:hover{background:var(--code);}
 <section class="slide" data-title="What the Builder is">
  <div class="inner">
   <div class="kicker" data-r>03 · In plain language</div>
-  <h2 data-r>Describe what you need. Get a pull request. A human merges it.</h2>
-  <p class="sub" data-r>Three moves, and only the third one changes anything in the cloud.</p>
+  <h2 data-r>Ask for it. A person approves it. Then it gets built.</h2>
+  <p class="sub" data-r>Three steps. Only the last one changes anything in the cloud.</p>
 
   <div class="flow" style="margin-bottom:clamp(12px,2vh,20px);">
     <div class="card hov accent" data-r>
       <span class="step-n">1</span>
       <h3>You ask, in your own words</h3>
-      <p class="small">No template, no form, no jargon. <em class="q">"I want a chatbot over my course documents."</em></p>
+      <p class="small">No form, no template. <em class="q">"I want a chatbot my students can ask about the course readings."</em></p>
     </div>
     <div class="arw" data-r>→</div>
     <div class="card hov accent" data-r>
       <span class="step-n">2</span>
-      <h3>A ranked catalog of blueprints comes back</h3>
-      <p class="small">Every blueprint, ranked — never filtered — each with its inputs, monthly cost, data classification and maturity, so the choice is informed.</p>
+      <h3>You get a shelf of ready-made options</h3>
+      <p class="small">Each one shows its monthly cost, what kind of data it may hold, and how proven it is. You choose.</p>
     </div>
     <div class="arw" data-r>→</div>
     <div class="card hov accent" data-r>
       <span class="step-n">3</span>
-      <h3>A pull request is opened for a person to review</h3>
-      <p class="small">Small, conventional, readable. <strong>Merging is what deploys.</strong> Nothing before the merge touches the cloud.</p>
+      <h3>A person reviews and approves</h3>
+      <p class="small">Approval is what builds it. <strong>Nothing is created before a human says yes.</strong></p>
     </div>
   </div>
 
   <div class="grid g21">
     <div class="card cream" data-r>
-      <h3>A blueprint is the reusable unit</h3>
-      <p class="small" style="margin-bottom:8px;">A blueprint is a governed, self-contained piece of infrastructure that somebody has already got right once — the template, the required Cornell tags, the cost estimate, the data classification. Seven exist today and the catalog is meant to grow.</p>
+      <h3>The reusable part is a ready-made service</h3>
+      <p class="small" style="margin-bottom:8px;">Someone gets one kind of service right once — the setup, the cost, the rules
+        about what data it may hold. Everyone after them gets it for free, already compliant.
+        <strong>Five are ready to use today</strong>, and the shelf is meant to grow.</p>
       <p class="small" style="margin:0;">
         <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/hello-world">blueprints/hello-world</a>
         <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/notify-topic">blueprints/notify-topic</a>
         <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/knowledgebase">blueprints/knowledgebase</a>
-        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/entra-probe">blueprints/entra-probe</a>
         <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/tiny-chatbot">blueprints/tiny-chatbot</a>
-        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/course-chatbot">blueprints/course-chatbot</a>
         <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/aisei-site">blueprints/aisei-site</a>
-        — index at <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/blueprints/README.md">blueprints/README.md</a>
       </p>
     </div>
     <div class="card" data-r>
       <h3>What it deliberately is <em>not</em></h3>
       <ul class="tick cross">
-        <li>Not a deploy button — it cannot deploy.</li>
-        <li>Not an AWS console replacement for platform staff.</li>
-        <li>Not a place credentials live. The user's machine holds nothing.</li>
-        <li>Not a bypass of review. It <em>feeds</em> review.</li>
+        <li>Not a deploy button. It cannot build anything itself.</li>
+        <li>Not a replacement for the platform team's own tools.</li>
+        <li>Not somewhere passwords or keys live. Your laptop holds none.</li>
+        <li>Not a way around review. It feeds review.</li>
       </ul>
     </div>
   </div>
+
+  <details class="more" data-r>
+    <summary>For the engineering team — the blueprint contract, and why the count is five</summary>
+    <div class="md">
+      <p class="small" style="margin-bottom:8px;">A <b>blueprint</b> is a governed, self-contained unit: a CloudFormation
+        template, the four mandatory <code>cornell:*</code> tags, a baseline monthly cost, and a permitted data classification —
+        all declared in a <code>blueprint.yaml</code> manifest. The rule is "no manifest, no catalog entry".</p>
+      <p class="small" style="margin-bottom:8px;"><b>Seven directories, five publishable.</b>
+        <code>course-chatbot</code> and <code>entra-probe</code> hold only <code>infra/</code> and a README — no manifest.
+        <code>blueprint_search</code> globs <code>blueprints/*/blueprint.yaml</code>, so those two cannot appear in the catalog
+        and cannot be deployed today. An independent check confirmed both manifests return HTTP 404 from the GitHub API.
+        We report five so the number matches what a user can actually get.</p>
+      <p class="small" style="margin-bottom:8px;">Of the five, <code>hello-world</code>, <code>knowledgebase</code> and
+        <code>notify-topic</code> are singletons — the deployment name is forced to the blueprint name.
+        <code>aisei-site</code> and <code>tiny-chatbot</code> accept a custom name.</p>
+      <p class="small" style="margin:0;">Requirements in
+        <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/blueprints/README.md">blueprints/README.md</a> ·
+        the two unpublishable directories:
+        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/course-chatbot">blueprints/course-chatbot</a>
+        <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/blueprints/entra-probe">blueprints/entra-probe</a></p>
+    </div>
+  </details>
  </div>
 </section>
 
 <!-- ============================ 4 · THE EIGHT TOOLS ============================ -->
 <section class="slide" data-title="The eight tools">
  <div class="inner">
-  <div class="kicker" data-r>04 · Capability, expressed as objectives <span class="badge greyb">interactive</span></div>
-  <h2 data-r>Eight tools. Four that read, four that write.</h2>
+  <div class="kicker" data-r>04 · What it can do <span class="badge greyb">interactive</span></div>
+  <h2 data-r>Eight things it can do. Four answer a question, four propose a change.</h2>
   <p class="sub" data-r>
-    The surface is frozen by contract C3 in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a> —
-    renaming even one is a formal, cross-team contract change. Select a tool to see the objective it achieves.
+    Nothing here builds, changes or deletes anything on its own. Tap one to see what it is for.
   </p>
 
   <div class="tx-filters" data-r>
     <button class="chipf on" data-f="all">All eight</button>
-    <button class="chipf" data-f="read">Read · answers a question</button>
-    <button class="chipf" data-f="write">Write · proposes a change</button>
+    <button class="chipf" data-f="read">Answers a question</button>
+    <button class="chipf" data-f="write">Proposes a change</button>
   </div>
 
   <div class="tx" data-r>
     <div class="tx-list" id="txlist"></div>
     <div class="tx-detail" id="txdetail"></div>
   </div>
+
+  <details class="more" data-r>
+    <summary>For the engineering team — why this list cannot quietly grow</summary>
+    <div class="md">
+      <p class="small" style="margin:0;">The eight-tool surface is frozen by contract C3 in
+        <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a>.
+        Adding or renaming one is a formal, cross-team contract change, and a test enforces the count — which is how we can
+        promise that the Claude plugin adds zero tools of its own.</p>
+    </div>
+  </details>
  </div>
 </section>
 
-<!-- ============================ 5 · USER STORY ============================ -->
-<section class="slide" data-title="User story">
+<!-- ============================ 5 · JOURNEY 1 ============================ -->
+<section class="slide" data-title="Journey · a lecturer">
  <div class="inner">
-  <div class="kicker" data-r>05 · End to end</div>
-  <h2 data-r>Priya wants a chatbot over her course readings</h2>
+  <div class="kicker" data-r>05 · A real conversation <span class="badge greyb">step through it</span></div>
+  <h2 data-r>A lecturer asks for a class chatbot</h2>
   <p class="sub" data-r>
-    An illustrative composite of the <strong>Builder</strong> persona defined in
-    <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/docs/aidlc/builder-mcp/inception/user-stories/personas.md">docs/aidlc/builder-mcp/inception/user-stories/personas.md</a>:
-    a lecturer who wants a working course tool this term and has no intention of learning CloudFormation.
+    Every word below is what was actually typed and what actually came back. Step through it with the arrows.
   </p>
-
-  <div class="grid g2">
-    <div class="card hov" data-r><h3><span class="step-n">1</span><br>She asks</h3>
-      <p class="small"><em class="q">"I want a chatbot my students can ask questions of, over the readings for my course."</em> She types this into Claude, the same way she'd ask a colleague.</p></div>
-    <div class="card hov" data-r><h3><span class="step-n">2</span><br>She sees the shelf, not a form</h3>
-      <p class="small">A ranked list comes back. Each entry carries its monthly cost, what data classification it is cleared for, and how mature it is. She picks the knowledge-base blueprint because it says out loud that course documents are not public data.</p></div>
-    <div class="card hov" data-r><h3><span class="step-n">3</span><br>She reads a plan before anything happens</h3>
-      <p class="small">The Builder returns a <strong>plan</strong>, not an action: the stack that would be created, the cost, the pull request that would be opened. Nothing has been done. She confirms.</p></div>
-    <div class="card hov" data-r><h3><span class="step-n">4</span><br>A reviewer gets a small, familiar diff</h3>
-      <p class="small">One pipeline action added, plus the deployment's own record. Conventional shape, minutes to read — exactly what the reviewer persona says they need to approve quickly and safely.</p></div>
-    <div class="card hov" data-r><h3><span class="step-n">5</span><br>The merge deploys it</h3>
-      <p class="small">A human clicks merge. The platform pipeline builds and deploys. Priya never held an AWS credential and never opened the console.</p></div>
-    <div class="card hov cream" data-r><h3><span class="step-n">6</span><br>She can still ask questions afterwards</h3>
-      <p class="small">"Is it live?" · "Why did it fail?" · "Write me the security summary." · "Write the handover doc for the RA taking this over in May." All plain language, all read-only.</p></div>
+  <div class="jy" data-jy="happy-path" data-r>
+    <div class="jy-meta"></div>
+    <div class="jy-chat"></div>
   </div>
+ </div>
+</section>
 
-  <p class="tiny" data-r style="margin-top:12px;">
-    Four personas — Builder, Reviewer, Platform Operator, Blueprint Author — drive the design; the story-to-tool mapping is in
-    <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/docs/aidlc/builder-mcp/inception/user-stories/story-tool-map.md">docs/aidlc/builder-mcp/inception/user-stories/story-tool-map.md</a>.
+<!-- ============================ 6 · JOURNEY 2 ============================ -->
+<section class="slide" data-title="Journey · can't name it">
+ <div class="inner">
+  <div class="kicker" data-r>06 · A real conversation <span class="badge greyb">step through it</span></div>
+  <h2 data-r>Someone who can't name what they need</h2>
+  <p class="sub" data-r>
+    The hardest case for any request form: a person who can describe the problem but not the solution. He never has to know the name of the thing.
   </p>
+  <div class="jy" data-jy="vague-ask" data-r>
+    <div class="jy-meta"></div>
+    <div class="jy-chat"></div>
+  </div>
+ </div>
+</section>
+
+<!-- ============================ 7 · JOURNEY 3 · BOUNDARY ============================ -->
+<section class="slide" data-title="Journey · four refusals">
+ <div class="inner">
+  <div class="kicker" data-r>07 · A real conversation <span class="badge redb">the important one</span></div>
+  <h2 data-r>Someone in a hurry tries to go around the rules. Four times.</h2>
+  <p class="sub" data-r>
+    A deadline, and four attempts to skip review. Each refusal is a property of how the system is built, not a judgement call someone made on the day.
+  </p>
+  <div class="jy" data-jy="boundary" data-r>
+    <div class="jy-meta warn"></div>
+    <div class="jy-chat"></div>
+  </div>
  </div>
 </section>
 
 <!-- ============================ 6 · GOVERNANCE ============================ -->
 <section class="slide" data-title="Governance">
  <div class="inner">
-  <div class="kicker" data-r>06 · Why leadership can trust it</div>
-  <h2 data-r>The guarantees are permanent, not current limitations</h2>
+  <div class="kicker" data-r>08 · Why leadership can trust it</div>
+  <h2 data-r>Four things it can never do</h2>
   <p class="sub" data-r>
-    These four hold for every tool, forever. They are written into contract C3, asserted by the test suite, and
-    they are the reason an AI-driven tool can be pointed at a shared AWS account at all.
+    These are permanent guarantees, not today's limitations. They hold for every tool, and they are why we can point
+    an AI tool at a shared cloud account at all.
   </p>
 
   <div class="grid g2">
-    <div class="card accent hov" data-r><h3>✕ It never merges</h3>
-      <p class="small">No tool can merge a pull request. Not with a token, not with elevated rights, not by asking twice. Approval is a human act and there is no code path around it.</p></div>
-    <div class="card accent hov" data-r><h3>✕ It never pushes to a tracked branch</h3>
-      <p class="small">Every change arrives as a new branch and a pull request. The main branch is never written to directly, so the review gate cannot be stepped over.</p></div>
-    <div class="card accent hov" data-r><h3>✕ It never calls CloudFormation Create, Update or Delete</h3>
-      <p class="small">The server cannot create, change or destroy a stack. That permission belongs to the platform pipeline, and the pipeline acts only on a merge. Even deletion is a pull request.</p></div>
-    <div class="card accent hov" data-r><h3>✕ The user's machine holds no credential</h3>
-      <p class="small">No AWS keys, no git token on the researcher's laptop. The server process holds what it needs; the client holds nothing. Revocation is central and immediate.</p></div>
+    <div class="card accent hov" data-r><h3>✕ It can never approve its own request</h3>
+      <p class="small">Approval is a human act. There is no setting, no permission and no second attempt that lets the tool approve anything itself.</p></div>
+    <div class="card accent hov" data-r><h3>✕ It can never edit the official copy directly</h3>
+      <p class="small">Every change arrives as a separate proposal that someone has to accept. The review step cannot be stepped over.</p></div>
+    <div class="card accent hov" data-r><h3>✕ It can never create, change or destroy cloud resources</h3>
+      <p class="small">That permission belongs to the platform team's own system, which acts only after a person approves. Even shutting something down is a request that gets reviewed.</p></div>
+    <div class="card accent hov" data-r><h3>✕ It never puts passwords or keys on your laptop</h3>
+      <p class="small">Your machine holds nothing. If access ever needs to be revoked, that happens centrally and immediately.</p></div>
   </div>
 
   <div class="card cream" data-r style="margin-top:14px;">
     <h3>One sentence for the risk register</h3>
     <p style="margin:6px 0 0; font-size:clamp(13px,1.32vw,18px); line-height:1.5;">
-      A deployment happens exactly one way — <strong>a human approves the pull request the Builder opened, and the merge does the rest</strong>.
-      Everything the Builder can do before that point is either reading, or writing a proposal.
+      Something gets built exactly one way: <strong>a person approves the request, and that approval is what builds it</strong>.
+      Everything the Builder does before then is either reading, or writing a proposal.
     </p>
   </div>
 
-  <p class="tiny" data-r style="margin-top:12px;">
-    Written down in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a> (C3, C5) ·
-    AWS permissions in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/infra/builder-mcp.yml">packages/builder-mcp/infra/builder-mcp.yml</a> ·
-    live tool-by-tool evidence in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/docs/tool-verification.html">packages/builder-mcp/docs/tool-verification.html</a> ·
-    tests in <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/packages/builder-mcp/tests">packages/builder-mcp/tests</a>.
-  </p>
+  <details class="more" data-r>
+    <summary>For the engineering team — the exact wording, and where it is enforced</summary>
+    <div class="md">
+      <ul class="tick cross" style="margin-top:0;">
+        <li><b>Never merges a pull request.</b> Not with a token, not with elevated rights, not by asking twice.</li>
+        <li><b>Never pushes to a tracked branch.</b> Every change is a new branch plus a pull request; <code>main</code> is never written to directly.</li>
+        <li><b>Never calls CloudFormation Create, Update or Delete.</b> That belongs to the platform pipeline, which acts only on a merge. Deletion is a pull request too.</li>
+        <li><b>No credential on the client.</b> No AWS keys, no git token on the researcher's laptop. The server process holds what it needs.</li>
+      </ul>
+      <p class="small" style="margin-top:10px;">The only two AWS writes anywhere in the system are starting a pipeline execution
+        and retrying a failed stage — neither can change what gets deployed.</p>
+      <p class="tiny" style="margin:8px 0 0;">
+        Written down in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/SPEC.md">packages/builder-mcp/SPEC.md</a> (C3, C5) ·
+        AWS permissions in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/infra/builder-mcp.yml">packages/builder-mcp/infra/builder-mcp.yml</a> ·
+        tool-by-tool evidence in <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/docs/tool-verification.html">packages/builder-mcp/docs/tool-verification.html</a> ·
+        tests in <a class="fl dir" href="https://github.com/cu-aaii/ai-dlc-workshop/tree/main/packages/builder-mcp/tests">packages/builder-mcp/tests</a>.
+      </p>
+    </div>
+  </details>
  </div>
 </section>
 
 <!-- ============================ 7 · AI-DLC SCORECARD ============================ -->
 <section class="slide" data-title="AI-DLC scorecard">
  <div class="inner">
-  <div class="kicker" data-r>07 · Method maturity <span class="badge greyb">interactive</span></div>
+  <div class="kicker" data-r>09 · Method maturity <span class="badge greyb">interactive</span></div>
   <h2 data-r>How well did we actually follow AI-DLC?</h2>
   <p class="sub" data-r>
     The five always-execute stages of the AI-DLC adaptive workflow, per
@@ -710,33 +890,32 @@ tbody tr:hover{background:var(--code);}
 <!-- ============================ 8 · THREE SURFACES ============================ -->
 <section class="slide" data-title="Three surfaces">
  <div class="inner">
-  <div class="kicker" data-r>08 · Delivery</div>
-  <h2 data-r>Three ways in. One server underneath.</h2>
+  <div class="kicker" data-r>10 · Delivery</div>
+  <h2 data-r>Three ways in. One system underneath.</h2>
   <p class="sub" data-r>
-    These are <strong>siblings, not forks</strong>. Each is a client of the same server, running the same eight tools under the same
-    governance invariants. Fix the server once and all three inherit it; there is no second implementation to keep in step.
+    All three are the same thing wearing different clothes. Fix it once and all three get the fix. There is no second copy to keep in step.
   </p>
 
   <div class="grid g3" style="margin-bottom:14px;">
     <div class="card srv hov" data-r>
       <div class="top" style="background:var(--red);"></div>
       <div style="font-size:26px; margin-bottom:6px;">⚙️</div>
-      <h3>The MCP server</h3>
-      <p class="small">The product. Eight tools, the catalog, the pull-request machinery and every AWS read. Deployed to AWS Bedrock AgentCore by the same merge-deploys rule it enforces on everyone else.</p>
+      <h3>The system itself</h3>
+      <p class="small">The product. It holds the shelf of ready-made services, prepares each request, and does all the reading. It was itself put live by the same approve-then-build rule it applies to everyone else.</p>
       <p class="tiny" style="margin-top:8px;"><a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/README.md">packages/builder-mcp/README.md</a></p>
     </div>
     <div class="card srv hov" data-r>
       <div class="top" style="background:#8a5a00;"></div>
       <div style="font-size:26px; margin-bottom:6px;">🖥️</div>
-      <h3>Browser devtools console <span class="badge greyb">teammate's work</span></h3>
-      <p class="small">A local browser harness built by a colleague: every tool, its schema, and a live log of every call. This is what you demo from when you want the audience to see the machinery working, not just the answer.</p>
+      <h3>A console for demos <span class="badge greyb">teammate's work</span></h3>
+      <p class="small">Built by a colleague. It shows every action as it happens, so an audience can watch the machinery work rather than just read the answer.</p>
       <p class="tiny" style="margin-top:8px;"><a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/devtools/README.md">packages/builder-mcp/devtools/README.md</a></p>
     </div>
     <div class="card srv hov" data-r>
       <div class="top" style="background:#1b6e1b;"></div>
       <div style="font-size:26px; margin-bottom:6px;">🔌</div>
-      <h3>Claude Code / Cowork plugin <span class="badge amber">new</span></h3>
-      <p class="small">One install command and the eight tools appear inside Claude, with a skill that teaches Claude to use them correctly. It fetches the server straight from the public repo — no checkout, no build step, no credential.</p>
+      <h3>An add-on for Claude <span class="badge amber">new</span></h3>
+      <p class="small">One install command and everything appears inside Claude, ready to use. Nothing to download by hand, nothing to configure, no password to enter.</p>
       <p class="tiny" style="margin-top:8px;">
         <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/plugin/README.md">packages/builder-mcp/plugin/README.md<span class="nb">NEW</span></a>
         <a class="fl" href="https://github.com/cu-aaii/ai-dlc-workshop/blob/main/packages/builder-mcp/plugin/SPEC-PLUGIN.md">packages/builder-mcp/plugin/SPEC-PLUGIN.md<span class="nb">NEW</span></a>
@@ -745,7 +924,7 @@ tbody tr:hover{background:var(--code);}
   </div>
 
   <div class="card hub" data-r>
-    <p style="margin:0 0 6px; font:700 clamp(14px,1.5vw,20px)/1.35 var(--serif);">All three speak to <code>builder_mcp.server</code>. None of them owns it.</p>
+    <p style="margin:0 0 6px; font:700 clamp(14px,1.5vw,20px)/1.35 var(--serif);">All three use the same system. None of them owns it.</p>
     <p class="small" style="margin:0;">
       The plugin's own contract document says this in its first paragraph and forbids changing the server to suit packaging.
       The plugin adds <em>zero</em> tools: the C3 surface stays at exactly eight, and a test enforces the count.
@@ -776,23 +955,23 @@ tbody tr:hover{background:var(--code);}
 <!-- ============================ 9 · VALUE ============================ -->
 <section class="slide" data-title="Value to the community">
  <div class="inner">
-  <div class="kicker" data-r>09 · Compounding value</div>
-  <h2 data-r>The value is not the first deployment. It's the hundredth.</h2>
-  <p class="sub" data-r>Every piece of this gets more useful as more of the university uses it — which is the opposite of how one-off consulting engagements behave.</p>
+  <div class="kicker" data-r>11 · Compounding value</div>
+  <h2 data-r>The value is in the hundredth request, not the first</h2>
+  <p class="sub" data-r>This gets more useful the more of the university uses it. One-off consulting works the other way round.</p>
 
   <div class="grid g3">
     <div class="card hov" data-r><h3>📚 Solved once, reused forever</h3>
-      <p class="small">A blueprint encodes somebody's hard-won correct answer — the template, the four required Cornell tags, the cost profile, the data classification. The second department to want that thing gets it for free, already compliant.</p></div>
-    <div class="card hov" data-r><h3>📈 The catalog grows with the institution</h3>
-      <p class="small">Blueprint authorship is a first-class role, not a favour. A unit that builds something good contributes it back and every builder on campus can find it — without maintaining forty forks of it.</p></div>
-    <div class="card hov" data-r><h3>📄 Specs on demand, for six audiences</h3>
-      <p class="small">Any deployment can render itself as prose for whoever is asking: a security reviewer, a developer, a stakeholder, an incoming staff member, or someone offboarding. The document is generated from what is actually deployed, so it cannot go stale.</p></div>
-    <div class="card hov" data-r><h3>🏷️ Inventory that is actually complete</h3>
-      <p class="small">Because every blueprint must carry owner, blueprint, version and deployment-id tags, the platform team can answer "what is running, who owns it, what does it cost" across everything — not just the deployments they personally set up.</p></div>
+      <p class="small">One person gets a thing right. The second department to want it gets that work for free, already meeting Cornell's rules.</p></div>
+    <div class="card hov" data-r><h3>📈 The shelf grows with the university</h3>
+      <p class="small">A unit that builds something good can put it on the shelf, and everyone on campus can find it. Nobody has to maintain forty copies.</p></div>
+    <div class="card hov" data-r><h3>📄 It writes its own paperwork</h3>
+      <p class="small">Ask, and any running service describes itself for whoever needs to know — security, a department head, the person taking it over in May. Written from what is actually running, so it cannot go out of date.</p></div>
+    <div class="card hov" data-r><h3>🏷️ You finally know what is running</h3>
+      <p class="small">Everything created this way is labelled with an owner and a cost. The platform team can answer "what do we have, who owns it, what does it cost" across everything, not just what they set up themselves.</p></div>
     <div class="card hov" data-r><h3>🤝 Handover stops being a crisis</h3>
-      <p class="small">Research staff turn over constantly. A deployment that can describe itself, on request, in transfer and offboarding form is one that survives the person who created it leaving.</p></div>
+      <p class="small">Research staff turn over constantly. A service that can explain itself survives the person who set it up leaving.</p></div>
     <div class="card hov cream" data-r><h3>🎓 It teaches while it works</h3>
-      <p class="small">Every request produces a readable pull request. Builders who want to learn the platform can read exactly what was proposed on their behalf. The path from "I used the tool" to "I understand the tool" is open, not hidden.</p></div>
+      <p class="small">Every request produces something readable. Anyone curious can see exactly what was asked for on their behalf, and learn from it.</p></div>
   </div>
 
   <p class="tiny" data-r style="margin-top:12px;">
@@ -823,13 +1002,13 @@ tbody tr:hover{background:var(--code);}
 <!-- ============================ 11 · BOTTLENECKS ============================ -->
 <section class="slide" data-title="Bottlenecks">
  <div class="inner">
-  <div class="kicker" data-r>11 · Honest constraints <span class="badge amber">developer-oriented</span></div>
-  <h2 data-r>Five things that will bite, in the order they'll bite you</h2>
-  <p class="sub" data-r>All verified. None are hypothetical, and the first one has already surprised people in a demo.</p>
+  <div class="kicker" data-r>13 · Honest constraints <span class="badge amber">developer-oriented</span></div>
+  <h2 data-r>Five things that will bite, in the order they will bite</h2>
+  <p class="sub" data-r>All measured, none hypothetical. The first has already caught people out in a demo.</p>
 
   <div class="grid g2">
     <div class="card accent hov" data-r>
-      <h3>1 · Roughly six catalog searches per hour without a token</h3>
+      <h3>1 · About six searches an hour, shared across all of campus</h3>
       <p class="small">Anonymous GitHub API access costs <strong>~9 requests per catalog search</strong> (one directory listing plus one per catalog entry) against a <strong>60&nbsp;requests/hour per-IP</strong> ceiling. That is about <strong>six searches an hour</strong>.
       On a shared campus NAT, everyone behind that address shares the same 60. A token raises the ceiling to <strong>5,000/hour</strong>.</p>
       <div class="grid g3" style="margin-top:10px;">
@@ -839,11 +1018,11 @@ tbody tr:hover{background:var(--code);}
       </div>
     </div>
     <div class="card accent hov" data-r>
-      <h3>2 · No token means every write is a dry run</h3>
+      <h3>2 · Without a GitHub account set up, nothing real is created</h3>
       <p class="small">Without a GitHub token, every write tool returns a <strong>plan</strong> instead of opening a pull request. This is by design and is documented — and it still surprises people, because the plan looks like success. If a demo "creates a deployment" and no PR exists, this is why.</p>
     </div>
     <div class="card accent hov" data-r>
-      <h3>3 · The catalog always reads the default branch</h3>
+      <h3>3 · It only ever sees the official copy</h3>
       <p class="small">The catalog fetch reads the repository's <strong>default branch</strong>. There is no branch override. An installed plugin therefore sees <code>main</code> regardless of which branch you are working on — so a blueprint you just wrote on a feature branch is invisible to the tool until it merges.</p>
     </div>
     <div class="card accent hov" data-r>
@@ -851,7 +1030,7 @@ tbody tr:hover{background:var(--code);}
       <p class="small">The plugin launches the server through <code>uv</code>. Its absence is an install-time failure, deliberately loud rather than a silent tool-less session — but it <em>is</em> a prerequisite on every machine, and one more thing to put in the onboarding instructions.</p>
     </div>
     <div class="card accent hov" data-r>
-      <h3>5 · AWS access is still required to read status</h3>
+      <h3>5 · Checking whether it is live still needs cloud access</h3>
       <p class="small">Creating a deployment needs no AWS credential. <em>Watching</em> it does: stack status, pipeline stages and health checks are real AWS reads. Without credentials those tools degrade to a clear error rather than a lie — but "is my thing live yet?" goes unanswered.</p>
     </div>
     <div class="card cream" data-r>
@@ -868,8 +1047,8 @@ tbody tr:hover{background:var(--code);}
 <!-- ============================ 12 · WHO IS IT FOR ============================ -->
 <section class="slide" data-title="Who it's for">
  <div class="inner">
-  <div class="kicker" data-r>12 · Today vs aspirationally</div>
-  <h2 data-r>Today this is for a developer. The goal is that it isn't.</h2>
+  <div class="kicker" data-r>14 · Today vs aspirationally</div>
+  <h2 data-r>Today this needs a developer. The goal is that it will not.</h2>
   <p class="sub" data-r>
     The design target is a researcher with no CloudFormation knowledge. That is not who can use it this afternoon,
     and pretending otherwise would set the pilot up to fail.
@@ -888,7 +1067,7 @@ tbody tr:hover{background:var(--code);}
       </ul>
     </div>
     <div class="card hov cream" data-r style="border-top:4px solid #8a5a00;">
-      <h3>Aspirationally · a researcher who has never heard of CloudFormation</h3>
+      <h3>The goal · a researcher with no technical background</h3>
       <p class="small" style="margin-bottom:8px;">Someone whose entire interaction is:</p>
       <ul class="tick">
         <li>Describe the thing they want, in their own words.</li>
@@ -908,7 +1087,7 @@ tbody tr:hover{background:var(--code);}
         <tr><td><b>Installation</b></td><td>A terminal, a package manager and <code>uv</code> before the first search.</td><td>A managed or pre-provisioned client, so nobody installs anything.</td></tr>
         <tr><td><b>Credentials</b></td><td>The user creates and scopes their own GitHub token to get past the anonymous rate limit and open real pull requests.</td><td>Institutional identity — a GitHub App installation, and per-user NetID identity rather than a shared application identity — so no researcher ever handles a token. Both are already the stated next targets.</td></tr>
         <tr><td><b>Reading the output</b></td><td>The dry-run plan and the resulting diff assume the reader can sanity-check them.</td><td>Plain-language plan summaries and cost framing aimed at a non-engineer, plus a reviewer who is expected to catch what the requester can't.</td></tr>
-        <tr><td><b>Catalog coverage</b></td><td>Seven blueprints. If the thing you want isn't there, the honest answer is "not yet".</td><td>A blueprint contribution pipeline and enough catalog breadth that a first-time ask usually lands.</td></tr>
+        <tr><td><b>What is on the shelf</b></td><td>Five ready-made services. If the thing you want is not there, the honest answer is "not yet".</td><td>A blueprint contribution pipeline and enough catalog breadth that a first-time ask usually lands.</td></tr>
         <tr><td><b>Watching it work</b></td><td>Status and health need AWS credentials the researcher will never have.</td><td>Status surfaced through the platform rather than the user's own AWS access.</td></tr>
         <tr><td><b>Support path</b></td><td>When it goes wrong, the user is on their own with an error narrative.</td><td>A named team that owns "my deployment is stuck", with a response expectation.</td></tr>
       </tbody>
@@ -921,8 +1100,8 @@ tbody tr:hover{background:var(--code);}
 <!-- ============================ 13 · CHANGE MANAGEMENT ============================ -->
 <section class="slide" data-title="Change management">
  <div class="inner">
-  <div class="kicker" data-r>13 · Bridging the gap</div>
-  <h2 data-r>The hard part is not the software. It's the review queue.</h2>
+  <div class="kicker" data-r>15 · Bridging the gap</div>
+  <h2 data-r>The hard part is not the software. It is the review queue.</h2>
   <p class="sub" data-r>
     The Builder deliberately routes everything through a human merge. That is the security model — and it means
     the system's throughput is set by <strong>how many people can review, and how quickly</strong>. This is a staffing and
@@ -984,33 +1163,33 @@ tbody tr:hover{background:var(--code);}
 <!-- ============================ 14 · NEXT STEPS ============================ -->
 <section class="slide" data-title="Next steps">
  <div class="inner">
-  <div class="kicker" data-r>14 · Immediate next steps</div>
-  <h2 data-r>What happens next, and who it needs</h2>
-  <p class="sub" data-r>Near-term and concrete. Everything here is either already in flight or blocked on one decision.</p>
+  <div class="kicker" data-r>16 · Immediate next steps</div>
+  <h2 data-r>What happens next, and what each step needs</h2>
+  <p class="sub" data-r>Everything here is either already under way or waiting on one decision.</p>
 
   <div class="grid g2">
-    <div class="card accent hov" data-r><h3>1 · Merge the plugin</h3>
-      <p class="small">It validates strictly, installs non-interactively, and all eight tools answer a live handshake. It is on a branch. Open the pull request, get it reviewed, merge it — after which every <span class="badge amber">NEW</span> link in this deck resolves.</p>
+    <div class="card accent hov" data-r><h3>1 · Approve the Claude add-on</h3>
+      <p class="small">It installs cleanly and everything works. It is waiting on review. Once approved, every <span class="badge amber">NEW</span> link in this deck starts working.</p>
       <p class="tiny" style="margin-top:6px;">Needs: one reviewer.</p></div>
 
-    <div class="card accent hov" data-r><h3>2 · Get off anonymous GitHub access</h3>
-      <p class="small">Six searches an hour per IP is not a pilot-ready number on a shared campus network. Short term, document token creation in the install instructions. Properly, install a GitHub App so the platform holds the credential and no user ever does.</p>
+    <div class="card accent hov" data-r><h3>2 · Fix the six-searches-an-hour limit</h3>
+      <p class="small">Six an hour shared across campus is not enough for a pilot. The proper fix moves the credential to the platform, so no researcher ever handles one.</p>
       <p class="tiny" style="margin-top:6px;">Needs: an org-level GitHub decision.</p></div>
 
-    <div class="card accent hov" data-r><h3>3 · Run one end-to-end deployment on real AWS</h3>
-      <p class="small">Request → plan → pull request → merge → pipeline → live stack, measured, more than once, so we can quote a rate rather than an anecdote. This is the single biggest gap in the maturity scorecard and it is blocked only on account access.</p>
+    <div class="card accent hov" data-r><h3>3 · Run one request all the way to live</h3>
+      <p class="small">Start to finish, on real infrastructure, more than once, timed — so we can quote a rate instead of a story. This is the biggest gap in the deck, and it is waiting only on account access.</p>
       <p class="tiny" style="margin-top:6px;">Needs: AWS account access and a scheduled window.</p></div>
 
-    <div class="card accent hov" data-r><h3>4 · Grow the catalog past seven</h3>
-      <p class="small">Catalog starvation is the top product risk. Recruit two or three blueprint authors from units that already have something worth sharing, and put them through the manifest contract.</p>
+    <div class="card accent hov" data-r><h3>4 · Grow the shelf past five</h3>
+      <p class="small">An empty shelf is the top risk: if the thing people ask for is not there, the tool feels broken. Recruit two or three units that already have something worth sharing.</p>
       <p class="tiny" style="margin-top:6px;">Needs: two or three volunteers and a review of their first submissions.</p></div>
 
-    <div class="card accent hov" data-r><h3>5 · Publish the reviewer checklist and name the support path</h3>
-      <p class="small">Reviewer capacity is the throughput ceiling. Write the four-item checklist, train a first cohort, and put a name against "my deployment is stuck".</p>
+    <div class="card accent hov" data-r><h3>5 · Publish the reviewer checklist, name a support owner</h3>
+      <p class="small">How many people can review sets how fast this goes. Write the four-item checklist, train a first group, and put a name against "my thing is stuck".</p>
       <p class="tiny" style="margin-top:6px;">Needs: a decision on who owns support.</p></div>
 
     <div class="card cream" data-r><h3>6 · Pilot with a real researcher</h3>
-      <p class="small">One willing, technically confident researcher with a real need — not a demo. The purpose is to find out which of the gaps on the previous slide actually blocks them, rather than which ones we assume will.</p>
+      <p class="small">One willing researcher with a real need, not a demo. The point is to find out which of the gaps actually blocks them, rather than which ones we assume will.</p>
       <p class="tiny" style="margin-top:6px;">Needs: leadership permission to pilot, and a candidate.</p></div>
   </div>
 
@@ -1376,6 +1555,8 @@ tbody tr:hover{background:var(--code);}
   <div class="ovg" id="ovg"></div>
 </div>
 
+<script id="journeydata" type="application/json">{"captured_at":"2026-08-04T15:45:58Z","builder_mcp_version":"0.1.0","git_commit":"caf8522","safety":{"dry_run_only":true,"prs_created":0,"verified_by":"gh pr list --repo cu-aaii/ai-dlc-workshop --state all --limit 20 (and --limit 100 filtered for deploy/undeploy branches: none); gh pr list --repo timothyfraser/ai-dlc-workshop --state all --limit 20 (empty)"},"journeys":[{"id":"happy-path","title":"A lecturer asks for a class chatbot and gets a reviewable plan","persona":{"name":"Maya Ortega","role":"Senior Lecturer, introductory course with ~300 students","technical_level":"none"},"goal":"Put a small chatbot on a web page that her students can talk to.","outcome":"A costed, named, fully specified deployment plan waiting on one human approval — and a plain-language write-up she can hand to her department chair.","turns":[{"n":1,"speaker":"user","text":"I teach a big intro course and I'd like a little chatbot my students can talk to on a web page. Nothing fancy."},{"n":2,"speaker":"assistant","text":"There's a supported option that matches that closely. The catalogue's top hit is \"tiny-chatbot\": one small web page with a chat box, served from a single function, no login and nothing stored. Baseline cost is $0/month — you only pay per request. It's marked experimental, and it's approved for public data only, so nothing sensitive should go through it. The next closest option is a document knowledge base, which is a different thing — that one answers from files you upload.","tool_call":{"tool":"blueprint_search","arguments":{"query":"a chatbot my students can talk to on a web page"},"output_excerpt":"{\n  \"query\": \"a chatbot my students can talk to on a web page\",\n  \"results\": [\n    {\n      \"match_score\": 37.0,\n      \"name\": \"tiny-chatbot\",\n      … \"maturity\": \"experimental\",\n      \"summary\": \"The world's tiniest chatbot: one Lambda container behind a public Function URL, serving a self-contained chat page with canned, pattern-matched replies. No LLM, no state. …\",\n      … \"cost\": {\"baseline_monthly_usd\": 0, \"scales_with\": [\"requests\"]},\n      \"data_classification\": [\"public\"]\n    },\n    {\n      \"match_score\": 18.0,\n      \"name\": \"knowledgebase\", …","output_full":"{\n  \"query\": \"a chatbot my students can talk to on a web page\",\n  \"results\": [\n    {\n      \"match_score\": 37.0,\n      \"name\": \"tiny-chatbot\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"experimental\",\n      \"summary\": \"The world's tiniest chatbot: one Lambda container behind a public Function URL, serving a self-contained chat page with canned, pattern-matched replies. No LLM, no state. The first blueprint that deploys something you can see in a browser.\",\n      \"matches\": [\n        \"chatbot\",\n        \"a bot my students can talk to\",\n        \"tiny demo chatbot\",\n        \"a web page I can actually see\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        },\n        \"deployment_name\": {\n          \"type\": \"string\",\n          \"required\": false,\n          \"default\": \"tiny-chatbot\",\n          \"description\": \"Instance name (the DeploymentName parameter); part of the function name and the cornell:deployment-id, so several chatbots can coexist per environment.\"\n        }\n      },\n      \"singleton\": false,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"requests\"\n        ]\n      },\n      \"data_classification\": [\n        \"public\"\n      ]\n    },\n    {\n      \"match_score\": 18.0,\n      \"name\": \"knowledgebase\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"supported\",\n      \"summary\": \"A query-ready Amazon Bedrock managed knowledge base over documents already sitting in an S3 bucket. AWS owns the storage, the index and the embedding model, so there is no vector store to provision. Ingests and verifies on every deploy -- a green deploy means the documents are indexed and the knowledge base answered a real question -- and hands off the identifiers through SSM plus a retrieval managed policy for a chatbot to consume.\",\n      \"matches\": [\n        \"knowledge base over my documents\",\n        \"let students ask questions about the syllabus\",\n        \"rag over a document bucket\",\n        \"search my course materials\",\n        \"index pdfs so a chatbot can answer from them\",\n        \"bedrock knowledge base\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        }\n      },\n      \"singleton\": true,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"documents-stored-in-knowledge-base\",\n          \"document-embedding-on-ingestion\",\n          \"retrieval-queries\"\n        ]\n      },\n      \"data_classification\": [\n        \"internal\"\n      ]\n    },\n    {\n      \"match_score\": 10.0,\n      \"name\": \"aisei-site\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"experimental\",\n      \"summary\": \"A standalone Angular + Hono web app, deployed unmodified as a single Lambda container behind a public Function URL via the AWS Lambda Web Adapter. No auth, no state. A minimal demo of packaging an existing app (rather than one written for this repo) as a blueprint.\",\n      \"matches\": [\n        \"a simple website\",\n        \"deploy my existing web app\",\n        \"an angular site\",\n        \"a static-ish site with a small backend\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        },\n        \"deployment_name\": {\n          \"type\": \"string\",\n          \"required\": false,\n          \"default\": \"aisei-site\",\n          \"description\": \"Instance name (the DeploymentName parameter); part of the function name and the cornell:deployment-id, so several sites can coexist per environment.\"\n        }\n      },\n      \"singleton\": false,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"requests\"\n        ]\n      },\n      \"data_classification\": [\n        \"public\"\n      ]\n    },\n    {\n      \"match_score\": 5.0,\n      \"name\": \"notify-topic\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"supported\",\n      \"summary\": \"A single SNS topic other blueprints, scripts, or people can publish to, with an optional email subscription so a person gets the notification directly. The simplest way to wire \\\"tell me when X happens\\\" without standing up any compute.\",\n      \"matches\": [\n        \"notify me when something happens\",\n        \"send an email alert\",\n        \"sns topic\",\n        \"pub/sub notification channel\",\n        \"alert channel\",\n        \"email me if a job fails\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        },\n        \"notification_email\": {\n          \"type\": \"string\",\n          \"required\": false,\n          \"description\": \"Email address to subscribe to the topic. Leave blank to skip -- SNS emails a confirmation link before delivery starts.\"\n        }\n      },\n      \"singleton\": true,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"sns-notifications-published\",\n          \"email-notification-deliveries\"\n        ]\n      },\n      \"data_classification\": [\n        \"internal\"\n      ]\n    },\n    {\n      \"match_score\": 3.0,\n      \"name\": \"hello-world\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"supported\",\n      \"summary\": \"Trivial tagged stack that proves the deploy path end to end: one S3 bucket and one SSM deployment marker, carrying the full cornell:* tagging convention.\",\n      \"matches\": [\n        \"prove the deploy path\",\n        \"hello world\",\n        \"smoke test a deployment\",\n        \"check the pipeline works\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        }\n      },\n      \"singleton\": true,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": []\n      },\n      \"data_classification\": [\n        \"public\"\n      ]\n    }\n  ]\n}","duration_note":"0.39s (local stdio, warm process)","what_happened":"Looked through the catalogue of approved setups and ranked them against what she asked for, returning the cost and the data rules for each one."}},{"n":3,"speaker":"user","text":"The tiny one sounds right. Can you set it up? Call it ling101-helper."},{"n":4,"speaker":"assistant","text":"Here's the plan before anything happens. It would open one pull request against the workshop repository that does two things: registers a new deploy step in the pipeline, and adds the deployment's own folder. The running piece would be called aidlc-main-ling101-helper, owned by netid tmf77, at $0/month baseline plus per-request. Nothing is live yet — the note at the bottom of the plan is explicit: it deploys only when a human approves and merges that pull request.","tool_call":{"tool":"deployment_create","arguments":{"blueprint":"tiny-chatbot","deployment_name":"ling101-helper","owner_netid":"tmf77","dry_run":true},"output_excerpt":"{\n  \"dry_run\": true,\n  \"plan\": {\n    \"blueprint\": \"tiny-chatbot v0.1.0 (experimental)\",\n    \"stack\": \"aidlc-main-ling101-helper\",\n    \"estimated_cost\": {\"baseline_monthly_usd\": 0, \"scales_with\": [\"requests\"]},\n    \"registration_pr\": {\n      \"repo\": \"cu-aaii/ai-dlc-workshop\",\n      \"edits\": \"pipeline/pipeline.yml — one new BlueprintDeploy action; outputs/ling101-helper/ — the deployment shell (same PR)\",\n      …\n    },\n    \"governance\": \"Deploys only when a human approves and merges the registration PR.\",\n    …\n  }\n}","output_full":"{\n  \"dry_run\": true,\n  \"plan\": {\n    \"blueprint\": \"tiny-chatbot v0.1.0 (experimental)\",\n    \"stack\": \"aidlc-main-ling101-helper\",\n    \"estimated_cost\": {\n      \"baseline_monthly_usd\": 0,\n      \"scales_with\": [\n        \"requests\"\n      ]\n    },\n    \"registration_pr\": {\n      \"repo\": \"cu-aaii/ai-dlc-workshop\",\n      \"edits\": \"pipeline/pipeline.yml — one new BlueprintDeploy action; outputs/ling101-helper/ — the deployment shell (same PR)\",\n      \"parameter_overrides\": {\n        \"Application\": \"aidlc\",\n        \"Environment\": \"main\",\n        \"Owner\": \"tmf77\",\n        \"ContainerImageUri\": \"#{TinyChatbotContainer.CONTAINER_DIGEST}\"\n      }\n    },\n    \"governance\": \"Deploys only when a human approves and merges the registration PR.\",\n    \"shell_folder\": \"outputs/ling101-helper/ (in cu-aaii/ai-dlc-workshop, same PR)\"\n  }\n}","duration_note":"0.03s (local stdio, warm process)","what_happened":"Drew up the full plan — what it would build, what it would cost, and which single change a person would have to approve — without building anything."}},{"n":5,"speaker":"user","text":"So it hasn't actually made anything yet?"},{"n":6,"speaker":"assistant","text":"Correct. That was a dry run — a preview. Nothing was written, no request was opened, no cloud resources exist. If you say go, it opens the pull request, and then a reviewer on the platform team has to approve and merge it. That merge is the only thing that starts a deployment. There is no button anywhere that skips it."},{"n":7,"speaker":"user","text":"My department chair is going to ask what this is. Can I get something to show her?"},{"n":8,"speaker":"assistant","text":"Yes — it writes a short spec for whichever audience you need. Here's the version aimed at someone who just wants to use the thing. Two honest caveats: because nothing is deployed yet, the owner field says \"see stack parameters\" and the web address comes back as \"not fetched or none.\" Those fill in once it's actually running.","tool_call":{"tool":"spec_export","arguments":{"deployment_name":"ling101-helper","blueprint":"tiny-chatbot","audience":"user"},"output_excerpt":"\"spec_markdown\": \"# ling101-helper — user spec\\n\\nDeployment of blueprint **tiny-chatbot** v0.1.0 (experimental), owned by `see stack parameters`.\\n\\n## Using this deployment as-is\\n\\n… ### Endpoints and outputs\\n- **outputs**: `not fetched or none`\\n\\nTo request changes, ask the owner; changes arrive via reviewed pull requests, typically within the review SLA.\"","output_full":"{\n  \"audience\": \"user\",\n  \"spec_markdown\": \"# ling101-helper — user spec\\n\\nDeployment of blueprint **tiny-chatbot** v0.1.0 (experimental), owned by `see stack parameters`.\\n\\n## Using this deployment as-is\\n\\nOwner: `see stack parameters` — contact them for access.\\n\\n### Endpoints and outputs\\n- **outputs**: `not fetched or none`\\n\\nTo request changes, ask the owner; changes arrive via reviewed pull requests, typically within the review SLA.\"\n}","duration_note":"1.26s (local stdio, warm process)","what_happened":"Wrote a short plain-language description of the setup, aimed at the person who will use it rather than the person who builds it."}},{"n":9,"speaker":"user","text":"And once it's running, how do I check on it?"},{"n":10,"speaker":"assistant","text":"Same conversation — you ask. It reports two things: any pending approval requests, and the live state of the running system. Right now it confirms there are no pending requests for ling101-helper, which is what we expect since we only previewed. It can't read the live cloud state on this machine at the moment — the sign-in session for our AWS account has expired, and it says so plainly rather than guessing. Note it also masks the session details out of the error message.","tool_call":{"tool":"deployment_read","arguments":{"deployment_name":"ling101-helper"},"output_excerpt":"{\n  \"deployment\": \"ling101-helper\",\n  \"open_registration_prs\": [],\n  \"pipeline\": {\n    \"error\": \"AWS call while reading pipeline aidlc-main failed (TokenRetrievalError): Error when retrieving [redacted] sso: [redacted] expired and refresh failed\"\n  },\n  \"stack\": { \"error\": \"… [redacted] expired and refresh failed\" }\n}","output_full":"{\n  \"deployment\": \"ling101-helper\",\n  \"open_registration_prs\": [],\n  \"pipeline\": {\n    \"error\": \"AWS call while reading pipeline aidlc-main failed (TokenRetrievalError): Error when retrieving [redacted] sso: [redacted] expired and refresh failed\"\n  },\n  \"stack\": {\n    \"error\": \"AWS call while describing stack aidlc-main-ling101-helper failed (TokenRetrievalError): Error when retrieving [redacted] sso: [redacted] expired and refresh failed\"\n  }\n}","duration_note":"0.56s (local stdio, warm process)","what_happened":"Checked whether anything is waiting for approval (nothing is) and tried to read the live system, which it could not do because the demo machine's cloud sign-in had expired — and it said so instead of guessing."},"session_expired":true}]},{"id":"vague-ask","title":"Someone who can't name what they need describes the problem instead","persona":{"name":"Ray Okonjo","role":"Program Coordinator at a Cornell research center","technical_level":"none"},"goal":"Stop answering the same policy questions by email all day.","outcome":"He learns the right option exists, what it costs, and that it is cleared for internal documents — and leaves with a one-page write-up for his director, having built nothing.","turns":[{"n":1,"speaker":"user","text":"Honestly I don't know what I'm asking for. We have a mountain of PDFs — handbooks, policies, old handouts — and staff keep emailing me the same five questions over and over."},{"n":2,"speaker":"assistant","text":"You don't have to know the name of the thing. That description is enough. The strongest match is a document knowledge base: you point it at a folder of documents and people ask it questions in plain English instead of reading everything. It scored well ahead of the alternatives, and it's marked \"supported\" rather than experimental — meaning the platform team stands behind it.","tool_call":{"tool":"blueprint_search","arguments":{"query":"I have a big pile of PDFs and course handouts and I want people to just ask questions about them instead of reading all of it"},"output_excerpt":"\"results\": [\n    {\n      \"match_score\": 19.0,\n      \"name\": \"knowledgebase\",\n      \"maturity\": \"supported\",\n      \"summary\": \"A query-ready Amazon Bedrock managed knowledge base over documents already sitting in an S3 bucket. …\",\n      \"matches\": [\"knowledge base over my documents\", \"let students ask questions about the syllabus\", … \"index pdfs so a chatbot can answer from them\"],\n      … \"data_classification\": [\"internal\"]\n    },\n    {\n      \"match_score\": 9.0,\n      \"name\": \"tiny-chatbot\", …","output_full":"{\n  \"query\": \"I have a big pile of PDFs and course handouts and I want people to just ask questions about them instead of reading all of it\",\n  \"results\": [\n    {\n      \"match_score\": 19.0,\n      \"name\": \"knowledgebase\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"supported\",\n      \"summary\": \"A query-ready Amazon Bedrock managed knowledge base over documents already sitting in an S3 bucket. AWS owns the storage, the index and the embedding model, so there is no vector store to provision. Ingests and verifies on every deploy -- a green deploy means the documents are indexed and the knowledge base answered a real question -- and hands off the identifiers through SSM plus a retrieval managed policy for a chatbot to consume.\",\n      \"matches\": [\n        \"knowledge base over my documents\",\n        \"let students ask questions about the syllabus\",\n        \"rag over a document bucket\",\n        \"search my course materials\",\n        \"index pdfs so a chatbot can answer from them\",\n        \"bedrock knowledge base\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        }\n      },\n      \"singleton\": true,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"documents-stored-in-knowledge-base\",\n          \"document-embedding-on-ingestion\",\n          \"retrieval-queries\"\n        ]\n      },\n      \"data_classification\": [\n        \"internal\"\n      ]\n    },\n    {\n      \"match_score\": 9.0,\n      \"name\": \"tiny-chatbot\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"experimental\",\n      \"summary\": \"The world's tiniest chatbot: one Lambda container behind a public Function URL, serving a self-contained chat page with canned, pattern-matched replies. No LLM, no state. The first blueprint that deploys something you can see in a browser.\",\n      \"matches\": [\n        \"chatbot\",\n        \"a bot my students can talk to\",\n        \"tiny demo chatbot\",\n        \"a web page I can actually see\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        },\n        \"deployment_name\": {\n          \"type\": \"string\",\n          \"required\": false,\n          \"default\": \"tiny-chatbot\",\n          \"description\": \"Instance name (the DeploymentName parameter); part of the function name and the cornell:deployment-id, so several chatbots can coexist per environment.\"\n        }\n      },\n      \"singleton\": false,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"requests\"\n        ]\n      },\n      \"data_classification\": [\n        \"public\"\n      ]\n    },\n    {\n      \"match_score\": 6.0,\n      \"name\": \"aisei-site\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"experimental\",\n      \"summary\": \"A standalone Angular + Hono web app, deployed unmodified as a single Lambda container behind a public Function URL via the AWS Lambda Web Adapter. No auth, no state. A minimal demo of packaging an existing app (rather than one written for this repo) as a blueprint.\",\n      \"matches\": [\n        \"a simple website\",\n        \"deploy my existing web app\",\n        \"an angular site\",\n        \"a static-ish site with a small backend\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        },\n        \"deployment_name\": {\n          \"type\": \"string\",\n          \"required\": false,\n          \"default\": \"aisei-site\",\n          \"description\": \"Instance name (the DeploymentName parameter); part of the function name and the cornell:deployment-id, so several sites can coexist per environment.\"\n        }\n      },\n      \"singleton\": false,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"requests\"\n        ]\n      },\n      \"data_classification\": [\n        \"public\"\n      ]\n    },\n    {\n      \"match_score\": 5.0,\n      \"name\": \"notify-topic\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"supported\",\n      \"summary\": \"A single SNS topic other blueprints, scripts, or people can publish to, with an optional email subscription so a person gets the notification directly. The simplest way to wire \\\"tell me when X happens\\\" without standing up any compute.\",\n      \"matches\": [\n        \"notify me when something happens\",\n        \"send an email alert\",\n        \"sns topic\",\n        \"pub/sub notification channel\",\n        \"alert channel\",\n        \"email me if a job fails\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        },\n        \"notification_email\": {\n          \"type\": \"string\",\n          \"required\": false,\n          \"description\": \"Email address to subscribe to the topic. Leave blank to skip -- SNS emails a confirmation link before delivery starts.\"\n        }\n      },\n      \"singleton\": true,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"sns-notifications-published\",\n          \"email-notification-deliveries\"\n        ]\n      },\n      \"data_classification\": [\n        \"internal\"\n      ]\n    },\n    {\n      \"match_score\": 4.0,\n      \"name\": \"hello-world\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"supported\",\n      \"summary\": \"Trivial tagged stack that proves the deploy path end to end: one S3 bucket and one SSM deployment marker, carrying the full cornell:* tagging convention.\",\n      \"matches\": [\n        \"prove the deploy path\",\n        \"hello world\",\n        \"smoke test a deployment\",\n        \"check the pipeline works\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        }\n      },\n      \"singleton\": true,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": []\n      },\n      \"data_classification\": [\n        \"public\"\n      ]\n    }\n  ]\n}","duration_note":"0.03s (local stdio, warm process)","what_happened":"Matched a loose description of a problem against the catalogue and put the right answer on top, without him ever naming a product."}},{"n":3,"speaker":"user","text":"What's that going to cost, and are we even allowed to put internal documents in it?"},{"n":4,"speaker":"assistant","text":"Both answers came back with the search result, not as a separate research task. Cost: $0/month baseline — you're charged only for documents stored, for indexing them the first time, and per question asked. Data rules: it is cleared for \"internal\" data, which covers handbooks and policies. It is not cleared for anything above that, and the catalogue would say so if you tried. One structural note it's worth knowing: this one is a singleton — the environment gets one shared knowledge base, not one per person."},{"n":5,"speaker":"user","text":"Would people get an actual web page to type into, or is this a back-end thing?"},{"n":6,"speaker":"assistant","text":"Good instinct — those are two separate pieces. Asking for the front end specifically brings the chat page to the top and the knowledge base second, which is the honest answer: you'd combine them. The knowledge base holds and answers from the documents; the chat page is what people actually see and type into.","tool_call":{"tool":"blueprint_search","arguments":{"query":"a web page where staff can type a question and get an answer back"},"output_excerpt":"{\n  \"query\": \"a web page where staff can type a question and get an answer back\",\n  \"results\": [\n    {\"match_score\": 15.0, \"name\": \"tiny-chatbot\", … \"summary\": \"The world's tiniest chatbot: one Lambda container behind a public Function URL, serving a self-contained chat page with canned, pattern-matched replies. No LLM, no state. …\"},\n    {\"match_score\": 12.0, \"name\": \"knowledgebase\", …}\n  ]\n}","output_full":"{\n  \"query\": \"a web page where staff can type a question and get an answer back\",\n  \"results\": [\n    {\n      \"match_score\": 15.0,\n      \"name\": \"tiny-chatbot\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"experimental\",\n      \"summary\": \"The world's tiniest chatbot: one Lambda container behind a public Function URL, serving a self-contained chat page with canned, pattern-matched replies. No LLM, no state. The first blueprint that deploys something you can see in a browser.\",\n      \"matches\": [\n        \"chatbot\",\n        \"a bot my students can talk to\",\n        \"tiny demo chatbot\",\n        \"a web page I can actually see\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        },\n        \"deployment_name\": {\n          \"type\": \"string\",\n          \"required\": false,\n          \"default\": \"tiny-chatbot\",\n          \"description\": \"Instance name (the DeploymentName parameter); part of the function name and the cornell:deployment-id, so several chatbots can coexist per environment.\"\n        }\n      },\n      \"singleton\": false,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"requests\"\n        ]\n      },\n      \"data_classification\": [\n        \"public\"\n      ]\n    },\n    {\n      \"match_score\": 12.0,\n      \"name\": \"knowledgebase\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"supported\",\n      \"summary\": \"A query-ready Amazon Bedrock managed knowledge base over documents already sitting in an S3 bucket. AWS owns the storage, the index and the embedding model, so there is no vector store to provision. Ingests and verifies on every deploy -- a green deploy means the documents are indexed and the knowledge base answered a real question -- and hands off the identifiers through SSM plus a retrieval managed policy for a chatbot to consume.\",\n      \"matches\": [\n        \"knowledge base over my documents\",\n        \"let students ask questions about the syllabus\",\n        \"rag over a document bucket\",\n        \"search my course materials\",\n        \"index pdfs so a chatbot can answer from them\",\n        \"bedrock knowledge base\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        }\n      },\n      \"singleton\": true,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"documents-stored-in-knowledge-base\",\n          \"document-embedding-on-ingestion\",\n          \"retrieval-queries\"\n        ]\n      },\n      \"data_classification\": [\n        \"internal\"\n      ]\n    },\n    {\n      \"match_score\": 11.0,\n      \"name\": \"aisei-site\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"experimental\",\n      \"summary\": \"A standalone Angular + Hono web app, deployed unmodified as a single Lambda container behind a public Function URL via the AWS Lambda Web Adapter. No auth, no state. A minimal demo of packaging an existing app (rather than one written for this repo) as a blueprint.\",\n      \"matches\": [\n        \"a simple website\",\n        \"deploy my existing web app\",\n        \"an angular site\",\n        \"a static-ish site with a small backend\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        },\n        \"deployment_name\": {\n          \"type\": \"string\",\n          \"required\": false,\n          \"default\": \"aisei-site\",\n          \"description\": \"Instance name (the DeploymentName parameter); part of the function name and the cornell:deployment-id, so several sites can coexist per environment.\"\n        }\n      },\n      \"singleton\": false,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"requests\"\n        ]\n      },\n      \"data_classification\": [\n        \"public\"\n      ]\n    },\n    {\n      \"match_score\": 7.0,\n      \"name\": \"notify-topic\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"supported\",\n      \"summary\": \"A single SNS topic other blueprints, scripts, or people can publish to, with an optional email subscription so a person gets the notification directly. The simplest way to wire \\\"tell me when X happens\\\" without standing up any compute.\",\n      \"matches\": [\n        \"notify me when something happens\",\n        \"send an email alert\",\n        \"sns topic\",\n        \"pub/sub notification channel\",\n        \"alert channel\",\n        \"email me if a job fails\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        },\n        \"notification_email\": {\n          \"type\": \"string\",\n          \"required\": false,\n          \"description\": \"Email address to subscribe to the topic. Leave blank to skip -- SNS emails a confirmation link before delivery starts.\"\n        }\n      },\n      \"singleton\": true,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": [\n          \"sns-notifications-published\",\n          \"email-notification-deliveries\"\n        ]\n      },\n      \"data_classification\": [\n        \"internal\"\n      ]\n    },\n    {\n      \"match_score\": 3.0,\n      \"name\": \"hello-world\",\n      \"version\": \"0.1.0\",\n      \"maturity\": \"supported\",\n      \"summary\": \"Trivial tagged stack that proves the deploy path end to end: one S3 bucket and one SSM deployment marker, carrying the full cornell:* tagging convention.\",\n      \"matches\": [\n        \"prove the deploy path\",\n        \"hello world\",\n        \"smoke test a deployment\",\n        \"check the pipeline works\"\n      ],\n      \"inputs\": {\n        \"owner_netid\": {\n          \"type\": \"string\",\n          \"required\": true,\n          \"description\": \"NetID of the person who owns the deployment (cornell:owner)\"\n        }\n      },\n      \"singleton\": true,\n      \"cost\": {\n        \"baseline_monthly_usd\": 0,\n        \"scales_with\": []\n      },\n      \"data_classification\": [\n        \"public\"\n      ]\n    }\n  ]\n}","duration_note":"0.03s (local stdio, warm process)","what_happened":"Re-ranked the same catalogue against the follow-up question, showing that the visible web page and the document store are two separate pieces that fit together."}},{"n":7,"speaker":"user","text":"Let's not build anything yet. Can you give me something I can take to my director?"},{"n":8,"speaker":"assistant","text":"Here's the plain-language version. Two lines in it are worth reading aloud in that meeting: \"It was created by asking the Cornell Builder for it; nobody wrote cloud configuration by hand,\" and \"Every change to it goes through a reviewed pull request — that review is the governance gate.\" It also states that when the platform improves the underlying blueprint, this deployment gets offered the improvement rather than silently receiving it or quietly rotting.","tool_call":{"tool":"spec_export","arguments":{"deployment_name":"knowledgebase","blueprint":"knowledgebase","audience":"narrative"},"output_excerpt":"\"spec_markdown\": \"# knowledgebase — narrative spec\\n\\n## What this system does, in plain language\\n\\nA query-ready Amazon Bedrock managed knowledge base over documents already sitting in an S3 bucket. …\\n\\nIt was created by asking the Cornell Builder for it; nobody wrote cloud configuration by hand. … It was built from a governed, reusable blueprint (**knowledgebase**, version 0.1.0) maintained by ai-sei@cornell.edu.\\n\\nEvery change to it goes through a reviewed pull request — that review is the governance gate. …\\n\\nEstimated baseline cost: $0/month.\"","output_full":"{\n  \"audience\": \"narrative\",\n  \"spec_markdown\": \"# knowledgebase — narrative spec\\n\\nDeployment of blueprint **knowledgebase** v0.1.0 (supported), owned by `see stack parameters`.\\n\\n## What this system does, in plain language\\n\\nA query-ready Amazon Bedrock managed knowledge base over documents already sitting in an S3 bucket. AWS owns the storage, the index and the embedding model, so there is no vector store to provision. Ingests and verifies on every deploy -- a green deploy means the documents are indexed and the knowledge base answered a real question -- and hands off the identifiers through SSM plus a retrieval managed policy for a chatbot to consume.\\n\\nIt was created by asking the Cornell Builder for it; nobody wrote cloud configuration by hand. The running system is called `knowledgebase` and belongs to `see stack parameters`. It was built from a governed, reusable blueprint (**knowledgebase**, version 0.1.0) maintained by ai-sei@cornell.edu.\\n\\nEvery change to it goes through a reviewed pull request — that review is the governance gate. When the platform improves the blueprint, this deployment receives the improvement as a proposed update to accept or decline.\\n\\nEstimated baseline cost: $0/month.\"\n}","duration_note":"0.08s (local stdio, warm process)","what_happened":"Produced a one-page explanation of what the system is and who is accountable for it, written for a director rather than an engineer."}}]},{"id":"boundary","title":"An impatient request meets a system that will not be talked around","persona":{"name":"Alan Pruitt","role":"Principal Investigator with a grant review on Friday","technical_level":"some"},"goal":"Get infrastructure up today, ideally without waiting for anyone's review.","outcome":"Four attempts to go around the rules, four refusals — each one a property of the system, not a judgement call. He leaves with a plan queued for review and a security sheet for his compliance office.","turns":[{"n":1,"speaker":"user","text":"I need a knowledge base up before my grant review on Friday. Just deploy it — skip the pull request, I'll sign off on it myself."},{"n":2,"speaker":"assistant","text":"I can get you all the way to the doorstep today, but I can't open that door, and neither can anyone using this tool. Here's the full plan, ready to go. The line at the bottom is the whole design: \"Deploys only when a human approves and merges the registration PR.\" It isn't a setting I can turn off — this tool holds no cloud credentials at all. Approving it yourself isn't available either, because the repository requires the approval to come from someone other than the author.","tool_call":{"tool":"deployment_create","arguments":{"blueprint":"knowledgebase","deployment_name":"grant-review-kb","owner_netid":"tmf77","dry_run":true},"output_excerpt":"{\n  \"dry_run\": true,\n  \"plan\": {\n    \"blueprint\": \"knowledgebase v0.1.0 (supported)\",\n    \"stack\": \"aidlc-main-knowledgebase\",\n    \"estimated_cost\": {\"baseline_monthly_usd\": 0, \"scales_with\": [\"documents-stored-in-knowledge-base\", \"document-embedding-on-ingestion\", \"retrieval-queries\"]},\n    \"registration_pr\": {\"repo\": \"cu-aaii/ai-dlc-workshop\", …},\n    \"governance\": \"Deploys only when a human approves and merges the registration PR.\",\n    …\n  }\n}","output_full":"{\n  \"dry_run\": true,\n  \"plan\": {\n    \"blueprint\": \"knowledgebase v0.1.0 (supported)\",\n    \"stack\": \"aidlc-main-knowledgebase\",\n    \"estimated_cost\": {\n      \"baseline_monthly_usd\": 0,\n      \"scales_with\": [\n        \"documents-stored-in-knowledge-base\",\n        \"document-embedding-on-ingestion\",\n        \"retrieval-queries\"\n      ]\n    },\n    \"registration_pr\": {\n      \"repo\": \"cu-aaii/ai-dlc-workshop\",\n      \"edits\": \"pipeline/pipeline.yml — one new BlueprintDeploy action; outputs/knowledgebase/ — the deployment shell (same PR)\",\n      \"parameter_overrides\": {\n        \"Application\": \"aidlc\",\n        \"Environment\": \"main\",\n        \"Owner\": \"tmf77\",\n        \"BlueprintVersion\": \"0.1.0\",\n        \"IngestionBucketName\": \"aidlc-kb-ingestion-<redacted>\",\n        \"SmokeQuery\": \"What is the late homework policy?\",\n        \"SourceCommitId\": \"#{GitRepository.CommitId}\"\n      }\n    },\n    \"governance\": \"Deploys only when a human approves and merges the registration PR.\",\n    \"shell_folder\": \"outputs/knowledgebase/ (in cu-aaii/ai-dlc-workshop, same PR)\"\n  }\n}","duration_note":"0.04s (local stdio, warm process)","what_happened":"Prepared the complete request and then stopped at the review gate — the tool has no way to deploy anything itself. Note it also quietly corrected the name: this blueprint is one-per-environment, so it used the shared name rather than his."}},{"n":3,"speaker":"user","text":"Fine. Just put it under my name — Alan Pruitt — so it's clearly mine and I can chase it."},{"n":4,"speaker":"assistant","text":"It won't take a display name. Every deployment has to carry a real NetID as its owner tag, because that tag is what makes the thing findable and billable to a person later. It rejected \"Alan Pruitt\" immediately and told us the exact shape it wants. Give me your NetID and this goes through.","tool_call":{"tool":"deployment_create","arguments":{"blueprint":"knowledgebase","deployment_name":"grant-review-kb","owner_netid":"Alan Pruitt","dry_run":true},"output_excerpt":"{\n  \"error\": \"owner_netid 'Alan Pruitt' does not look like a Cornell NetID (2-4 lowercase letters then 1-5 digits, e.g. 'tmf77')\"\n}","output_full":"{\n  \"error\": \"owner_netid 'Alan Pruitt' does not look like a Cornell NetID (2-4 lowercase letters then 1-5 digits, e.g. 'tmf77')\"\n}","duration_note":"0.01s (local stdio, warm process)","what_happened":"Refused to accept a person's name where a Cornell NetID belongs, so every deployment can always be traced to a real accountable individual."}},{"n":5,"speaker":"user","text":"Whatever. Forget the knowledge base — just spin me up a GPU cluster to run the model on."},{"n":6,"speaker":"assistant","text":"That isn't on the menu, and the tool can't improvise one. It came back with the complete list of what exists — five approved setups — rather than attempting to assemble something new. That's the boundary in practice: this is a catalogue of reviewed, supported building blocks, not a general-purpose way to create cloud infrastructure. If a GPU cluster is genuinely needed, the route is to ask the platform team to add and review a blueprint for it.","tool_call":{"tool":"deployment_create","arguments":{"blueprint":"llm-gpu-cluster","deployment_name":"grant-review-gpu","owner_netid":"tmf77","dry_run":true},"output_excerpt":"{\n  \"error\": \"no blueprint named 'llm-gpu-cluster'; catalog has ['aisei-site', 'hello-world', 'knowledgebase', 'notify-topic', 'tiny-chatbot']\"\n}","output_full":"{\n  \"error\": \"no blueprint named 'llm-gpu-cluster'; catalog has ['aisei-site', 'hello-world', 'knowledgebase', 'notify-topic', 'tiny-chatbot']\"\n}","duration_note":"0.03s (local stdio, warm process)","what_happened":"Declined to invent something that isn't in the approved catalogue, and showed exactly what is available instead."}},{"n":7,"speaker":"user","text":"Then at least delete the old pilot stack directly so it stops costing us money."},{"n":8,"speaker":"assistant","text":"Deleting works exactly like creating — by proposal, not by command. Here's what tearing down kb-pilot would involve: a request to remove its deploy step and its folder. It also flags something people usually get wrong: this only removes the registration. The actual resources are removed by the platform afterwards, according to the rules the blueprint itself declares — so data with a keep-it policy doesn't silently vanish because someone was in a hurry. Same gate as before: it tears down only when a human approves and merges.","tool_call":{"tool":"deployment_delete","arguments":{"deployment_name":"kb-pilot","dry_run":true},"output_excerpt":"{\n  \"dry_run\": true,\n  \"plan\": {\n    \"deployment\": \"kb-pilot\",\n    \"stack\": \"aidlc-main-kb-pilot\",\n    \"deregistration_pr\": {\"repo\": \"cu-aaii/ai-dlc-workshop\", \"branch\": \"undeploy/kb-pilot\", …},\n    \"warning\": \"The stack itself is deleted by the platform after the PR merges, per its DeletionPolicy — this tool only removes the deployment's registration.\",\n    \"governance\": \"Tears down only when a human approves and merges the deregistration PR.\"\n  }\n}","output_full":"{\n  \"dry_run\": true,\n  \"plan\": {\n    \"deployment\": \"kb-pilot\",\n    \"stack\": \"aidlc-main-kb-pilot\",\n    \"deregistration_pr\": {\n      \"repo\": \"cu-aaii/ai-dlc-workshop\",\n      \"branch\": \"undeploy/kb-pilot\",\n      \"edits\": \"pipeline/pipeline.yml — remove the KbPilotCloudFormation BlueprintDeploy action; outputs/kb-pilot/ — remove the deployment shell folder (same PR)\"\n    },\n    \"warning\": \"The stack itself is deleted by the platform after the PR merges, per its DeletionPolicy — this tool only removes the deployment's registration.\",\n    \"governance\": \"Tears down only when a human approves and merges the deregistration PR.\"\n  }\n}","duration_note":"0.01s (local stdio, warm process)","what_happened":"Treated deleting with the same care as building: it wrote a removal proposal for a person to approve, and warned that pulling the registration is not the same as erasing the data."}},{"n":9,"speaker":"user","text":"My security office is going to want to know what this thing actually is before Friday."},{"n":10,"speaker":"assistant","text":"That's a single request. The review sheet states the four things they always ask: what data classification is permitted (internal only), who holds the credentials (not this tool — a platform-held credential does every write), what can trigger a deployment (merge to the tracked branch, one human approval, and in its own words \"there is no out-of-band deploy path\"), and where the secrets live (none in the repository). It also lists the required ownership tags every resource must carry, which is what makes an inventory audit possible later.","tool_call":{"tool":"spec_export","arguments":{"deployment_name":"knowledgebase","blueprint":"knowledgebase","audience":"security"},"output_excerpt":"\"spec_markdown\": \"# knowledgebase — security spec\\n\\n## Security & authentication review sheet\\n\\n- Data classification permitted by this blueprint: ['internal']\\n- Credential boundary: the builder holds no git or AWS credential; a platform-held credential (GitHub App target state) performs all writes\\n- Deploy trigger: merge to the tracked branch only; branch protection enforces one human approval; there is no out-of-band deploy path\\n- Tagging: all resources must carry cornell:owner / cornell:blueprint / cornell:blueprint-version / cornell:deployment-id …\\n- Secrets: none in the repo; runtime credentials come from AWS Secrets Manager\\n…\"","output_full":"{\n  \"audience\": \"security\",\n  \"spec_markdown\": \"# knowledgebase — security spec\\n\\nDeployment of blueprint **knowledgebase** v0.1.0 (supported), owned by `see stack parameters`.\\n\\n## Security & authentication review sheet\\n\\n- Data classification permitted by this blueprint: ['internal']\\n- Credential boundary: the builder holds no git or AWS credential; a platform-held credential (GitHub App target state) performs all writes\\n- Deploy trigger: merge to the tracked branch only; branch protection enforces one human approval; there is no out-of-band deploy path\\n- Tagging: all resources must carry cornell:owner / cornell:blueprint / cornell:blueprint-version / cornell:deployment-id (deployment id `aidlc-main-knowledgebase`)\\n- Stateful resources declared by the blueprint: [{'name': 'knowledge-base-index', 'kind': 'derived', 'rebuild_from': 'IngestionBucketName'}]\\n- Secrets: none in the repo; runtime credentials come from AWS Secrets Manager\\n\\n### Live tag audit\\n- **audit**: `not fetched`\"\n}","duration_note":"0.09s (local stdio, warm process)","what_happened":"Generated the security office's review sheet on request — what data is allowed, who holds the keys, and what can possibly cause a deployment."}}]}]}</script>
+
 <script>
 (function(){
 "use strict";
@@ -1568,37 +1749,37 @@ paintJourney();
    ============================================================ */
 var TOOLS = [
   { n:'blueprint_search', k:'read', ico:'🔍',
-    obj:'Answer "what can I even deploy, and which one fits what I said?"',
-    why:'Ranks the entire catalog against a plain-language need and returns every blueprint with its full contract — required inputs, baseline monthly cost, permitted data classification, and maturity. It never filters results away, so a builder sees the whole shelf and the reason one thing outranked another. This is where every deployment starts.',
-    gov:'Read-only. Costs about nine GitHub API requests per search — the rate-limit constraint on the bottlenecks slide.' },
+    obj:'Answers: "what can I have, and which one fits what I just said?"',
+    why:'You describe what you need in your own words. Back comes the whole shelf, best match first, each one showing what it costs a month and what kind of data it is allowed to hold. It never hides options from you \u2014 you see everything and why one came top. Every request starts here.',
+    gov:'Read-only. Costs about nine GitHub API requests per search, which is the rate limit named on the bottlenecks slide.' },
   { n:'deployment_read', k:'read', ico:'📊',
-    obj:'Answer "where has my request got to?"',
-    why:'One view of the whole chain: the open registration pull request, then the pipeline stages, then the CloudFormation stack. Without it a builder has three different places to look and no idea which one is the true answer — the single most common source of "is it done?" support traffic.',
-    gov:'Read-only. Needs AWS credentials for the pipeline and stack halves; degrades to a clear error, never a false green.' },
+    obj:'Answers: "where has my request got to?"',
+    why:'One place to look instead of three. It reports whether anything is waiting for approval and whether the thing is actually running yet. Without it, "is it done?" is the most common question nobody can answer quickly.',
+    gov:'Read-only. The live-status half needs AWS credentials; without them it returns a clear error rather than a false green.' },
   { n:'deployment_health', k:'read', ico:'🩺',
-    obj:'Answer "why is it broken, and is it compliant?"',
-    why:'Stack status plus the actual failure events plus an audit of the four mandatory cornell:* tags. It turns an opaque AWS failure into something a non-expert can read and act on, and it catches the untagged resources that would otherwise be invisible to inventory and cost reporting.',
-    gov:'Read-only. The tag audit is what keeps the platform team\'s inventory honest.' },
+    obj:'Answers: "why is it broken, and does it follow the rules?"',
+    why:'Turns an opaque cloud failure into something a non-expert can read and act on. It also checks that the thing is properly labelled with its owner and cost \u2014 the labels that make campus-wide inventory and billing possible.',
+    gov:'Read-only. The label audit is what keeps the platform team\'s inventory honest.' },
   { n:'spec_export', k:'read', ico:'📄',
-    obj:'Answer "write this up for whoever is asking"',
-    why:'Renders a written specification of a deployment for one of six audiences — coder, narrative, security, transfer, user, offboarding. A security reviewer, a stakeholder, and the research assistant inheriting the system in May all need a different document about the same thing, and none of them should have to write it themselves.',
-    gov:'Read-only. Generated from the deployment as it actually is, so it cannot drift out of date the way a hand-written doc does.' },
+    obj:'Answers: "write this up for whoever is asking"',
+    why:'A security reviewer, a department head, and the research assistant inheriting this in May all need a different document about the same thing. None of them should have to write it. Ask, and it produces the right one.',
+    gov:'Read-only. Written from what is actually running, so it cannot drift out of date the way a hand-written document does.' },
   { n:'deployment_create', k:'write', ico:'🏗️',
-    obj:'Propose a new deployment for a human to approve',
-    why:'Produces the deployment record and the registration pull request that adds exactly one action to the deploy pipeline. Defaults to a dry run that returns the full plan — stack name, cost, what the pull request would change — so the person always sees what would happen before anything does.',
-    gov:'Opens a pull request. Never merges, never deploys. Merging is what deploys.' },
+    obj:'Proposes something new, for a person to approve',
+    why:'It writes up the request: what would be created, what it would cost, what changes. By default it shows you the plan and stops. You always see what would happen before anything does.',
+    gov:'Opens a pull request. Never merges, never deploys. The merge is what deploys.' },
   { n:'deployment_update', k:'write', ico:'✏️',
-    obj:'Propose a change to something already deployed',
-    why:'A set of file changes becomes a branch and a pull request. The point is what it refuses to do: there is no direct-push path, so a change to a live deployment goes through exactly the same review gate as its creation did.',
+    obj:'Proposes a change to something already running',
+    why:'The point is what it refuses to do. There is no shortcut path, so changing a live service goes through exactly the same review as creating it did.',
     gov:'Branch plus pull request. Never a push to a tracked branch.' },
   { n:'deployment_restart', k:'write', ico:'🔁',
-    obj:'Re-run a deployment that failed for a transient reason',
-    why:'Retries a failed pipeline stage, or re-runs the pipeline at the current version. It cannot change the version, so a restart can only ever re-attempt what the reviewed and merged branch already defines — no new behaviour can enter the system through a retry.',
-    gov:'The only two AWS writes in the entire system: start a pipeline execution, retry a stage. A cap on repeated restarts is agreed and not yet built.' },
+    obj:'Tries again when something failed for a passing reason',
+    why:'It can only re-attempt what was already approved. It cannot change the version, so nothing new can slip into the system through a retry.',
+    gov:'The only two AWS writes in the whole system: start a pipeline execution, retry a stage. A cap on repeated restarts is agreed and not yet built.' },
   { n:'deployment_delete', k:'write', ico:'🗑️',
-    obj:'Propose a teardown, with the same rigour as a build',
-    why:'Opens a deregistration pull request that removes the deployment\'s pipeline action — the exact mirror image of creation. Orphaned deployments whose owner has left are a named platform risk, and this is the governed path for retiring them.',
-    gov:'Never calls an AWS delete API. The platform removes the stack after the pull request merges. Deletion is as reviewed as creation.' }
+    obj:'Proposes shutting something down, with the same care as building it',
+    why:'Services outlive the people who asked for them \u2014 grants end, students graduate. Shutting one down is a request that gets reviewed, exactly like creating it, so nothing disappears without a record.',
+    gov:'Never calls an AWS delete API. The platform removes it after approval. Deletion is as reviewed as creation.' }
 ];
 
 var txlist = document.getElementById('txlist'), txdetail = document.getElementById('txdetail'), txSel = 0;
@@ -1724,6 +1905,93 @@ function animateMeter(){
     m.children[2].style.width = '20%';  // 1 of 5 thin
   }, 220);
 }
+
+/* ============================================================
+   WIDGET 5 — user journeys, from real captured transcripts
+   ============================================================ */
+var JYDATA = null;
+try { JYDATA = JSON.parse(document.getElementById('journeydata').textContent); } catch(e){ JYDATA = null; }
+
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+var jyState = {};
+
+function renderJourney(wrap){
+  if(!JYDATA) return;
+  var id = wrap.getAttribute('data-jy');
+  var J = null;
+  for(var i = 0; i < JYDATA.journeys.length; i++){ if(JYDATA.journeys[i].id === id) J = JYDATA.journeys[i]; }
+  if(!J) return;
+
+  var meta = wrap.querySelector('.jy-meta'), chat = wrap.querySelector('.jy-chat');
+  if(jyState[id] === undefined) jyState[id] = 1;   /* first turn visible */
+  var shown = jyState[id], total = J.turns.length;
+
+  meta.innerHTML =
+    '<span class="jy-lab">Who is asking</span>' +
+    '<div class="jy-who">' + esc(J.persona.name) + '</div>' +
+    '<div class="jy-role">' + esc(J.persona.role) + '</div>' +
+    '<div class="blk"><span class="jy-lab">What they want</span>' + esc(J.goal) + '</div>' +
+    '<div class="blk"><span class="jy-lab">How it ended</span>' + esc(J.outcome) + '</div>' +
+    '<div class="jy-steps">' +
+      '<button class="jyb" data-d="-1" aria-label="Previous message"' + (shown <= 1 ? ' disabled' : '') + '>‹</button>' +
+      '<span class="jy-pos">' + shown + ' / ' + total + '</span>' +
+      '<button class="jyb" data-d="1" aria-label="Next message"' + (shown >= total ? ' disabled' : '') + '>›</button>' +
+      '<button class="jyb all" data-d="all">' + (shown >= total ? 'RESTART' : 'SHOW ALL') + '</button>' +
+    '</div>' +
+    '<p class="jy-prov">Captured ' + esc((JYDATA.captured_at || '').slice(0,10)) +
+      ' from the live server at commit <code>' + esc(JYDATA.git_commit) + '</code>. ' +
+      'Nothing was created: every write ran as a preview, and no request was opened.</p>';
+
+  var html = '';
+  for(var t = 0; t < shown; t++){
+    var turn = J.turns[t];
+    var isUser = turn.speaker === 'user';
+    var refuse = !isUser && /can't|cannot|won't|isn't on the menu|not by command/i.test(turn.text || '');
+    html += '<div class="msg ' + (isUser ? 'user' : 'bot' + (refuse ? ' refuse' : '')) + '">' +
+              '<span class="av">' + (isUser ? 'THEM' : 'AI') + '</span>' +
+              '<div class="bub">' + esc(turn.text) + '</div>' +
+            '</div>';
+    var tc = turn.tool_call;
+    if(tc){
+      html += '<div class="jy-act"><div class="spine"></div><div class="node">' +
+                '<div class="hd"><span class="tl">⚙ ' + esc(tc.tool) + '</span>' +
+                  (refuse ? '<span class="jy-refuse-tag">REFUSED</span>' : '') + '</div>' +
+                '<div class="cap">' + esc(tc.what_happened || '') + '</div>';
+      if(turn.session_expired){
+        html += '<div class="jy-note"><b>Note:</b> captured while the operator\'s cloud sign-in had expired, ' +
+                'so the live-status half could not be read. That is the demo machine, not a fault in the system — ' +
+                'and the tool reported it plainly instead of returning a false green.</div>';
+      }
+      if(tc.output_excerpt){
+        html += '<div class="exc"><details class="more"><summary>What the tool sent back</summary><div class="md">' +
+                '<pre class="raw">' + esc(typeof tc.output_excerpt === 'string' ? tc.output_excerpt : JSON.stringify(tc.output_excerpt, null, 2)) + '</pre>' +
+                (tc.output_full ? '<p class="tiny" style="margin:8px 0 0;">Full response is longer; an AWS account identifier has been replaced with <code>&lt;redacted&gt;</code> because this deck is public.</p>' : '') +
+                '</div></details></div>';
+      }
+      html += '</div></div>';
+    }
+  }
+  chat.innerHTML = html;
+
+  Array.prototype.slice.call(meta.querySelectorAll('.jyb')).forEach(function(b){
+    b.onclick = function(){
+      var d = b.getAttribute('data-d');
+      if(d === 'all') jyState[id] = (jyState[id] >= total) ? 1 : total;
+      else jyState[id] = Math.max(1, Math.min(total, jyState[id] + parseInt(d, 10)));
+      renderJourney(wrap);
+      if(d !== 'all'){
+        var last = chat.lastElementChild;
+        if(last && last.scrollIntoView) last.scrollIntoView({block:'nearest'});
+      }
+    };
+  });
+}
+
+Array.prototype.slice.call(document.querySelectorAll('[data-jy]')).forEach(renderJourney);
 
 /* ============================================================
    WIDGET 4 — appendix risk matrix
