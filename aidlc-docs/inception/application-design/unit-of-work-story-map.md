@@ -131,7 +131,13 @@ satisfies this stage's completion criterion without implying they are ready to b
 **The queued telemetry amendment has no stories yet.** Routed to a second Requirements → Stories pass by
 Q3 = B of the telemetry questions. When it lands, its stories are expected to be **U-02**-owned on the
 reader side — but the emitting side is a cross-blueprint contract that belongs to no unit here.
-Two design drafts on this branch (`aidlc-docs/design/composable-dashboards.md`,
-`observability-contract.md`) exist to be ratified before that pass, and they report repo changes beyond
-those in amendment A1 — including a `team-d` track the `cornell:deployment-id`-under-composition
-decision needs to be made with. Flagged here so that pass is not started as a dashboard-local decision.
+Two design drafts exist to be ratified before that pass — relocated 2026-08-03 to
+**`docs/aidlc/dashboard/design/`** (amendment §A2.1) — and they report repo changes beyond those in
+amendment A1, including a `team-d` track the `cornell:deployment-id`-under-composition decision needs to
+be made with. Flagged here so that pass is not started as a dashboard-local decision.
+
+`observability/` now exists as a documented placeholder whose README says "Nothing here yet" — and it
+states that the four `cornell:*` tags "exist for this track and nothing else," naming
+`cornell:deployment-id` as *the join key*. That is the same conclusion the telemetry amendment reached
+independently, and it means this blueprint is the first consumer of a contract Track E owns. Relevant to
+that pass; nothing to build here.

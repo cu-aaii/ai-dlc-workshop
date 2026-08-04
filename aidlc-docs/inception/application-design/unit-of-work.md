@@ -81,7 +81,7 @@ observable.
 | Observability | C-09 alarms, metrics, log groups, dashboard |
 | Templates | `dashboard-storage.yml`, `dashboard.yml` |
 | Contract | `blueprints/dashboard/blueprint.yaml` |
-| Shared-file edits | `pipeline/stacks.yml` entries; `pipeline/pipeline.yml` Build action + BlueprintDeploy action(s); root `Dockerfile` targets |
+| Shared-file edits | `pipeline/stacks.yml` entries; `pipeline/pipeline.yml` Build action + BlueprintDeploy action(s). The Dockerfile is **inside** the blueprint, so it is not a shared-file edit. |
 
 **Explicitly does not own**
 - Any grouping, classification, freshness, or serialization logic — all of it is U-01's, imported
@@ -117,16 +117,27 @@ blueprints/dashboard/
     dashboard-storage.yml   snapshot bucket, site bucket        (Q4 = A)
     dashboard.yml           compute, edge, observability, marker
   core/               U-01. No boto3, no os, no datetime.now() beneath here.
-  collector/          U-02. C-01 handler. No Dockerfile here — see below.
-  api/                U-02. C-03 handler. Likewise.
+  Dockerfile          two named targets: collector, api. Context = this directory,
+                      so core/ is reachable by COPY from both.        (amendment §A2.2)
+  collector/          U-02. C-01 handler.
+  api/                U-02. C-03 handler.
   ui/                 U-02. package.json, package-lock.json, vite config, src/
   tests/              properties for U-01; integration for U-02
 ```
 
-**Dockerfiles live at the repo root, not here.** The established pattern (`Dockerfile` on `main`) is
-one `FROM ... AS <target>` per component with the repo root as build context, selected by
-`CONTAINER_TARGET` in the Build stage action. This blueprint adds two targets —
-`dashboard-collector` and `dashboard-api` — rather than two Dockerfiles.
+**The Dockerfile lives inside the blueprint** — corrected 2026-08-03, see amendment §A2.2. The
+convention is now one Dockerfile *per component directory* with a named target, and `CLAUDE.md` states
+outright that "there is no root `Dockerfile`." The Build stage action supplies both `CONTAINER_CONTEXT`
+(the component directory) and `CONTAINER_TARGET` (its named target).
+
+So: **one `blueprints/dashboard/Dockerfile` with two named targets**, `collector` and `api`, and
+`CONTAINER_CONTEXT: blueprints/dashboard`.
+
+The context is the blueprint root rather than `collector/` or `api/` for a specific reason: **both
+images need `core/`.** A context of `collector/` could not `COPY` U-01's package, so the two-target
+single-Dockerfile shape is not a style preference — it is what the U-01/U-02 dependency requires. This
+was the one thing the earlier root-Dockerfile assumption got right by accident and would now get wrong
+by default.
 
 **`core/` is the enforceable boundary.** A single grep in `tools/check` or CI keeps §4.5 true as the
 code grows. Recorded as a concrete suggestion for Infrastructure Design, not as an existing check.
@@ -141,6 +152,7 @@ code grows. Recorded as a concrete suggestion for Infrastructure Design, not as 
 | `singleton` | `false`, with a `DeploymentName` parameter | Follows hello-world's own comment that "Real blueprints should take a `DeploymentName` parameter instead." Propagates into both templates' resource and stack names; both must still match `aidlc-<env>-*`. |
 | `state` | snapshot = `derived` | The snapshot is fully rebuildable by re-running the collector. This makes the manifest agree with RESILIENCY-02's RTO/RPO N/A, which already rests on exactly that reasoning. Nothing here is `authoritative`; nothing needs backing up. |
 | `cost` | see below | Q9d = A — a real estimate, recorded as an estimate |
+| `template` | `blueprints/dashboard/infra/dashboard.yml` | New rule (amendment §A2.3): a `blueprint.yaml` must name a **registered** template or `validate_stacks.py` fails. With two templates under Q4 = A the manifest names the application stack, since that is what a builder deploys; `dashboard-storage.yml` is registered but not the manifest's entry point. |
 | `matches` | intent phrases | e.g. "see what's deployed", "cost and usage dashboard", "find untagged resources", "who owns this resource" |
 | `inputs` | `owner_netid`, `deployment_name` | The builder-facing contract. Both are required; neither is a credential. |
 

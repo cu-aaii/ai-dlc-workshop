@@ -102,6 +102,25 @@ Approved conclusions were **not** rewritten — each affected passage keeps its 
 gains a pointer. No user decision was reopened. `CLAUDE.md`'s own closing paragraph still contradicts
 its `pipeline.yml` on the container build; flagged for its owner, not edited here.
 
+### Amendment A2 — monorepo reorganization, same day (27 commits, clean fast-forward, no rewrite)
+| § | What changed | Effect here |
+|---|---|---|
+| A2.1 | `aidlc-rules/`→`docs/aidlc-rules/`, `builder-mcp/`→`packages/builder-mcp/`, design docs→`docs/aidlc/dashboard/design/` | Reference fixed in the story map. **`aidlc-docs/` did not move.** |
+| A2.2 | **There is no root `Dockerfile`** — one per component directory, `CONTAINER_CONTEXT` + `CONTAINER_TARGET` | `unit-of-work.md` **corrected**: one `blueprints/dashboard/Dockerfile`, targets `collector` + `api`, context = blueprint root (forced, because both images need `core/`) |
+| A2.3 | New enforced rule: a `blueprint.yaml` must name a **registered** template | Manifest names `dashboard.yml`; `dashboard-storage.yml` is registered but not the entry point |
+| A2.4 | `observability/` exists — README only, "Nothing here yet" | Still not to be built. Its README names `cornell:deployment-id` as *the* join key, so this blueprint is the first consumer of a Track E contract |
+| A2.5 | New gotchas: `--list` must emit LF; `uv` may pick 32-bit Python without a `.python-version` pin | Relevant at Code Generation |
+
+**A2 changed no decision and no unit.** Path-and-packaging only. §6.4 still open — no commit touched the
+pipeline's stage order.
+
+### ⚠️ Flagged for the user, not decided
+`CLAUDE.md` now says `docs/aidlc/` is "this repo's own AI-DLC record," and builder-mcp's record was
+relocated to `docs/aidlc/builder-mcp/`. By that convention this blueprint's record belongs at
+`docs/aidlc/dashboard/`. But **the vendored rules hardcode `aidlc-docs/` paths in every stage file**, so
+relocating puts the repo convention in direct conflict with the methodology. ~30 files. A decision, not a
+cleanup — deliberately not done.
+
 ## Stage Progress
 ### 🔵 INCEPTION PHASE
 - [x] Workspace Detection

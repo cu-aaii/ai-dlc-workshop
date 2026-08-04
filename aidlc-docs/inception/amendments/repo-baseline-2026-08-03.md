@@ -162,3 +162,91 @@ rating is not read as resting on a finding that no longer holds.
   silent on the Build stage action and the Dockerfiles — the known coverage gap is unchanged, only
   cheaper to close now that the stage exists.
 - **Does not edit `CLAUDE.md`.** Its stale paragraph is flagged, not fixed.
+
+---
+
+# Amendment A2 — Monorepo reorganization, same day
+
+**Trigger**: a second sync, hours after A1. **Not** a force-push this time — `git merge-base
+--is-ancestor HEAD origin/dashboard` confirmed a clean fast-forward, so no history was rewritten and
+nothing needed recovery. 27 incoming commits reorganized the repository.
+
+## A2.1 — Paths moved
+
+| Was | Now |
+|---|---|
+| `aidlc-rules/` | **`docs/aidlc-rules/`** — still verbatim vendored, still do not edit |
+| `builder-mcp/` | **`packages/builder-mcp/`** |
+| `aidlc-docs/design/*.md` | **`docs/aidlc/dashboard/design/`** |
+| — | **`packages/<name>/`** is now the home for non-blueprint components |
+| — | **`docs/decisions/`**, one file per deliberate decision |
+
+`aidlc-docs/` at the repo root — this blueprint's entire inception record — **did not move.** Fixed
+reference in `unit-of-work-story-map.md`.
+
+**Unresolved, flagged not decided**: `CLAUDE.md` now says `docs/aidlc/` is "this repo's own AI-DLC
+record," and `builder-mcp`'s record was relocated to `docs/aidlc/builder-mcp/`. By that convention this
+blueprint's record belongs at `docs/aidlc/dashboard/`. But the **vendored rules hardcode `aidlc-docs/`
+paths** in every stage file, so moving it puts the repo convention and the methodology in direct
+conflict. Roughly 30 files, and it is a decision, not a cleanup — **left for the user.** Doing it
+silently mid-stage would also invalidate every path in this amendment.
+
+## A2.2 — There is no root `Dockerfile` any more
+
+`CLAUDE.md` now states it outright: one Dockerfile **per component directory** with a named target.
+The Build stage action supplies `CONTAINER_CONTEXT` (the component directory) **and** `CONTAINER_TARGET`.
+Real examples now in the repo: `blueprints/tiny-chatbot/Dockerfile`, `blueprints/aisei-site/Dockerfile`,
+`packages/builder-mcp/Dockerfile`.
+
+This directly contradicts what `unit-of-work.md` said hours earlier — it had the dashboard adding two
+targets to a root Dockerfile. **Corrected**: one `blueprints/dashboard/Dockerfile` with targets
+`collector` and `api`, and `CONTAINER_CONTEXT: blueprints/dashboard`.
+
+**The context choice is forced, not stylistic.** Both images need `core/` (U-01). A context of
+`collector/` cannot `COPY` it. So the single-Dockerfile-two-targets shape is what the U-01 → U-02
+dependency requires, and a future reader who "tidies" it into two per-directory Dockerfiles will break
+both builds.
+
+## A2.3 — New enforced rule: a `blueprint.yaml` must name a registered template
+
+`validate_stacks.py` now fails when a manifest points at an unregistered or nonexistent template, on the
+grounds that the manifest is the contract `blueprint_search` hands a builder — so a bad one advertises a
+blueprint whose `deployment_create` opens a PR that cannot deploy. `CLAUDE.md` also clarifies that a
+template with **no** manifest is fine and normal (builder-mcp is platform infrastructure, not a catalog
+entry).
+
+Consequence under Q4 = A's two templates: the manifest names **`dashboard.yml`**, the application stack,
+because that is what a builder deploys. `dashboard-storage.yml` is registered in `stacks.yml` but is not
+the manifest's entry point. Recorded in `unit-of-work.md`'s `blueprint.yaml` table.
+
+## A2.4 — `observability/` now exists
+
+It was on `CLAUDE.md`'s "deliberately not built" list and now has a `README.md` — which says **"Nothing
+here yet."** So it is a documented placeholder for Track E, not an implementation, and the instruction
+not to pre-build it still stands.
+
+It matters anyway, because its README states that the four `cornell:*` tags "exist for this track and
+nothing else" and names `cornell:deployment-id` as **the join key**. That is the same conclusion the
+telemetry amendment reached independently from the other direction. **This blueprint is the first
+consumer of a contract Track E owns**, which strengthens the existing recommendation that the queued
+telemetry pass not be run as a dashboard-local decision.
+
+## A2.5 — Two new gotchas worth knowing before Code Generation
+
+- **`validate_stacks.py --list` must emit LF, not the platform newline.** `tools/check` word-splits that
+  output into `cfn-lint`'s arguments; a CRLF left a trailing carriage return on every path but the last,
+  and `cfn-lint` reported `E0003 <template> could not be processed by glob.glob` — which reads as a
+  broken template rather than a broken path, and made `tools/check` unable to pass on a Windows checkout
+  while CI stayed green.
+- **`uv` will pick a 32-bit Python if that is what it finds.** `packages/builder-mcp/.python-version`
+  pins the interpreter for that reason. Relevant when U-01 gets its own package metadata: without a pin,
+  a machine whose only Python is `x86` has no `cryptography` wheel and the install disappears into a
+  failing Rust build.
+
+## A2.6 — What A2 does not change
+
+The unit decomposition, every Q1–Q9 answer, all three artifacts' substance, the story map, and the
+dependency graph are unaffected. A2 is a **path-and-packaging** amendment: two concrete corrections
+(§A2.2 Dockerfile, §A2.1 doc reference), one new constraint to satisfy (§A2.3), and one flagged decision
+left to the user (§A2.1, whether `aidlc-docs/` relocates). **§6.4 remains open and unchanged** — none of
+these commits altered the pipeline's stage order.
