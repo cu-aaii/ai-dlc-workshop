@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - Functional Design for U-01 Domain Core (awaiting answers)
+- **Current Stage**: **CONSTRUCTION** - Functional Design U-01 complete, awaiting approval
 - **INCEPTION COMPLETE**: 2026-08-03
 - **Units Approved**: 2026-08-03 — user response "Approve & Continue"
 - **Application Design Approved**: 2026-08-03 — user response "approved"
@@ -116,6 +116,41 @@ its `pipeline.yml` on the container build; flagged for its owner, not edited her
 **A2 changed no decision and no unit.** Path-and-packaging only. §6.4 still open — no commit touched the
 pipeline's stage order.
 
+## Functional Design U-01 — decisions and outputs
+`construction/plans/u-01-domain-core-functional-design-plan.md` Part A2 (Q1-Q9, all **A**).
+Artifacts: `construction/u-01-domain-core/functional-design/` — `domain-entities.md`,
+`business-rules.md`, `business-logic-model.md`.
+
+| Rule | Decision |
+|---|---|
+| BR-01 | Tag presence: exact key match **and** non-whitespace value. Empty or wrong-case ⇒ **missing**. One predicate, shared. |
+| BR-02 | Malformed item skipped, counted in `skipped_count` + `skipped_reasons` — never silently |
+| BR-03 | Global resources get region `"global"` |
+| BR-04 | Duplicate ARNs deduped, last wins, collisions counted |
+| BR-05 | Grouping: missing group `value=None`, omitted when empty; order count desc, value asc, missing last |
+| BR-06 | Gap report lists **which** tags are missing, in `REQUIRED_TAGS` order |
+| BR-07 | Freshness three-valued: FRESH / STALE / **INVALID**; `stale_after` = **3 × refresh_interval** |
+| BR-08 | JSON, sorted keys, deterministic bytes; read requires major-version match; unknown top-level keys **ignored** |
+
+**10 PBT properties identified** (P1-P10), up from 6. New: **P8** accounting identity
+(`raw_returned == len(resources) + skipped + duplicates`), **P9** grouping/classification agreement,
+**P10** freshness monotonic in `now`.
+
+### Corrections recorded at this stage
+1. **My Q1 text claimed skipping weakens FR-1.1. It does not.** Checked the approved text: FR-1.1 says
+   nothing about totality, and US-02 is phrased in terms of *silence* ("no resource is **silently**
+   omitted", "never presented as complete"). Q1 = A satisfies both exactly. **No amendment warranted** —
+   a fabricated amendment is as much a defect as a missing one.
+2. **Q9's option text was ambiguous ("preserved-or-ignored") — my error, resolved not re-asked.**
+   Resolved to **ignore**, because **no code path reads a snapshot and writes it back** (collector always
+   constructs fresh + single PutObject; API only reads), so key loss is unobservable by construction.
+   P1 is correspondingly **scoped to the same major version**, stated rather than hidden.
+
+### ⚠️ Cross-unit obligations flowing to U-02
+- `Freshness.INVALID` needs a **sixth row** in C-03's degraded-state table: **503 / `error`**, not 200
+- `skipped_count`, `duplicates_removed`, `raw_returned` must reach the UI, or Q1 = A's "surface the
+  count" half is never delivered
+
 ### ⚠️ Flagged for the user, not decided
 `CLAUDE.md` now says `docs/aidlc/` is "this repo's own AI-DLC record," and builder-mcp's record was
 relocated to `docs/aidlc/builder-mcp/`. By that convention this blueprint's record belongs at
@@ -136,7 +171,9 @@ cleanup — deliberately not done.
 **🔵 INCEPTION PHASE COMPLETE — 2026-08-03**
 
 ### 🟢 CONSTRUCTION PHASE
-- [ ] Functional Design — **IN PROGRESS: U-01** (plan + 9 questions issued). PBT-01 identifies properties here. U-02 pass follows.
+- [ ] Functional Design — **U-01 complete (awaiting approval)**; U-02 pass follows
+      - [x] U-01 Domain Core — 3 artifacts, BR-01..BR-08, **10 PBT properties** (PBT-01 satisfied)
+      - [ ] U-02 Dashboard Platform — incl. `frontend-components.md` for C-06
 - [ ] NFR Requirements — EXECUTE
 - [ ] NFR Design — EXECUTE (RESILIENCY-04, -14, -15 user decisions are due here)
 - [ ] Infrastructure Design — EXECUTE (SECURITY-01, -06, -14 SRI, RESILIENCY-08, container build)
