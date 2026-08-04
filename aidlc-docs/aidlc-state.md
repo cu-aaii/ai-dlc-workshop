@@ -181,6 +181,36 @@ implied a generic top-level `core` importable, refined to one namespaced package
 every "automated" verification in `nfr-requirements.md` currently describes **intent, not observed
 behaviour**. Must not be blurred at Build and Test.
 
+## Inbound context — UI design language contract (2026-08-03, merged not authored by me)
+Three commits arrived while NFR Requirements U-01 was being written. **Nothing of mine is invalidated**
+— U-01 has no UI and accessibility/usability was already recorded N/A → U-02 — so this is recorded as
+binding context for U-02's passes rather than as an amendment.
+
+| New file | Bears on |
+|---|---|
+| `contracts/ui-design-language.md` | **Binding on C-06.** §2 accessibility (WCAG 2.2 AA) and §3 Cornell logo have **no exemption path**. Deviation is declarable only for §5 and below. |
+| `blueprints/dashboard/docs/design-language.md` | A dashboard addendum **already written by someone else** in this blueprint's directory, ahead of the template |
+| `.claude/skills/cornell-ui-compliance/` | A skill that triggers on UI work and blocks non-compliant output |
+| `docs/decisions/0001-ui-design-language-is-a-contract.md` | The decision record |
+
+**Convergence, not conflict**: the addendum's §8 position is "bundled SPA behind CloudFront, CSP with no
+`unsafe-inline`" — which is exactly Q4 = A (one distribution), Q9 = B (React + Vite) and US-01's strict CSP.
+It also says charts §9 exists *because of* this blueprint.
+
+**New constraint on C-06 that U-02 must honour**: a **two-accent series ceiling**. Once green/orange/red
+are reserved for status, Cornell's palette leaves only blue `#006699` and navy `#073949` plus dark gray for
+de-emphasis. That directly constrains US-03's grouping views, which group by `cornell:blueprint` and
+`cornell:owner` and will exceed two categories.
+
+**Verified against the frozen manifest contract** (`packages/builder-mcp/SPEC.md` §C1 — `blueprint.yaml` is
+**FROZEN**, no substantive change without mob agreement, and the dashboard is itself a listed consumer):
+all four keys chosen at Q9 — `data_classification`, `singleton`, `state`, `cost` — **exist in the frozen
+schema**, so Q9 set values rather than adding keys and no violation occurred. Two refinements noted:
+`state` entries take a `class:` key, and `data_classification` feeds a **review gate that blocks anything
+above the declared level** — an enforcement consequence of choosing `[internal]` that was not known when
+Q9a was answered. Also confirmed `singleton: false` is consistent with `deployment_create`, which forces
+`deployment_name = blueprint name` only for singletons.
+
 ### ⚠️ Flagged for the user, not decided
 `CLAUDE.md` now says `docs/aidlc/` is "this repo's own AI-DLC record," and builder-mcp's record was
 relocated to `docs/aidlc/builder-mcp/`. By that convention this blueprint's record belongs at
