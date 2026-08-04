@@ -5,7 +5,6 @@ export interface RouteData {
   title?: string;
   icon?: string;
   path?: string;
-  roles?: string[]; // reserved for future auth guard
   [key: string]: any;
 }
 
@@ -18,23 +17,41 @@ export const routes: AppRoute[] = [
   {
     path: '',
     pathMatch: 'full',
-    redirectTo: 'admin',
-    data: { menu: [] },
+    loadComponent: () =>
+      import('./features/home/home.component').then((m) => m.HomeComponent),
+    title: 'Home',
+    data: { menu: ['main'] },
   },
   {
-    path: 'admin',
-    // canActivate: [MultiRoleGuard], // enable when auth is added
-    loadChildren: () =>
-      import('./admin.routes').then((m) => m.AdminRoutes),
-    data: {
-      menu: [],
-      // roles: ['admin'], // enable when auth is added
-    },
-    title: 'Admin',
+    path: 'component-library',
+    loadComponent: () =>
+      import('./features/component-library/component-library.component').then(
+        (m) => m.ComponentLibraryComponent,
+      ),
+    title: 'Component Library',
+    data: { menu: ['main'] },
+  },
+  {
+    path: 'style-guide',
+    loadComponent: () =>
+      import('./features/style-guide/style-guide.component').then(
+        (m) => m.StyleGuideComponent,
+      ),
+    title: 'Style Guide',
+    data: { menu: ['main'] },
+  },
+  {
+    path: 'implementation-plan',
+    loadComponent: () =>
+      import('./features/implementation-plan/implementation-plan.component').then(
+        (m) => m.ImplementationPlanComponent,
+      ),
+    title: 'Implementation Plan',
+    data: { menu: ['main'] },
   },
   {
     path: '**',
-    redirectTo: 'admin',
+    redirectTo: '',
     pathMatch: 'full',
     data: { menu: [] },
   },

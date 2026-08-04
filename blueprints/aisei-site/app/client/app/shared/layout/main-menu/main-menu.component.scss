@@ -58,7 +58,7 @@
   }
 
   #main-navigation {
-    background: #666;
+    background: var(--color-accent-dark);
     color: #fff;
     // This is needed to fix the overlay being really big
     display: block;
@@ -140,7 +140,7 @@
     text-transform: capitalize;
     display: block;
     color: white;
-    background-color: #666;
+    background-color: var(--color-accent-dark);
     text-align: center;
     border: none;
     border-radius: 0;

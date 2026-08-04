@@ -124,9 +124,9 @@ body {
 
 @media (max-width: 767px) {
 
-  lib-main-menu {
-    display: none;
-  }
+  // No dedicated mobile nav exists yet, so keep the main nav visible on
+  // mobile (it wraps via #main-navigation .list-menu's flex/float layout)
+  // rather than hiding navigation entirely.
 
   .desktop-only {
     display: none;

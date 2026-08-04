@@ -1,0 +1,40 @@
+:host {
+  display: block;
+
+  .cu-utility-bar {
+    background: #f2f2f2;
+    padding: 6px 24px;
+    font-size: 12px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .cu-masthead {
+    background: var(--color-accent);
+    color: var(--color-on-primary);
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+
+      small {
+        font-size: 13px;
+        opacity: 0.9;
+      }
+
+      strong {
+        font-family: var(--heading-font);
+        font-size: 24px;
+      }
+    }
+
+    img.seal {
+      height: 56px;
+    }
+  }
+}

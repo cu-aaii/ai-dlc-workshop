@@ -1,8 +1,8 @@
 // @import '@angular/material/theming';
 @use '@angular/material' as mat;
 
-$heading-font-family: Georgia, serif;
-$text-font-family: Verdana, Geneva, Tahoma, sans-serif;
+$heading-font-family: "freight-sans-pro", Georgia, serif;
+$text-font-family: "freight-sans-pro", Verdana, Geneva, Tahoma, sans-serif;
 $custom-typography: mat.m2-define-typography-config(
   $headline-1: mat.m2-define-typography-level(112px, $font-family: $heading-font-family),
   $headline-2: mat.m2-define-typography-level(56px, $font-family: $heading-font-family),
