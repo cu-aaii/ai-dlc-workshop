@@ -233,7 +233,7 @@ changed to enable it.
 | Boundary grep | clean |
 | NFR-P2 | 10,000 records in **~0.013 s** (bound 10 s) |
 | **Mutation testing** | **9/9 mutants killed** (after fixing the one survivor) |
-| `tools/check` end to end · `cfn-lint` | **still not run** — need `uv` / `terraform` |
+| **`tools/check` end to end** | ✅ **PASSES** (`uv` + terraform installed 2026-08-03) — incl. **first cfn-lint of `dashboard-marker.yml`: clean**, and `uv.lock` committed |
 
 ### 🐛 Three defects found only by executing
 1. **`[tool.hypothesis]` in `pyproject.toml` did nothing** — Hypothesis has no pyproject config source.
@@ -367,7 +367,7 @@ changed to enable it.
 | Boundary grep | clean |
 | NFR-P2 | 10,000 records in **~0.013 s** (bound 10 s) |
 | **Mutation testing** | **9/9 mutants killed** (after fixing the one survivor) |
-| `tools/check` end to end · `cfn-lint` | **still not run** — need `uv` / `terraform` |
+| **`tools/check` end to end** | ✅ **PASSES** (`uv` + terraform installed 2026-08-03) — incl. **first cfn-lint of `dashboard-marker.yml`: clean**, and `uv.lock` committed |
 
 ### 🐛 Three defects found only by executing
 1. **`[tool.hypothesis]` in `pyproject.toml` did nothing** — Hypothesis has no pyproject config source.
