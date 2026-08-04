@@ -51,8 +51,8 @@ templates:
 
   - name: 'course-chatbot'
     template: 'blueprints/course-chatbot/infra/course-chatbot.yml'
-    deployed_by: 'manual'
-    description: 'Microsoft Teams chatbot (Track C): Bot Framework front door on a public Lambda Function URL, answering via Cornell''s LiteLLM gateway. Parked until its Build stage action is wired (blueprints/course-chatbot/Dockerfile, target course-chatbot, arm64); flipped to pipeline in that same PR.'
+    deployed_by: 'pipeline'
+    description: 'Microsoft Teams chatbot (Track C): Bot Framework front door on a public Lambda Function URL, answering via Cornell''s LiteLLM gateway. Image built by the Build stage (arm64, blueprints/course-chatbot/Dockerfile target course-chatbot), deployed by digest. Needs two secret values injected once by CLI before it can answer anything.'
 
   - name: 'builder-mcp'
     template: 'packages/builder-mcp/infra/builder-mcp.yml'

@@ -107,11 +107,25 @@ Parameters:
     Description: 'Optional key of the system prompt object in SystemPromptS3Bucket.'
     Type: 'String'
 
+  GreetingText:
+    Default: ''
+    AllowedPattern: '.{0,512}'
+    Description: 'Sent when a human joins the conversation. Empty falls back to a greeting derived from CourseName.'
+    Type: 'String'
+
   LogRetentionDays:
     Default: 90
     AllowedValues: [90, 180, 365]
     Description: 'CloudWatch retention. SECURITY-14 requires at least 90 days.'
     Type: 'Number'
+
+  # Pipeline Provided Parameters
+
+  SourceCommitId:
+    Default: 'unknown'
+    AllowedPattern: '.{1,64}'
+    Description: 'Commit the pipeline deployed, passed through as #{GitRepository.CommitId}. Defaults to a placeholder so the template also deploys by hand.'
+    Type: 'String'
 
 Conditions:
 
@@ -321,6 +335,7 @@ Resources:
         Variables:
           PYTHONUNBUFFERED: '1'
           LOG_LEVEL: 'INFO'
+          GREETING_TEXT: !Ref 'GreetingText'
           BOT_APP_ID: !Ref 'BotAppId'
           BOT_TENANT_ID: !Ref 'BotTenantId'
           BOT_CLIENT_SECRET_ARN: !Ref 'BotClientSecret'
@@ -373,6 +388,10 @@ Outputs:
     Condition: 'HasImage'
     Description: 'Public HTTPS endpoint. Set as the Azure Bot messaging endpoint.'
     Value: !GetAtt 'FrontDoorUrl.FunctionUrl'
+
+  DeployedCommitId:
+    Description: 'Commit this stack was deployed from'
+    Value: !Ref 'SourceCommitId'
 
   BotClientSecretArn:
     Description: 'ARN of the Entra client secret. Inject the value with put-secret-value; it is never in git.'

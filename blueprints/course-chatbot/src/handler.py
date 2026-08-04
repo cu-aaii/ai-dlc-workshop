@@ -98,9 +98,13 @@ class _Config:
         self.gateway_base_url = os.environ.get("GATEWAY_BASE_URL", "")
         self.course_name = _param(os.environ.get("COURSE_NAME_PARAM", ""), "this course")
         self.model_id = _param(os.environ.get("MODEL_ID_PARAM", ""), "claude-haiku-4-5")
-        self.greeting = os.environ.get(
-            "GREETING_TEXT",
-            f"Hi! I'm the {self.course_name} assistant. Ask me anything about the course.",
+        # `or`, not a .get default: the stack passes GREETING_TEXT through unconditionally, so
+        # an unset parameter arrives as an empty string rather than as a missing key -- and a
+        # .get default would then be skipped, greeting people with nothing.
+        # Phrased to read correctly with CourseName's default of "this course" as well as with
+        # a real course name: "the assistant for this course" / "the assistant for CS 1110".
+        self.greeting = os.environ.get("GREETING_TEXT") or (
+            f"Hi! I'm the assistant for {self.course_name}. Ask me anything about it."
         )
         self.system_prompt = self._load_prompt()
 
