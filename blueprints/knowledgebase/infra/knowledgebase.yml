@@ -1,0 +1,611 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Amazon Bedrock managed knowledge base over an existing S3 document bucket. Ingests on every deploy and fails the stack unless the documents are indexed and answerable, so a green pipeline means a query-ready knowledge base. Hands the identifiers off through SSM and a retrieval managed policy.'
+
+Parameters:
+
+  # Metadata Parameters
+
+  Application:
+    Default: 'aidlc'
+    AllowedPattern: '[a-z0-9-]{1,10}'
+    Description: 'Name used for billing and other tracking/identification purposes'
+    Type: 'String'
+
+  Environment:
+    Default: 'main'
+    AllowedPattern: '[a-z0-9]{1,4}'
+    Description: 'Name of the deployment branch'
+    Type: 'String'
+
+  # Tagging Convention Parameters
+  #
+  # cornell:owner, cornell:blueprint, cornell:blueprint-version and cornell:deployment-id
+  # are required on every resource. Owner and deployment id vary per deployment; blueprint
+  # name and version are properties of this template, so they live here as defaults and are
+  # bumped in the PR that changes the blueprint.
+  #
+  # AWS::Bedrock::DataSource has no Tags property at all, so DocumentDataSource cannot carry
+  # them. Its identity is mirrored into SSM instead - see DataSourceIdParameter.
+
+  Owner:
+    Default: 'ai-sei'
+    AllowedPattern: '.{1,128}'
+    Description: 'Who owns this deployment (cornell:owner)'
+    Type: 'String'
+
+  BlueprintVersion:
+    Default: '0.1.0'
+    AllowedPattern: '[0-9]+\.[0-9]+\.[0-9]+'
+    Description: 'Version of the knowledgebase blueprint (cornell:blueprint-version)'
+    Type: 'String'
+
+  # Blueprint Parameters
+
+  IngestionBucketName:
+    Default: 'aidlc-kb-ingestion-890349359349'
+    AllowedPattern: '[a-z0-9.-]{3,63}'
+    Description: 'Existing General Purpose S3 bucket holding the documents to index. Must be in the same account and region as this stack -- the managed S3 connector is same-region only, and the earlier aidlc-kb-ingestion-bucket was us-east-2, which would have failed the first create. This template references the bucket and never creates it, because a bucket it created would be empty on the deploy that created it and fail the zero-documents assertion.'
+    Type: 'String'
+
+  SmokeQuery:
+    Default: 'What is the late homework policy?'
+    AllowedPattern: '.{1,512}'
+    Description: 'Question the deploy-time verifier asks the knowledge base. The deploy fails if this returns no results, so it has to be answerable from the documents in IngestionBucketName.'
+    Type: 'String'
+
+  # There are deliberately no chunking parameters. A managed embedding model owns chunking, and
+  # supplying a ChunkingConfiguration alongside it is rejected outright:
+  #   "A chunking strategy cannot be specified with a managed embedding model."
+  # An earlier version of this template exposed ChunkingMaxTokens and ChunkingOverlapPercentage,
+  # which lints clean and fails at CREATE. Tuning chunking requires EmbeddingModelType: CUSTOM,
+  # which means naming an embedding model and provisioning a vector store.
+
+  # Pipeline Provided Parameters
+
+  SourceCommitId:
+    Default: 'unknown'
+    AllowedPattern: '.{1,64}'
+    Description: 'Commit the pipeline deployed, passed through as #{GitRepository.CommitId}. Defaults to a placeholder so the template also deploys by hand.'
+    Type: 'String'
+
+Resources:
+
+  # The role Bedrock assumes to read the document bucket. Trust policy and both statement
+  # blocks are copied from the managed-knowledge-base service-role docs, including the
+  # confused-deputy conditions and the aws:ResourceAccount conditions on S3.
+  #
+  # The embedding-model statements look redundant for a MANAGED knowledge base, which embeds
+  # with a service-owned model. They are here because the managed service-role page lists
+  # "access to the Amazon Bedrock base models" as required without distinguishing MANAGED from
+  # CUSTOM embedding, and being wrong costs a failed deploy we have no way to diagnose while
+  # being over-permissive costs nothing - these are read-only lists plus InvokeModel on three
+  # named embedding models. Do not generalise them to bedrock:* or Resource: '*'.
+
+  KnowledgeBaseRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-knowledgebase-bedrock'
+      Description: 'Service role Amazon Bedrock assumes to read documents for the knowledgebase blueprint'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'bedrock.amazonaws.com'
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref 'AWS::AccountId'
+              ArnLike:
+                # The Bedrock docs use this exact capitalisation for the source ARN key.
+                'AWS:SourceArn': !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*'
+      Policies:
+        - PolicyName: 'embedding-models'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'bedrock:ListFoundationModels'
+                  - 'bedrock:ListCustomModels'
+                Resource: '*'
+              - Effect: 'Allow'
+                Action: 'bedrock:InvokeModel'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v1'
+                  - !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0'
+                  - !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/cohere.embed-english-v3'
+                  - !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/cohere.embed-multilingual-v3'
+        - PolicyName: 'read-ingestion-bucket'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: 's3:ListBucket'
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${IngestionBucketName}'
+                Condition:
+                  StringEquals:
+                    'aws:ResourceAccount': !Ref 'AWS::AccountId'
+              - Effect: 'Allow'
+                Action: 's3:GetObject'
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${IngestionBucketName}/*'
+                Condition:
+                  StringEquals:
+                    'aws:ResourceAccount': !Ref 'AWS::AccountId'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'iam-role-knowledgebase-bedrock'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'knowledgebase'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-knowledgebase'
+
+  # The knowledge base itself. Type MANAGED means AWS owns the storage, the index and the
+  # embedding model, so there is no StorageConfiguration, no vector store to provision and no
+  # model-access gate to clear. Everything under KnowledgeBaseConfiguration is create-only:
+  # changing the type or the embedding model replaces the knowledge base and loses the index.
+
+  KnowledgeBase:
+    Type: 'AWS::Bedrock::KnowledgeBase'
+    Properties:
+      # The Name pattern is ^([0-9a-zA-Z][_-]?){1,100}$ - single separators only, so the
+      # stack-name convention fits but a doubled hyphen would not.
+      Name: !Sub '${Application}-${Environment}-knowledgebase'
+      Description: 'Managed knowledge base over the AI-DLC workshop document bucket'
+      RoleArn: !GetAtt 'KnowledgeBaseRole.Arn'
+      KnowledgeBaseConfiguration:
+        Type: 'MANAGED'
+        ManagedKnowledgeBaseConfiguration:
+          EmbeddingModelType: 'MANAGED'
+      # AWS::Bedrock::KnowledgeBase takes tags as a map, not a list of Key/Value pairs - the
+      # same trap as AWS::SSM::Parameter. Every other taggable resource here uses the list.
+      Tags:
+        Application: !Ref 'Application'
+        Environment: !Ref 'Environment'
+        Resource: 'bedrock-knowledge-base-knowledgebase'
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'knowledgebase'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-knowledgebase'
+
+  # Where the documents come from. A managed knowledge base reaches S3 through the managed
+  # connector rather than the classic S3Configuration, and ConnectorParameters is free-form
+  # Json - cfn-lint cannot validate a single key inside it. A typo here passes tools/check and
+  # fails at deploy time, which is the main reason IngestionVerifier exists.
+  #
+  # This resource cannot be tagged at all - see DataSourceIdParameter for the SSM mirror.
+
+  DocumentDataSource:
+    Type: 'AWS::Bedrock::DataSource'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-knowledgebase-s3'
+      Description: 'Documents in the workshop ingestion bucket'
+      KnowledgeBaseId: !GetAtt 'KnowledgeBase.KnowledgeBaseId'
+      # RETAIN leaves the indexed vectors alone if the data source is removed, so a template
+      # edit that replaces the data source does not silently empty the knowledge base.
+      DataDeletionPolicy: 'RETAIN'
+      DataSourceConfiguration:
+        Type: 'MANAGED_KNOWLEDGE_BASE_CONNECTOR'
+        ManagedKnowledgeBaseConnectorConfiguration:
+          # bucketOwnerAccountId is REQUIRED, always. The AWS connector reference marks it
+          # "Conditional -- required for cross-account access", and that is wrong: omitting it
+          # fails validation with "Member must not be null" even for a same-account bucket. Every
+          # AWS example includes it, which is the tell. Verified by a failed create, not inferred.
+          #
+          # Worse, that failure does not surface as a stack failure. Bedrock marks the data source
+          # FAILED within a second and CloudFormation keeps reporting CREATE_IN_PROGRESS for at
+          # least twenty minutes, so a malformed body here HANGS the deploy rather than reddening
+          # it -- which on the shared pipeline blocks every other track. See docs/warnings.md.
+          ConnectorParameters:
+            type: 'S3'
+            version: '1'
+            connectionConfiguration:
+              bucketName: !Ref 'IngestionBucketName'
+              bucketOwnerAccountId: !Ref 'AWS::AccountId'
+      VectorIngestionConfiguration:
+        # SMART_PARSING is the only strategy a managed knowledge base accepts, and it is the
+        # default - stated explicitly anyway because the AWS CLI example for this connector does,
+        # and an unstated default is one more thing that could differ from what we assume.
+        ParsingConfiguration:
+          ParsingStrategy: 'SMART_PARSING'
+        # No ChunkingConfiguration. The managed embedding model owns chunking and rejects any
+        # attempt to specify it -- verified by a failed CREATE, not inferred. See the note in
+        # Parameters above.
+
+  # CloudFormation creates a data source but never ingests through it, so CREATE_COMPLETE on
+  # its own says nothing about whether the knowledge base holds a single document. Nobody on
+  # this track has AWS CLI or console access, which means the pipeline's red/green is the only
+  # signal that ever reaches us. So the custom resource below is a verifier, not a trigger: it
+  # ingests, asserts documents were indexed with no failures, runs a retrieval smoke query and
+  # fails the stack if the knowledge base cannot answer.
+  #
+  # Do not soften this into fire-and-forget to make a deploy pass. It is the only thing
+  # standing between "green pipeline" and "empty knowledge base".
+
+  IngestionVerifierRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-knowledgebase-verifier'
+      Description: 'Execution role for the knowledgebase blueprint deploy-time ingestion verifier'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'ingest-and-verify'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'bedrock:GetDataSource'
+                  - 'bedrock:StartIngestionJob'
+                  - 'bedrock:GetIngestionJob'
+                  - 'bedrock:Retrieve'
+                Resource: !GetAtt 'KnowledgeBase.KnowledgeBaseArn'
+        - PolicyName: 'write-own-logs'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${Application}-${Environment}-knowledgebase-verifier*'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'iam-role-knowledgebase-verifier'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'knowledgebase'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-knowledgebase'
+
+  # A zip function with inline code, which is a deliberate exception to the repo's "Lambda
+  # means container images" rule: no pipeline stage builds an image yet, and with no CLI access
+  # there is no way to upload a code bundle to S3 either, so inline is the only zip available.
+  #
+  # Inline Code.ZipFile is hard-capped at 4096 characters by CloudFormation, which is why the
+  # handler is terse and uncommented. Keep it under the cap or this template stops deploying.
+  #
+  # The handler's shape is driven by one failure mode: a custom resource that never answers
+  # leaves the stack waiting, and nobody here can cancel a stuck stack. So
+  #   - every import and client is built inside the try block, because a module-level failure
+  #     would mean the handler never runs and CloudFormation never hears anything;
+  #   - every poll loop is bounded by get_remaining_time_in_millis rather than a fixed count,
+  #     so running long produces a clean FAILED instead of a killed invocation;
+  #   - botocore timeouts are pinned short, so one hung API call cannot eat the whole budget;
+  #   - send() retries, because a dropped response is indistinguishable from a hang.
+  # A hang is strictly worse than a red deploy. Keep it that way.
+
+  IngestionVerifierFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: !Sub '${Application}-${Environment}-knowledgebase-verifier'
+      Description: 'Ingests the knowledgebase data source and fails the stack unless the documents are indexed and answerable'
+      Handler: 'index.handler'
+      Runtime: 'python3.13'
+      Role: !GetAtt 'IngestionVerifierRole.Arn'
+      # Polling is deadline-driven off this value, not a fixed iteration count. Raising it
+      # raises the polling budget automatically.
+      Timeout: 900
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          import json, time, urllib.request
+
+          def send(e, c, status, data, reason):
+              b = json.dumps({'Status': status, 'Reason': reason[:1000],
+                  'PhysicalResourceId': e.get('PhysicalResourceId') or c.log_stream_name,
+                  'StackId': e['StackId'], 'RequestId': e['RequestId'],
+                  'LogicalResourceId': e['LogicalResourceId'], 'NoEcho': False,
+                  'Data': data}).encode()
+              r = urllib.request.Request(e['ResponseURL'], data=b, method='PUT',
+                  headers={'content-type': '', 'content-length': str(len(b))})
+              for i in range(3):
+                  try:
+                      urllib.request.urlopen(r, timeout=10)
+                      return
+                  except Exception as x:
+                      print('send failed: %r' % x)
+                      time.sleep(2 + 2 * i)
+
+          def verify(e, c):
+              import boto3
+              from botocore.config import Config
+              def left():
+                  return c.get_remaining_time_in_millis() / 1000.0
+              cfg = Config(connect_timeout=5, read_timeout=20,
+                  retries={'max_attempts': 3, 'mode': 'standard'})
+              p = e['ResourceProperties']
+              kb, ds = p['KnowledgeBaseId'], p['DataSourceId']
+              ba = boto3.client('bedrock-agent', config=cfg)
+              br = boto3.client('bedrock-agent-runtime', config=cfg)
+              s = 'unknown'
+              while left() > 150:
+                  s = ba.get_data_source(knowledgeBaseId=kb, dataSourceId=ds)['dataSource']['status']
+                  if s == 'AVAILABLE':
+                      break
+                  if 'DELET' in s or 'FAIL' in s:
+                      raise Exception('data source status ' + s)
+                  time.sleep(10)
+              if s != 'AVAILABLE':
+                  raise Exception('data source stuck at ' + s)
+              jid = None
+              while left() > 130:
+                  try:
+                      jid = ba.start_ingestion_job(knowledgeBaseId=kb,
+                          dataSourceId=ds)['ingestionJob']['ingestionJobId']
+                      break
+                  except Exception as x:
+                      if 'Conflict' not in type(x).__name__:
+                          raise
+                      time.sleep(15)
+              if not jid:
+                  raise Exception('could not start an ingestion job; one may already be running')
+              j = {'status': 'UNKNOWN'}
+              while left() > 110:
+                  j = ba.get_ingestion_job(knowledgeBaseId=kb, dataSourceId=ds,
+                      ingestionJobId=jid)['ingestionJob']
+                  if j['status'] in ('COMPLETE', 'FAILED', 'STOPPED'):
+                      break
+                  time.sleep(10)
+              if j['status'] != 'COMPLETE':
+                  raise Exception('ingestion %s: %s' % (j['status'], j.get('failureReasons')))
+              st = j.get('statistics', {})
+              scanned = st.get('numberOfDocumentsScanned', 0)
+              failed = st.get('numberOfDocumentsFailed', 0)
+              indexed = (st.get('numberOfNewDocumentsIndexed', 0)
+                  + st.get('numberOfModifiedDocumentsIndexed', 0))
+              if not scanned:
+                  raise Exception('no documents scanned; check bucket contents and ConnectorParameters')
+              if failed:
+                  raise Exception('%d of %d documents failed ingestion' % (failed, scanned))
+              hits = []
+              while left() > 90 and not hits:
+                  hits = br.retrieve(knowledgeBaseId=kb,
+                      retrievalQuery={'text': p['SmokeQuery']})['retrievalResults']
+                  if not hits:
+                      time.sleep(10)
+              if not hits:
+                  raise Exception('smoke query returned nothing: ' + p['SmokeQuery'])
+              return {'DocumentsIndexed': str(indexed), 'DocumentsScanned': str(scanned),
+                  'DocumentsFailed': str(failed), 'IngestionJobId': jid,
+                  'SmokeQueryResult': (hits[0].get('content') or {}).get('text', '')[:400]}
+
+          def handler(e, c):
+              print(json.dumps({k: v for k, v in e.items() if k != 'ResponseURL'}))
+              try:
+                  d = {} if e['RequestType'] == 'Delete' else verify(e, c)
+                  send(e, c, 'SUCCESS', d, 'verified')
+              except Exception as x:
+                  if e['RequestType'] == 'Delete':
+                      send(e, c, 'SUCCESS', {}, 'delete ignored: %r' % x)
+                  else:
+                      send(e, c, 'FAILED', {}, '%s: %s' % (type(x).__name__, x))
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'lambda-function-knowledgebase-verifier'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'knowledgebase'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-knowledgebase'
+
+  # SourceCommitId is a property rather than decoration: it changes on every merge, so the
+  # verifier re-runs on every deploy. Syncs are incremental, so re-running is cheap, and it
+  # means "merged" implies "documents indexed and proven answerable" without any scheduler.
+
+  IngestionVerifier:
+    Type: 'AWS::CloudFormation::CustomResource'
+    Properties:
+      ServiceToken: !GetAtt 'IngestionVerifierFunction.Arn'
+      KnowledgeBaseId: !GetAtt 'KnowledgeBase.KnowledgeBaseId'
+      DataSourceId: !GetAtt 'DocumentDataSource.DataSourceId'
+      SmokeQuery: !Ref 'SmokeQuery'
+      SourceCommitId: !Ref 'SourceCommitId'
+
+  # The retrieval seam. Downstream blueprints attach this policy instead of writing their own
+  # Bedrock statements, so read access to this knowledge base stays one reviewable artifact.
+
+  RetrievalPolicy:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      ManagedPolicyName: !Sub '${Application}-${Environment}-knowledgebase-retrieval'
+      Description: 'Read-only retrieval against the knowledgebase blueprint knowledge base. Attach this to a consuming role rather than granting bedrock:Retrieve directly.'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Action:
+              - 'bedrock:Retrieve'
+              - 'bedrock:RetrieveAndGenerate'
+            Resource: !GetAtt 'KnowledgeBase.KnowledgeBaseArn'
+
+  # Handoff. Consumers read these parameters rather than a CloudFormation Export, which would
+  # tie their stack's lifecycle to this one and block replacing the knowledge base.
+
+  KnowledgeBaseIdParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub '/${Application}/${Environment}/knowledgebase/knowledge-base-id'
+      Description: 'Id of the managed knowledge base to query'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !GetAtt 'KnowledgeBase.KnowledgeBaseId'
+      # AWS::SSM::Parameter takes tags as a map, not a list of Key/Value pairs.
+      Tags:
+        Application: !Ref 'Application'
+        Environment: !Ref 'Environment'
+        Resource: 'ssm-parameter-knowledgebase-id'
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'knowledgebase'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-knowledgebase'
+
+  # AWS::Bedrock::DataSource is untaggable, so this parameter is the only place tag-based
+  # inventory can pick the data source up. Deleting it hides the data source from Track E.
+
+  DataSourceIdParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub '/${Application}/${Environment}/knowledgebase/data-source-id'
+      Description: 'Id of the S3 data source. Mirrored here because AWS::Bedrock::DataSource cannot be tagged.'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !GetAtt 'DocumentDataSource.DataSourceId'
+      Tags:
+        Application: !Ref 'Application'
+        Environment: !Ref 'Environment'
+        Resource: 'ssm-parameter-knowledgebase-data-source-id'
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'knowledgebase'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-knowledgebase'
+
+  IngestionBucketParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub '/${Application}/${Environment}/knowledgebase/ingestion-bucket'
+      Description: 'Bucket the knowledge base indexes. Created outside IaC, so it carries none of the cornell:* tags.'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !Ref 'IngestionBucketName'
+      Tags:
+        Application: !Ref 'Application'
+        Environment: !Ref 'Environment'
+        Resource: 'ssm-parameter-knowledgebase-ingestion-bucket'
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'knowledgebase'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-knowledgebase'
+
+  RetrievalPolicyArnParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub '/${Application}/${Environment}/knowledgebase/retrieval-policy-arn'
+      Description: 'Managed policy a consuming role attaches to query the knowledge base'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !Ref 'RetrievalPolicy'
+      Tags:
+        Application: !Ref 'Application'
+        Environment: !Ref 'Environment'
+        Resource: 'ssm-parameter-knowledgebase-retrieval-policy-arn'
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'knowledgebase'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-knowledgebase'
+
+  # Records which commit produced the running stack. Reading this back is the cheapest
+  # proof that a merge actually flowed through to a deployed resource.
+
+  DeploymentMarkerParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub '/${Application}/${Environment}/knowledgebase/deployed-commit'
+      Description: 'Commit id of the last pipeline deploy of the knowledgebase blueprint'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !Ref 'SourceCommitId'
+      Tags:
+        Application: !Ref 'Application'
+        Environment: !Ref 'Environment'
+        Resource: 'ssm-parameter-knowledgebase-deployment-marker'
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'knowledgebase'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-knowledgebase'
+
+  # The verifier's own findings, so what the last deploy actually proved is readable without
+  # digging through CloudFormation events or Lambda logs.
+
+  LastIngestionResultParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub '/${Application}/${Environment}/knowledgebase/last-ingestion-result'
+      Description: 'Documents indexed by the last verified ingestion, and the job that did it'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !Sub
+        - 'indexed=${Indexed} scanned=${Scanned} failed=${Failed} job=${Job} commit=${SourceCommitId}'
+        - Indexed: !GetAtt 'IngestionVerifier.DocumentsIndexed'
+          Scanned: !GetAtt 'IngestionVerifier.DocumentsScanned'
+          Failed: !GetAtt 'IngestionVerifier.DocumentsFailed'
+          Job: !GetAtt 'IngestionVerifier.IngestionJobId'
+      Tags:
+        Application: !Ref 'Application'
+        Environment: !Ref 'Environment'
+        Resource: 'ssm-parameter-knowledgebase-last-ingestion-result'
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'knowledgebase'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-knowledgebase'
+
+Outputs:
+
+  KnowledgeBaseId:
+    Description: 'Id of the managed knowledge base. This is what a consumer passes to bedrock-agent-runtime.'
+    Value: !GetAtt 'KnowledgeBase.KnowledgeBaseId'
+
+  KnowledgeBaseArn:
+    Description: 'ARN of the managed knowledge base'
+    Value: !GetAtt 'KnowledgeBase.KnowledgeBaseArn'
+
+  DataSourceId:
+    Description: 'Id of the S3 data source, needed to start a manual re-sync'
+    Value: !GetAtt 'DocumentDataSource.DataSourceId'
+
+  RetrievalPolicyArn:
+    Description: 'Managed policy granting bedrock:Retrieve and bedrock:RetrieveAndGenerate on this knowledge base'
+    Value: !Ref 'RetrievalPolicy'
+
+  IngestionBucketName:
+    Description: 'Bucket whose contents this knowledge base indexes'
+    Value: !Ref 'IngestionBucketName'
+
+  DocumentsIndexed:
+    Description: 'Documents the deploy-time verifier indexed. A non-zero value here is the proof the deploy produced a populated knowledge base.'
+    Value: !GetAtt 'IngestionVerifier.DocumentsIndexed'
+
+  SmokeQueryResult:
+    Description: 'Top chunk the verifier retrieved for SmokeQuery, truncated. Proof the knowledge base answers.'
+    Value: !GetAtt 'IngestionVerifier.SmokeQueryResult'
+
+  DeploymentId:
+    Description: 'Value of the cornell:deployment-id tag on every resource in this stack'
+    Value: !Sub '${Application}-${Environment}-knowledgebase'
+
+  BlueprintVersion:
+    Description: 'Value of the cornell:blueprint-version tag'
+    Value: !Ref 'BlueprintVersion'
+
+  DeployedCommitId:
+    Description: 'Commit this stack was deployed from'
+    Value: !Ref 'SourceCommitId'
