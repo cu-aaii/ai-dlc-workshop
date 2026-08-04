@@ -37,7 +37,7 @@ async def call(tool: str, arguments: dict) -> dict:
     # same entrypoint a builder's Claude Code session does.
     params = StdioServerParameters(
         command='uv',
-        args=['run', '--directory', str(REPO_ROOT / 'builder-mcp'), 'builder-mcp'],
+        args=['run', '--directory', str(REPO_ROOT / 'packages' / 'builder-mcp'), 'builder-mcp'],
         env={
             'BUILDER_MCP_TRANSPORT': 'stdio',
             # Pin the catalog to this checkout: without it an off-repo launch fetches the

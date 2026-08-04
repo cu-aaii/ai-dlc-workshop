@@ -14,20 +14,53 @@ team controls. Builders get PR-only write access — no AWS account, no console.
 Everyone works in this one repo during the workshop, so `main` staying green matters more than
 usual: **every merge to `main` deploys to a shared AWS account.**
 
+## Where things live
+
+A monorepo. `README.md` has the annotated tree; what matters when deciding where to put
+something:
+
+| | |
+|---|---|
+| `blueprints/<name>/` | the deploy surface — one self-contained blueprint each, `blueprint.yaml` + `infra/` (+ `src/`, `infra/azure/`) |
+| `packages/<name>/` | a component that isn't a blueprint and isn't the deploy path, self-contained with its own `pyproject.toml` and lockfile |
+| `pipeline/`, `bootstrap/` | the deploy path and the account baseline |
+| `docs/aidlc-rules/` | vendored methodology, read-only |
+| `docs/aidlc/` | this repo's own AI-DLC record — historical |
+| `docs/decisions/` | one file per decision made on purpose |
+| `<component>/Dockerfile` | one per component that ships an image, in that component's own directory, with a **named target** — there is no root `Dockerfile` |
+
+**Two paths cannot move, and one of them cannot be moved even by a PR that also updates every
+reference to it:**
+
+- **`pipeline/pipeline.yml`.** The running pipeline's `PipelineDeploy` stage deploys the pipeline
+  from that literal `TemplatePath`. A commit that relocates it makes that stage fail *before* it
+  can pick up the new location, so the pipeline never self-updates and recovery is a by-hand
+  `aws cloudformation deploy` from an account nobody here has. Blueprint templates move safely
+  because `PipelineDeploy` runs first and `RestartExecutionOnUpdate` reruns from the top.
+- **`blueprints/`.** Named in a `TemplatePath` in `pipeline.yml` and globbed by
+  `catalog._load_local` in the builder-mcp package.
+
+Anything else can be rearranged, provided `tools/check` still passes.
+
 ## The AI-DLC workflow rules
 
-`aidlc-rules/` is a **verbatim vendored copy** of that directory from
+`docs/aidlc-rules/` is a **verbatim vendored copy** of the `aidlc-rules/` directory from
 [awslabs/aidlc-workflows](https://github.com/awslabs/aidlc-workflows) — the AI-DLC methodology
-the workshop teaches. Provenance and re-sync instructions are in `README.md`.
+the workshop teaches. Provenance and re-sync instructions are in `README.md`. Note the path is
+under `docs/`, not the repository root where upstream ships it.
 
-Keep it byte-identical to upstream — **do not edit anything under `aidlc-rules/`**, including to
-fix a lint or a typo. Local changes are what make the next upstream release impossible to take
+Keep it byte-identical to upstream — **do not edit anything under `docs/aidlc-rules/`**, including
+to fix a lint or a typo. Local changes are what make the next upstream release impossible to take
 cleanly, and the re-sync is a delete-and-replace that would silently discard them. Anything this
 repo needs to say about the rules goes here or in `README.md`.
 
-**When the user invokes AI-DLC, read and follow `aidlc-rules/aws-aidlc-rules/core-workflow.md`,
-and resolve its rule-detail references against `aidlc-rules/aws-aidlc-rule-details/`.** That
-second half is required: `core-workflow.md` resolves rule details from four hardcoded paths
+Not to be confused with `docs/aidlc/`, which is this repo's own record of how things here were
+built — historical, editable, and not the methodology.
+
+**When the user invokes AI-DLC, read and follow
+`docs/aidlc-rules/aws-aidlc-rules/core-workflow.md`, and resolve its rule-detail references
+against `docs/aidlc-rules/aws-aidlc-rule-details/`.** That second half is required:
+`core-workflow.md` resolves rule details from four hardcoded paths
 (`.aidlc/aidlc-rules/aws-aidlc-rule-details/`, `.aidlc-rule-details/`, `.kiro/…`, `.amazonq/…`)
 and **none of them exists here**, so without that mapping every `common/…` and `inception/…`
 reference in it dangles.
@@ -150,6 +183,12 @@ blueprint is only step 2 of three — without the action the stack deploys nothi
 in both directions, so it is a review-time error rather than a mystery, but the mirroring is
 still done by hand on purpose.
 
+**A `blueprint.yaml` must name a registered template.** The manifest is the contract
+`blueprint_search` hands a builder, so one pointing at an unregistered or nonexistent template
+advertises a blueprint whose `deployment_create` opens a PR that cannot deploy. Write the manifest
+in the same PR as the template, not before it — `validate_stacks.py` fails on the gap. A template
+with no manifest is fine and normal: builder-mcp is platform infrastructure, not a catalog entry.
+
 **Pass every parameter explicitly from the pipeline.** Template defaults exist so a stack can be
 deployed by hand for debugging — they are not the real values. A blueprint should deploy
 identically by hand and by pipeline.
@@ -175,6 +214,16 @@ and CI gets it from `hashicorp/setup-terraform`. Never document or run the bare 
 - **`cfn-lint --region` takes `nargs='+'`.** `cfn-lint --region us-east-1 <paths>` parses your
   template paths as region names, lints **nothing**, and exits 0. A literal `--` before the
   paths is mandatory. `tools/check` handles this.
+- **`validate_stacks.py --list` must emit LF, not the platform newline.** `tools/check`
+  word-splits that output into cfn-lint's arguments, so on Windows a CRLF left a trailing
+  carriage return on every path but the last and cfn-lint reported `E0003 <template> could not be
+  processed by glob.glob` — which reads like a broken template, not a broken path, and made
+  `tools/check` unable to pass on a Windows checkout at all while CI stayed green. The `--list`
+  branch reconfigures stdout; don't undo it.
+- **`uv` picks a 32-bit Python if that's what it finds.** `packages/builder-mcp/.python-version`
+  pins the interpreter, so `uv run` fetches a 64-bit CPython. Without it, on a machine whose only
+  Python is `x86`, `cryptography` has no wheel and the install disappears into a failing Rust
+  build.
 - **`AWS::SSM::Parameter` takes `Tags` as a map**, not the usual list of `Key`/`Value` pairs.
   Every other resource here uses the list form.
 - **CodeConnections connections need a human browser handshake.** CloudFormation creates them
@@ -229,15 +278,36 @@ and CI gets it from `hashicorp/setup-terraform`. Never document or run the bare 
   the stack has to start the job, and on this repo's no-CLI deploy path it should also assert the
   result — see `blueprints/knowledgebase/docs/decisions.md`.
 
-## Deliberately not built
+## Scaffolded but not built
 
-Scaffolding these early defeats the workshop's purpose. Don't pre-build them without being
-asked:
+Each of these has a directory and a README describing what goes in it and how to wire it. The
+README is the deliverable; the contents are the workshop's work, and filling them in
+unprompted defeats the point. **None of them deploys anything** — no template, no image target,
+no `pipeline/stacks.yml` entry, no pipeline action — which is what keeps a merge to `main` from
+creating resources nobody asked for:
 
-- `blueprints/course-chatbot/` — managed Bedrock Knowledge Base, Teams bot, Strands agent
-- `builder-mcp/` — the MCP server that searches blueprints and creates deployment repos
-- `observability/`
+- `blueprints/course-chatbot/` — the Lambda handler exists; the Teams frontend, the template
+  and the image target do not. Deliberately has **no `blueprint.yaml`** until its template
+  exists, so the Builder cannot offer a blueprint that can't deploy. Its knowledge base is no
+  longer a gap: `blueprints/knowledgebase/` deploys one and hands off the identifiers through
+  SSM and a retrieval managed policy.
+- `blueprints/course-chatbot/infra/azure/` — Terraform for the Bot Framework side, still just
+  a README. The pipeline does now have a Terraform stage (added for `entra-probe`), and
+  `validate_stacks.py` cross-checks modules against it in both directions — but a directory
+  only counts as a module once it holds a `.tf` file, so the first `.tf` here has to arrive in
+  the same PR as its Terraform action.
+- `observability/` — the dashboard, and the harder question of serving a unit its own view
+  without giving it AWS access.
+- `docs/decisions/` — empty but for the format. Track D's inter-block protocol decision is the
+  first one due.
 
-`ContainerBuildProject`, `ContainerRepository` and `pipeline/codebuild.yml` **are** defined and
-known-good, but no stage invokes them yet because nothing needs an image. Wiring one is a Build
-stage action plus a Dockerfile — see `pipeline/README.md`.
+`packages/builder-mcp/` **is** built: seven tools, 41 tests, an AgentCore stack, registered and
+wired to both a Build and a `BlueprintDeploy` action. It is the worked example for everything
+above — read its `SPEC.md` and `infra/builder-mcp.yml` before writing a second one.
+
+`ContainerBuildProject` and `ArmContainerBuildProject` are both live; `pipeline/codebuild.yml`
+handles the ECR login and the digest export. Adding an image is a Build stage action plus a
+`Dockerfile` with a named target in the component's own directory — the action sets
+`CONTAINER_CONTEXT` to that directory and `CONTAINER_TARGET` to the target, so **the two must
+agree with where the component actually lives**; a stale `CONTAINER_CONTEXT` fails the build with
+a missing-path error that says nothing about the move that caused it. See `pipeline/README.md`.

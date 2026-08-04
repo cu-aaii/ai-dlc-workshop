@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+#
+# Start the builder-mcp server and its local browser console together, then open
+# http://127.0.0.1:8765. Ctrl-C stops both.
+#
+# The `npm run dev` of this repo. uv has no task runner and Python has no package.json
+# scripts, so the shortcut lives here alongside tools/check.
+#
+# Nothing here deploys anything: both processes are local, and the console can only reach
+# what the MCP server exposes.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+# Local, gitignored credentials (ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, ...) -- .env is
+# excluded in .gitignore, so this is how a dev key persists across restarts without ever
+# being something a commit could pick up.
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
+PKG='packages/builder-mcp'
+MCP_PORT="${BUILDER_MCP_PORT:-8000}"
+CONSOLE_PORT="${BUILDER_CONSOLE_PORT:-8765}"
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo 'error: uv is required and was not found. See tools/check for install hints.' >&2
+  exit 127
+fi
+
+# Killing the `uv` wrapper is not enough on Windows: msys translates SIGTERM to
+# TerminateProcess, which does not touch children, so the Python server survives and keeps
+# holding its port -- the next `tools/dev` then fails to bind. taskkill //T kills the tree.
+kill_tree() {
+  local pid="$1" winpid
+  case "${OSTYPE:-}" in
+    msys* | cygwin*)
+      # msys `ps` column 4 is the Windows PID for the msys PID in column 1.
+      winpid=$(ps 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
+      if [ -n "${winpid:-}" ]; then
+        taskkill //PID "$winpid" //T //F >/dev/null 2>&1 || true
+        return
+      fi
+      ;;
+  esac
+  kill "$pid" 2>/dev/null || true
+}
+
+SERVER_PID=''
+
+stop() {
+  trap - EXIT INT TERM
+  if [ -n "$SERVER_PID" ]; then
+    echo
+    echo '==> stopping builder-mcp'
+    kill_tree "$SERVER_PID"
+  fi
+}
+trap stop EXIT INT TERM
+
+echo "==> builder-mcp        http://127.0.0.1:${MCP_PORT}/mcp"
+( cd "$PKG" && uv run builder-mcp 2>&1 | sed -u 's/^/[mcp] /' ) &
+SERVER_PID=$!
+
+# Wait for the port to accept connections before handing over to the console. The console
+# polls every 15s and would recover on its own, but starting green beats starting red.
+#
+# A TCP connect rather than an HTTP request on purpose: a bare `GET /mcp` is a protocol
+# error to an MCP server, so probing that way logs a 400 and leaves a dead session behind
+# on every startup -- noise that reads like a real failure.
+for _ in $(seq 1 60); do
+  if (exec 3<>"/dev/tcp/127.0.0.1/${MCP_PORT}") 2>/dev/null; then
+    exec 3<&- 2>/dev/null || true
+    break
+  fi
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    echo 'error: builder-mcp exited during startup -- see the [mcp] output above.' >&2
+    exit 1
+  fi
+  sleep 0.5
+done
+
+if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+  echo '    note: ANTHROPIC_API_KEY is unset. The tool panel works without it; the chat'
+  echo '          needs a credential (export the key, or run `ant auth login`).'
+fi
+
+echo "==> console            http://127.0.0.1:${CONSOLE_PORT}"
+echo '    Ctrl-C stops both.'
+echo
+
+# Foreground on purpose: Ctrl-C reaches the console directly, and the EXIT trap above
+# takes the server down with it.
+cd "$PKG" && uv run --script devtools/console.py

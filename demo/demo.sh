@@ -75,9 +75,10 @@ scene_1_ask() {
     '{"query": "a knowledge base I can ask questions about my course documents"}' --ranked
   beat
   say "Ranked, not filtered -- the whole catalog goes to the model, best match first."
-  note "knowledgebase wins on match_score. Before this branch it was invisible here: no"
-  note "blueprint.yaml manifest meant the catalog skipped the directory, and the top hit was"
-  note "tiny-chatbot -- a confident wrong answer rather than an empty result."
+  note "Every blueprint here is in the catalog because it has a blueprint.yaml manifest. One"
+  note "without a manifest is skipped with no error, so it deploys fine and no builder can be"
+  note "offered it: knowledgebase was invisible that way until #15, and this query returned"
+  note "tiny-chatbot as its top hit -- a confident wrong answer rather than an empty result."
 }
 
 scene_2_contract() {
@@ -200,7 +201,7 @@ preflight() {
   # Warm the server's dependencies before the recording starts, so scene 1 is not a wall of
   # uv download output. Failing here is a real problem worth seeing.
   note "warming up (uv sync, first run only) ..."
-  uv run --quiet --directory builder-mcp python -c 'import builder_mcp' >/dev/null
+  uv run --quiet --directory packages/builder-mcp python -c 'import builder_mcp' >/dev/null
   uv run --quiet demo/mcp_call.py blueprint_search '{"query": "warmup"}' --keys query >/dev/null
   ok "ready"
 }

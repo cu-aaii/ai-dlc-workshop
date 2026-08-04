@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cornell Builder — MCP console</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1b1e24;
+    --panel-2: #22262e;
+    --line: #2e333d;
+    --text: #dfe3ea;
+    --dim: #8d97a6;
+    --dimmer: #616b7a;
+    --cornell: #d13c3c;
+    --ok: #4fbf87;
+    --warn: #e0b653;
+    --err: #e2685f;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  button {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 5px 11px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--dimmer); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--cornell); border-color: var(--cornell); color: #fff; }
+  select {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 5px 8px;
+  }
+  select:disabled { opacity: .45; }
+  select:focus-visible { outline: 2px solid var(--cornell); outline-offset: 1px; }
+  textarea {
+    font: 12.5px/1.5 var(--mono);
+    color: var(--text);
+    background: #0f1115;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 8px;
+    width: 100%;
+    resize: vertical;
+  }
+  textarea:focus, button:focus-visible { outline: 2px solid var(--cornell); outline-offset: 1px; }
+  pre {
+    margin: 0;
+    font: 12px/1.55 var(--mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  code { font: 12.5px var(--mono); }
+
+  /* ---------- left: debug panel ---------- */
+  #debug {
+    width: 420px;
+    min-width: 300px;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+  }
+  .head { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .head h1 {
+    margin: 0 0 3px;
+    font-size: 13px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--cornell);
+  }
+  .meta { font: 11.5px/1.7 var(--mono); color: var(--dim); }
+  .meta b { color: var(--text); font-weight: 500; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; }
+  .dot.up { background: var(--ok); }
+  .dot.down { background: var(--err); }
+  .dot.wait { background: var(--warn); }
+  .flag { color: var(--dimmer); }
+  .flag.on { color: var(--ok); }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .tab {
+    flex: 1;
+    padding: 9px 0;
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--dim);
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+  }
+  .tab.sel { color: var(--text); border-bottom-color: var(--cornell); }
+  .tab .n { color: var(--dimmer); }
+
+  .scroll { flex: 1; overflow-y: auto; padding: 10px; }
+  .hidden { display: none !important; }
+
+  .tool { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 7px; background: var(--panel-2); }
+  .tool > summary {
+    padding: 8px 10px;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .tool > summary::-webkit-details-marker { display: none; }
+  .tool[open] > summary { border-bottom: 1px solid var(--line); }
+  .tname { font: 12.5px var(--mono); color: var(--text); }
+  .tsig { font: 11px var(--mono); color: var(--dimmer); }
+  .tbody { padding: 9px 10px; }
+  .tdesc { color: var(--dim); font-size: 12.5px; margin-bottom: 9px; white-space: pre-wrap; }
+  table.params { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 9px; }
+  table.params th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--dimmer);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-size: 10px;
+    padding-bottom: 4px;
+  }
+  table.params td { padding: 2px 8px 2px 0; vertical-align: top; border-top: 1px solid var(--line); }
+  table.params td:first-child { font: 11.5px var(--mono); white-space: nowrap; }
+  .req { color: var(--cornell); }
+  .ptype { font: 11px var(--mono); color: var(--dim); white-space: nowrap; }
+  .pdesc { color: var(--dim); }
+  .runrow { display: flex; gap: 7px; align-items: center; margin-top: 7px; }
+  .runrow .spacer { flex: 1; }
+  .outcome { margin-top: 8px; border-left: 2px solid var(--line); padding-left: 9px; }
+  .outcome.bad { border-left-color: var(--err); }
+  .outcome .lbl { font-size: 11px; color: var(--dim); margin-bottom: 3px; }
+
+  .logentry { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 7px; background: var(--panel-2); }
+  .logentry > summary { padding: 7px 10px; cursor: pointer; list-style: none; font: 12px var(--mono); }
+  .logentry > summary::-webkit-details-marker { display: none; }
+  .logentry.bad { border-color: #5c322f; }
+  .logentry .t { color: var(--dimmer); }
+  .logbody { padding: 0 10px 9px; }
+  .logbody .lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--dimmer);
+    margin: 8px 0 3px;
+  }
+  .empty { color: var(--dimmer); font-size: 12.5px; padding: 14px 4px; }
+
+  #grip { width: 4px; cursor: col-resize; background: var(--line); flex: 0 0 auto; }
+  #grip:hover { background: var(--cornell); }
+
+  /* ---------- right: chat ---------- */
+  #chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  #chathead {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  #chathead .title { font-size: 13px; font-weight: 600; }
+  #chathead .sub { font-size: 12px; color: var(--dim); flex: 1; }
+  #log { flex: 1; overflow-y: auto; padding: 20px 18px 8px; }
+  .msg { max-width: 760px; margin: 0 auto 18px; }
+  .who {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--dimmer);
+    margin-bottom: 5px;
+  }
+  .msg.user .bubble {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 12px;
+    white-space: pre-wrap;
+  }
+  .msg.bot .bubble { white-space: pre-wrap; }
+  .msg.bot .who { color: var(--cornell); }
+  .think {
+    border-left: 2px solid var(--line);
+    margin-bottom: 10px;
+    font-size: 12.5px;
+    color: var(--dim);
+  }
+  .think > summary {
+    cursor: pointer;
+    list-style: none;
+    padding-left: 9px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--dimmer);
+  }
+  .think > summary::-webkit-details-marker { display: none; }
+  .think .body { padding: 5px 0 3px 9px; white-space: pre-wrap; }
+  .call {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    margin: 9px 0;
+    font-size: 12.5px;
+  }
+  .call > summary { padding: 7px 11px; cursor: pointer; list-style: none; display: flex; gap: 8px; align-items: baseline; }
+  .call > summary::-webkit-details-marker { display: none; }
+  .call .n { font: 12.5px var(--mono); }
+  .call .s { color: var(--dimmer); font-size: 11.5px; margin-left: auto; }
+  .call.bad { border-color: #5c322f; }
+  .call.bad .n { color: var(--err); }
+  .call .body { padding: 0 11px 9px; }
+  .call .lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--dimmer);
+    margin: 7px 0 3px;
+  }
+  .banner {
+    max-width: 760px;
+    margin: 0 auto 18px;
+    border: 1px solid #5c322f;
+    background: #241a19;
+    color: var(--err);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 12.5px;
+  }
+  .stats { max-width: 760px; margin: -8px auto 18px; font: 11px var(--mono); color: var(--dimmer); }
+  #composer { border-top: 1px solid var(--line); padding: 12px 18px 16px; }
+  #composer .inner { max-width: 760px; margin: 0 auto; display: flex; gap: 9px; align-items: flex-end; }
+  #prompt {
+    flex: 1;
+    font: 14px/1.5 inherit;
+    min-height: 44px;
+    max-height: 190px;
+  }
+  .hint { max-width: 760px; margin: 7px auto 0; font-size: 11.5px; color: var(--dimmer); }
+  .caret::after {
+    content: "▍";
+    color: var(--cornell);
+    animation: blink 1s steps(2, start) infinite;
+  }
+  @keyframes blink { to { visibility: hidden; } }
+</style>
+</head>
+<body>
+
+<aside id="debug">
+  <div class="head">
+    <h1>Builder MCP · debug</h1>
+    <div class="meta">
+      <div><span id="dot" class="dot wait"></span><span id="conn">connecting…</span></div>
+      <div>mcp <b id="mcpurl">—</b></div>
+      <div>model <b id="model">—</b></div>
+      <div>
+        <span id="fkey" class="flag">ANTHROPIC_API_KEY</span> ·
+        <span id="ftok" class="flag">GITHUB_TOKEN</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab sel" data-pane="tools">Tools <span class="n" id="ntools"></span></button>
+    <button class="tab" data-pane="activity">Activity <span class="n" id="ncalls"></span></button>
+  </div>
+
+  <div class="scroll" id="pane-tools"></div>
+  <div class="scroll hidden" id="pane-activity">
+    <div class="empty">No tool calls yet. Chat on the right, or invoke a tool from the Tools tab.</div>
+  </div>
+</aside>
+
+<div id="grip"></div>
+
+<main id="chat">
+  <div id="chathead">
+    <span class="title">Cornell Builder</span>
+    <span class="sub" id="chatsub">describe what you want to deploy</span>
+    <button id="reset">Reset chat</button>
+  </div>
+  <div id="log"></div>
+  <div id="composer">
+    <div class="inner">
+      <textarea id="prompt" rows="1" placeholder="e.g. I need a simple hello-world service for my department"></textarea>
+      <select id="modelSelect" title="model used for the next message"></select>
+      <button id="send" class="primary">Send</button>
+    </div>
+    <div class="hint">Enter sends · Shift+Enter for a newline · mutating tools run with dry_run=true first</div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const SESSION = Math.random().toString(36).slice(2);
+let TOOLS = [];
+let CALLS = 0;
+
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+const pretty = (s) => {
+  try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; }
+};
+const clock = () => new Date().toLocaleTimeString([], { hour12: false });
+
+/* ---------- status + tool list ---------- */
+
+async function loadStatus() {
+  let s;
+  try {
+    s = await (await fetch("/api/status")).json();
+  } catch (e) {
+    $("dot").className = "dot down";
+    $("conn").textContent = "console unreachable";
+    return;
+  }
+  $("mcpurl").textContent = s.mcp_url;
+  $("model").textContent = `${s.model} · ${s.effort}`;
+  $("fkey").className = "flag" + (s.anthropic_env_key ? " on" : "");
+  $("ftok").className = "flag" + (s.github_token ? " on" : "");
+  $("ftok").title = s.github_token
+    ? "GitHub writes are live — deployment_create can open real PRs"
+    : "No GITHUB_TOKEN: write tools degrade to dry-run plans";
+
+  if (s.connected) {
+    $("dot").className = "dot up";
+    $("conn").textContent = `${s.server_name || "server"} ${s.server_version || ""}`.trim();
+  } else {
+    $("dot").className = "dot down";
+    $("conn").textContent = s.error || "MCP server unreachable";
+  }
+
+  TOOLS = s.tools || [];
+  $("ntools").textContent = TOOLS.length ? TOOLS.length : "";
+  renderTools(s);
+  populateModelSelect(s);
+}
+
+/* Populated once from the server's allow-list, not re-rendered on every 15s poll --
+   otherwise the periodic status refresh would stomp the user's in-progress selection. */
+function populateModelSelect(status) {
+  const sel = $("modelSelect");
+  if (sel.options.length) return;
+  for (const m of status.selectable_models || []) {
+    sel.append(new Option(m.label, m.id));
+  }
+  sel.value = status.default_model || sel.value;
+}
+
+function renderTools(status) {
+  const pane = $("pane-tools");
+  pane.textContent = "";
+
+  if (!TOOLS.length) {
+    const box = el("div", "empty");
+    box.append(
+      el("div", null, "No tools. Start the server first:"),
+      el("pre", null, "cd packages/builder-mcp\nuv run builder-mcp")
+    );
+    pane.append(box);
+    return;
+  }
+
+  for (const tool of TOOLS) {
+    const schema = tool.input_schema || {};
+    const props = schema.properties || {};
+    const required = schema.required || [];
+    const names = Object.keys(props);
+
+    const d = el("details", "tool");
+    const sum = el("summary");
+    sum.append(el("span", "tname", tool.name), el("span", "tsig", `(${names.join(", ")})`));
+    d.append(sum);
+
+    const body = el("div", "tbody");
+    if (tool.description) body.append(el("div", "tdesc", tool.description));
+
+    if (names.length) {
+      const table = el("table", "params");
+      const head = el("tr");
+      for (const h of ["param", "type", "description"]) head.append(el("th", null, h));
+      table.append(head);
+      for (const name of names) {
+        const spec = props[name] || {};
+        const row = el("tr");
+        const cell = el("td");
+        cell.append(el("span", null, name));
+        if (required.includes(name)) cell.append(el("span", "req", " *"));
+        row.append(cell, el("td", "ptype", typeOf(spec)), el("td", "pdesc", spec.description || ""));
+        table.append(row);
+      }
+      body.append(table);
+    }
+
+    const input = el("textarea");
+    input.rows = Math.min(10, Math.max(3, names.length + 2));
+    input.value = JSON.stringify(seed(props, required), null, 2);
+    body.append(input);
+
+    const row = el("div", "runrow");
+    const run = el("button", null, "Invoke");
+    row.append(run, el("span", "spacer"));
+    const note = el("span", "tsig", "direct call — not added to the chat");
+    row.append(note);
+    body.append(row);
+
+    const out = el("div", "outcome hidden");
+    body.append(out);
+
+    run.onclick = async () => {
+      let args;
+      try {
+        args = JSON.parse(input.value || "{}");
+      } catch (e) {
+        out.className = "outcome bad";
+        out.textContent = "";
+        out.append(el("div", "lbl", "invalid JSON"), el("pre", null, String(e.message)));
+        return;
+      }
+      run.disabled = true;
+      run.textContent = "…";
+      try {
+        const res = await fetch("/api/tool", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: tool.name, arguments: args }),
+        });
+        const data = await res.json();
+        out.className = "outcome" + (data.is_error ? " bad" : "");
+        out.textContent = "";
+        out.append(
+          el("div", "lbl", `${data.is_error ? "error" : "result"} · ${data.ms} ms`),
+          el("pre", null, pretty(data.text || data.error || ""))
+        );
+        logCall(tool.name, args, data, "manual");
+      } finally {
+        run.disabled = false;
+        run.textContent = "Invoke";
+      }
+    };
+
+    d.append(body);
+    pane.append(d);
+  }
+}
+
+function typeOf(spec) {
+  if (spec.enum) return spec.enum.join(" | ");
+  if (spec.type) return Array.isArray(spec.type) ? spec.type.join(" | ") : spec.type;
+  const any = spec.anyOf || spec.oneOf;
+  if (any) return any.map((s) => s.type || "?").filter((t) => t !== "null").join(" | ") || "any";
+  return "any";
+}
+
+/* Prefill the invoke box: required params get an empty value of the right shape, and
+   dry_run is seeded true so a stray click can't open a PR. */
+function seed(props, required) {
+  const out = {};
+  for (const [name, spec] of Object.entries(props)) {
+    if (name === "dry_run") { out[name] = true; continue; }
+    if (!required.includes(name)) continue;
+    const t = spec.type;
+    out[name] = spec.enum ? spec.enum[0]
+      : t === "integer" || t === "number" ? 0
+      : t === "boolean" ? false
+      : t === "array" ? []
+      : t === "object" ? {}
+      : "";
+  }
+  return out;
+}
+
+/* ---------- activity log ---------- */
+
+function logCall(name, input, result, origin) {
+  const pane = $("pane-activity");
+  const placeholder = pane.querySelector(".empty");
+  if (placeholder) placeholder.remove();
+
+  const bad = !!result.is_error;
+  const d = el("details", "logentry" + (bad ? " bad" : ""));
+  const sum = el("summary");
+  sum.append(
+    el("span", "t", `${clock()} `),
+    el("span", null, name),
+    el("span", "t", `  ${origin} · ${result.ms ?? "?"} ms${bad ? " · error" : ""}`)
+  );
+  d.append(sum);
+
+  const body = el("div", "logbody");
+  body.append(
+    el("div", "lbl", "input"),
+    el("pre", null, JSON.stringify(input, null, 2)),
+    el("div", "lbl", bad ? "error" : "result"),
+    el("pre", null, pretty(result.text || ""))
+  );
+  d.append(body);
+  pane.prepend(d);
+
+  CALLS += 1;
+  $("ncalls").textContent = CALLS;
+}
+
+/* ---------- chat ---------- */
+
+function addMessage(role, text) {
+  const m = el("div", `msg ${role}`);
+  m.append(el("div", "who", role === "user" ? "you" : "builder"));
+  const bubble = el("div", "bubble", text || "");
+  m.append(bubble);
+  $("log").append(m);
+  scrollLog();
+  return { node: m, bubble };
+}
+
+function scrollLog() {
+  const log = $("log");
+  log.scrollTop = log.scrollHeight;
+}
+
+async function send() {
+  const prompt = $("prompt");
+  const text = prompt.value.trim();
+  if (!text || $("send").disabled) return;
+
+  prompt.value = "";
+  prompt.style.height = "auto";
+  addMessage("user", text);
+
+  $("send").disabled = true;
+  $("chatsub").textContent = "working…";
+
+  const bot = addMessage("bot", "");
+  bot.bubble.classList.add("caret");
+  let stream = bot.bubble;            // where text deltas land right now
+  let thinking = null;
+  let produced = false;               // did anything at all come back?
+  const pending = new Map();          // tool_use id -> its <details> node
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: text, session: SESSION, model: $("modelSelect").value || undefined }),
+    });
+
+    if (!res.ok || !res.body) {
+      const detail = await res.text();
+      throw new Error(detail || `HTTP ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop();
+      for (const frame of frames) {
+        const line = frame.split("\n").find((l) => l.startsWith("data: "));
+        if (!line) continue;
+        handle(JSON.parse(line.slice(6)));
+      }
+    }
+  } catch (e) {
+    const banner = el("div", "banner", String(e.message || e));
+    $("log").append(banner);
+  } finally {
+    bot.bubble.classList.remove("caret");
+    stream.classList.remove("caret");
+    // Nothing came back (usually an error banner explains why) — drop the empty bubble
+    // rather than leaving a stray "builder" label with nothing under it.
+    if (!produced) bot.node.remove();
+    $("send").disabled = false;
+    $("chatsub").textContent = "describe what you want to deploy";
+    $("prompt").focus();
+  }
+
+  function handle(ev) {
+    if (ev.type === "thinking" || ev.type === "text" || ev.type === "tool_use") produced = true;
+
+    if (ev.type === "thinking") {
+      if (!thinking) {
+        thinking = el("details", "think");
+        thinking.append(el("summary", null, "thinking"), el("div", "body", ""));
+        bot.node.insertBefore(thinking, bot.bubble);
+      }
+      thinking.querySelector(".body").textContent += ev.text;
+      scrollLog();
+      return;
+    }
+
+    if (ev.type === "text") {
+      stream.classList.remove("caret");
+      // After a tool call the bubble is closed off; start a fresh one.
+      if (!stream.isConnected || stream.dataset.closed) {
+        stream = el("div", "bubble");
+        bot.node.append(stream);
+      }
+      stream.textContent += ev.text;
+      stream.classList.add("caret");
+      scrollLog();
+      return;
+    }
+
+    if (ev.type === "tool_use") {
+      stream.classList.remove("caret");
+      stream.dataset.closed = "1";
+      const d = el("details", "call");
+      const sum = el("summary");
+      sum.append(el("span", "n", ev.name), el("span", "s", "running…"));
+      d.append(sum);
+      const body = el("div", "body");
+      body.append(el("div", "lbl", "input"), el("pre", null, JSON.stringify(ev.input, null, 2)));
+      d.append(body);
+      bot.node.append(d);
+      pending.set(ev.id, { node: d, input: ev.input });
+      scrollLog();
+      return;
+    }
+
+    if (ev.type === "tool_result") {
+      const entry = pending.get(ev.id);
+      logCall(ev.name, entry ? entry.input : {}, ev, "chat");
+      if (!entry) return;
+      const { node } = entry;
+      if (ev.is_error) node.classList.add("bad");
+      node.querySelector(".s").textContent = `${ev.ms} ms${ev.is_error ? " · error" : ""}`;
+      const body = node.querySelector(".body");
+      body.append(
+        el("div", "lbl", ev.is_error ? "error" : "result"),
+        el("pre", null, pretty(ev.text))
+      );
+      if (ev.is_error) node.open = true;
+      scrollLog();
+      return;
+    }
+
+    if (ev.type === "usage") {
+      const line = el("div", "stats",
+        `${ev.model} · stop=${ev.stop_reason} · in ${ev.input_tokens}` +
+        (ev.cache_read ? ` (+${ev.cache_read} cached)` : "") +
+        ` · out ${ev.output_tokens}`);
+      $("log").append(line);
+      scrollLog();
+      return;
+    }
+
+    if (ev.type === "error") {
+      $("log").append(el("div", "banner", ev.message));
+      scrollLog();
+    }
+  }
+}
+
+/* ---------- wiring ---------- */
+
+for (const tab of document.querySelectorAll(".tab")) {
+  tab.onclick = () => {
+    for (const t of document.querySelectorAll(".tab")) t.classList.toggle("sel", t === tab);
+    $("pane-tools").classList.toggle("hidden", tab.dataset.pane !== "tools");
+    $("pane-activity").classList.toggle("hidden", tab.dataset.pane !== "activity");
+  };
+}
+
+$("send").onclick = send;
+
+$("prompt").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
+$("prompt").addEventListener("input", (e) => {
+  e.target.style.height = "auto";
+  e.target.style.height = Math.min(190, e.target.scrollHeight) + "px";
+});
+
+$("reset").onclick = async () => {
+  await fetch("/api/reset", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ session: SESSION }),
+  });
+  $("log").textContent = "";
+  $("prompt").focus();
+};
+
+// Drag the divider between the debug panel and the chat.
+(() => {
+  let dragging = false;
+  $("grip").addEventListener("mousedown", (e) => { dragging = true; e.preventDefault(); });
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    $("debug").style.width = Math.max(300, Math.min(760, e.clientX)) + "px";
+  });
+  window.addEventListener("mouseup", () => { dragging = false; });
+})();
+
+loadStatus();
+setInterval(loadStatus, 15000);
+$("prompt").focus();
+</script>
+</body>
+</html>

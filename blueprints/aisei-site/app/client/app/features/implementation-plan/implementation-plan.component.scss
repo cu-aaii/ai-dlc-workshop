@@ -1,0 +1,112 @@
+:host {
+  display: block;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+
+  .page-header {
+    margin-bottom: 32px;
+
+    h1 { font-family: var(--heading-font); margin-bottom: 8px; }
+
+    p {
+      color: #555;
+      max-width: 760px;
+
+      a { color: var(--color-link); }
+    }
+
+    .demo-note {
+      background: #fdf6ec;
+      border: 1px solid var(--color-warning);
+      border-radius: 4px;
+      padding: 12px 16px;
+      color: #444;
+      font-size: 14px;
+    }
+  }
+
+  .demo-section {
+    margin-bottom: 48px;
+
+    h2 {
+      font-family: var(--heading-font);
+      border-bottom: 3px solid var(--color-accent);
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+    }
+  }
+
+  .bullet-list {
+    padding-left: 20px;
+
+    li { margin-bottom: 10px; line-height: 1.5; }
+    code { background: #f2f2f2; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+  }
+
+  .plan-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+
+    th, td {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    th { color: #777; font-weight: 700; font-size: 12px; text-transform: uppercase; }
+    code { font-size: 12px; }
+  }
+
+  .phase-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    li {
+      border: 1px solid var(--color-border);
+      border-left: 4px solid #ccc;
+      border-radius: 4px;
+      padding: 12px 16px;
+
+      &.status-done { border-left-color: #3a8a3a; }
+      &.status-in-progress { border-left-color: var(--color-warning); }
+      &.status-partial { border-left-color: var(--color-primary); }
+      &.status-todo { border-left-color: #ccc; }
+
+      p { margin: 6px 0 0; color: #555; font-size: 14px; }
+    }
+
+    .phase-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .phase-num {
+      background: var(--color-accent);
+      color: #fff;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .phase-title { font-weight: 700; font-family: var(--heading-font); }
+
+    .phase-status {
+      margin-left: auto;
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #777;
+    }
+  }
+}
