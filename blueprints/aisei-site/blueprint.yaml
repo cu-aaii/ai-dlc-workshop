@@ -1,0 +1,50 @@
+# Blueprint manifest -- the contract the Cornell Builder MCP reads (product proposal §04).
+# Not a CloudFormation template: it declares no template format version, so
+# validate_stacks.py and cfn-lint ignore it by design (that check is a text scan, so even
+# naming the marker key here would trip it). The CFN template it points at is registered
+# in pipeline/stacks.yml as usual.
+apiVersion: builder.cornell.edu/v1
+kind: Blueprint
+metadata:
+  name: aisei-site
+  version: 0.1.0        # keep in lockstep with BlueprintVersion default in the template
+  maintainer: ai-sei@cornell.edu
+  maturity: experimental
+summary: >-
+  A standalone Angular + Hono web app, deployed unmodified as a single Lambda container
+  behind a public Function URL via the AWS Lambda Web Adapter. No auth, no state. A
+  minimal demo of packaging an existing app (rather than one written for this repo) as a
+  blueprint.
+matches:
+  - "a simple website"
+  - "deploy my existing web app"
+  - "an angular site"
+  - "a static-ish site with a small backend"
+inputs:
+  owner_netid:
+    type: string
+    required: true
+    description: NetID of the person who owns the deployment (cornell:owner)
+  deployment_name:
+    type: string
+    required: false
+    default: aisei-site
+    description: >-
+      Instance name (the DeploymentName parameter); part of the function name and the
+      cornell:deployment-id, so several sites can coexist per environment.
+template: blueprints/aisei-site/infra/aisei-site.yml
+# CodePipeline-level parameters, resolved by the pipeline at deploy time (not by the MCP).
+# ContainerImageUri is the digest the Build stage exports once the aisei-site Build
+# action is wired; until then the blueprint is parked (deployed_by: manual in stacks.yml).
+pipeline_parameters:
+  ContainerImageUri: "#{AiseiSiteContainer.CONTAINER_DIGEST}"
+# Unlike hello-world (which hardcodes its name and is a deliberate singleton), this
+# blueprint takes DeploymentName properly, so multiple deployments can coexist.
+singleton: false
+cost:
+  baseline_monthly_usd: 0
+  scales_with: [requests]
+data_classification: [public]
+# Backup/recovery contract (see versioning-releases-and-recovery-options.md):
+# stateless | derived | authoritative. No datastore, nothing to back up.
+state: []

@@ -1,0 +1,139 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'A single SNS topic other blueprints or scripts can publish to, with an optional email subscription so a person gets the notification directly.'
+
+Parameters:
+
+  # Metadata Parameters
+
+  Application:
+    Default: 'aidlc'
+    AllowedPattern: '[a-z0-9-]{1,10}'
+    Description: 'Name used for billing and other tracking/identification purposes'
+    Type: 'String'
+
+  Environment:
+    Default: 'main'
+    AllowedPattern: '[a-z0-9]{1,4}'
+    Description: 'Name of the deployment branch'
+    Type: 'String'
+
+  # Tagging Convention Parameters
+  #
+  # cornell:owner, cornell:blueprint, cornell:blueprint-version and cornell:deployment-id
+  # are required on every resource. Owner and deployment id vary per deployment; blueprint
+  # name and version are properties of this template, so they live here as defaults and are
+  # bumped in the PR that changes the blueprint.
+
+  Owner:
+    Default: 'ai-sei'
+    AllowedPattern: '.{1,128}'
+    Description: 'Who owns this deployment (cornell:owner)'
+    Type: 'String'
+
+  BlueprintVersion:
+    Default: '0.1.0'
+    AllowedPattern: '[0-9]+\.[0-9]+\.[0-9]+'
+    Description: 'Version of the notify-topic blueprint (cornell:blueprint-version)'
+    Type: 'String'
+
+  # Pipeline Provided Parameters
+
+  SourceCommitId:
+    Default: 'unknown'
+    AllowedPattern: '.{1,64}'
+    Description: 'Commit the pipeline deployed, passed through as #{GitRepository.CommitId}. Defaults to a placeholder so the template also deploys by hand.'
+    Type: 'String'
+
+  # Blueprint Parameters
+
+  NotificationEmail:
+    Default: ''
+    AllowedPattern: '.{0,254}'
+    Description: 'Email address to subscribe to the topic. Leave blank to skip -- SNS emails a confirmation link before delivery starts, so a subscription is inert until that link is clicked.'
+    Type: 'String'
+
+Conditions:
+
+  HasNotificationEmail: !Not [!Equals [!Ref 'NotificationEmail', '']]
+
+Resources:
+
+  # The building block: anything with permission to publish (another blueprint's Lambda, a
+  # CodeBuild step, a person with the AWS CLI) can send a message here without standing up
+  # its own delivery mechanism.
+
+  NotifyTopic:
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      TopicName: !Sub '${Application}-${Environment}-notify-topic'
+      DisplayName: !Sub '${Application}-${Environment} notifications'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'sns-topic-notify-topic'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'notify-topic'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-notify-topic'
+
+  # Optional: a person can subscribe directly instead of standing up a subscriber. SNS
+  # subscriptions have no tagging API, so this resource carries none -- it isn't an
+  # oversight, the resource type has nothing to tag.
+
+  NotifyTopicEmailSubscription:
+    Type: 'AWS::SNS::Subscription'
+    Condition: 'HasNotificationEmail'
+    Properties:
+      Protocol: 'email'
+      TopicArn: !Ref 'NotifyTopic'
+      Endpoint: !Ref 'NotificationEmail'
+
+  # Records which commit produced the running stack. Reading this back is the cheapest
+  # proof that a merge actually flowed through to a deployed resource.
+
+  NotifyTopicDeploymentMarker:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub '/${Application}/${Environment}/notify-topic/deployed-commit'
+      Description: 'Commit id of the last pipeline deploy of the notify-topic blueprint'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !Ref 'SourceCommitId'
+      # AWS::SSM::Parameter takes tags as a map, not a list of Key/Value pairs.
+      Tags:
+        Application: !Ref 'Application'
+        Environment: !Ref 'Environment'
+        Resource: 'ssm-parameter-notify-topic-deployment-marker'
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'notify-topic'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Sub '${Application}-${Environment}-notify-topic'
+
+Outputs:
+
+  DeploymentId:
+    Description: 'Value of the cornell:deployment-id tag on every resource in this stack'
+    Value: !Sub '${Application}-${Environment}-notify-topic'
+
+  BlueprintVersion:
+    Description: 'Value of the cornell:blueprint-version tag'
+    Value: !Ref 'BlueprintVersion'
+
+  DeployedCommitId:
+    Description: 'Commit this stack was deployed from'
+    Value: !Ref 'SourceCommitId'
+
+  TopicArn:
+    Description: 'ARN to publish to, or to hand to another stack that needs to publish here'
+    Value: !Ref 'NotifyTopic'
+
+  TopicName:
+    Description: 'The tagged topic this blueprint creates'
+    Value: !Sub '${Application}-${Environment}-notify-topic'

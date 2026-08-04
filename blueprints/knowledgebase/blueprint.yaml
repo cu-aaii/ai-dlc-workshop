@@ -1,0 +1,83 @@
+# Blueprint manifest -- the contract the Cornell Builder MCP reads (product proposal §04).
+# Not a CloudFormation template: it declares no template format version, so
+# validate_stacks.py and cfn-lint ignore it by design (that check is a text scan, so even
+# naming the marker key here would trip it). The CFN template it points at is registered
+# in pipeline/stacks.yml as usual.
+#
+# This manifest is why the blueprint is visible at all. The template, the registry entry and
+# the BlueprintDeploy action all landed in #13, but blueprint_search globs
+# blueprints/*/blueprint.yaml -- so until this file existed the knowledge base deployed on
+# every merge while no builder could be offered it.
+apiVersion: builder.cornell.edu/v1
+kind: Blueprint
+metadata:
+  name: knowledgebase
+  version: 0.1.0        # keep in lockstep with BlueprintVersion default in the template
+  maintainer: ai-sei@cornell.edu
+  maturity: supported
+summary: >-
+  A query-ready Amazon Bedrock managed knowledge base over documents already sitting in an S3
+  bucket. AWS owns the storage, the index and the embedding model, so there is no vector store
+  to provision. Ingests and verifies on every deploy -- a green deploy means the documents are
+  indexed and the knowledge base answered a real question -- and hands off the identifiers
+  through SSM plus a retrieval managed policy for a chatbot to consume.
+matches:
+  - "knowledge base over my documents"
+  - "let students ask questions about the syllabus"
+  - "rag over a document bucket"
+  - "search my course materials"
+  - "index pdfs so a chatbot can answer from them"
+  - "bedrock knowledge base"
+inputs:
+  owner_netid:
+    type: string
+    required: true
+    description: NetID of the person who owns the deployment (cornell:owner)
+# IngestionBucketName and SmokeQuery are deliberately NOT builder inputs even though the
+# template parameterizes both. Two reasons, and the second is the binding one:
+#   - The bucket has to already exist, hold documents, and be General Purpose in this account
+#     and region (the managed S3 connector is same-region only). A builder with no AWS access
+#     cannot satisfy that, and a wrong value does not fail cleanly -- a malformed connector
+#     body leaves CloudFormation reporting CREATE_IN_PROGRESS for twenty-plus minutes, which
+#     blocks the shared pipeline for every other track. See docs/warnings.md.
+#   - deployment_create only forwards Owner and the pipeline_parameters below into
+#     ParameterOverrides. Declaring either as an input would collect a value from the builder
+#     that never reaches the deploy, which is worse than not asking.
+# Both are platform-set below. Changing the bucket is a PR against this blueprint.
+template: blueprints/knowledgebase/infra/knowledgebase.yml
+# CodePipeline-level parameters, resolved by the pipeline at deploy time (not by the MCP).
+# Mirrors the ParameterOverrides on the live KnowledgeBaseCloudFormation action, so an action
+# rendered from this manifest deploys the same stack the pipeline already deploys. BlueprintVersion
+# is duplicated from the template default on purpose: bump both in the same PR, or the
+# cornell:blueprint-version tag will lie.
+pipeline_parameters:
+  BlueprintVersion: "0.1.0"
+  IngestionBucketName: "aidlc-kb-ingestion-890349359349"
+  SmokeQuery: "What is the late homework policy?"
+  SourceCommitId: "#{GitRepository.CommitId}"
+# The template hardcodes the knowledge base name and deployment id to
+# <app>-<env>-knowledgebase, so only one deployment of it can exist per app/environment --
+# same tradeoff hello-world and notify-topic make. Serving a second course would mean taking a
+# DeploymentName parameter and a bucket per deployment.
+singleton: true
+cost:
+  # Nothing is provisioned per-hour: MANAGED means no OpenSearch Serverless collection and no
+  # idle vector store, which is the whole reason this blueprint is affordable. What does accrue
+  # is per-document storage, embedding on ingestion, and per-query retrieval. Every merge
+  # re-ingests, but syncs are incremental, so that is cheap rather than a full re-embed.
+  baseline_monthly_usd: 0
+  scales_with:
+    - 'documents-stored-in-knowledge-base'
+    - 'document-embedding-on-ingestion'
+    - 'retrieval-queries'
+data_classification: [internal]
+# Backup/recovery contract (see versioning-releases-and-recovery-options.md):
+# stateless | derived | authoritative.
+state:
+  - name: knowledge-base-index
+    kind: derived
+    # The index is rebuildable from the documents in IngestionBucketName -- a fresh deploy
+    # re-ingests and re-verifies. Nothing here needs backing up; the bucket does, and it is
+    # outside this template (created by hand, to be brought under IaC by a CloudFormation
+    # import in a follow-up PR).
+    rebuild_from: 'IngestionBucketName'

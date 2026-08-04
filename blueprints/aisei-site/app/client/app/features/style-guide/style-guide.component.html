@@ -1,0 +1,119 @@
+<div class="page-header">
+  <h1>Style Guide</h1>
+  <p>Colors, typography, spacing, breakpoints, and logo usage ported from the live site.</p>
+</div>
+
+<section class="demo-section">
+  <h2>Colors</h2>
+  <div class="swatches">
+    <div class="swatch">
+      <span class="chip" style="background: var(--color-primary)"></span>
+      <code>--color-primary</code><span>#2d668e</span>
+    </div>
+    <div class="swatch">
+      <span class="chip" style="background: var(--color-accent)"></span>
+      <code>--color-accent</code><span>#b31b1b</span>
+    </div>
+    <div class="swatch">
+      <span class="chip" style="background: var(--color-accent-dark)"></span>
+      <code>--color-accent-dark</code><span>#a01114</span>
+    </div>
+    <div class="swatch">
+      <span class="chip" style="background: var(--color-warning)"></span>
+      <code>--color-warning</code><span>#f8981d</span>
+    </div>
+    <div class="swatch">
+      <span class="chip" style="background: var(--color-hero-bg)"></span>
+      <code>--color-hero-bg</code><span>#1a1a1a</span>
+    </div>
+    <div class="swatch">
+      <span class="chip" style="background: var(--color-hero-accent-1)"></span>
+      <code>--color-hero-accent-1</code><span>#a66dd5</span>
+    </div>
+    <div class="swatch">
+      <span class="chip" style="background: var(--color-hero-accent-2)"></span>
+      <code>--color-hero-accent-2</code><span>#c6b20f</span>
+    </div>
+    <div class="swatch">
+      <span class="chip" style="background: var(--color-footer-bg)"></span>
+      <code>--color-footer-bg</code><span>#333333</span>
+    </div>
+    <div class="swatch">
+      <span class="chip" style="background: var(--color-link)"></span>
+      <code>--color-link</code><span>#1176ac</span>
+    </div>
+  </div>
+</section>
+
+<section class="demo-section">
+  <h2>Typography</h2>
+  <p class="section-note">
+    <code>--heading-font</code>: "freight-sans-pro", Georgia, serif &middot;
+    <code>--body-font</code>: "freight-sans-pro", Verdana, Geneva, Tahoma, sans-serif
+  </p>
+  <div class="type-scale">
+    <div class="type-row"><h1>Heading 1</h1><code>42px / heading-font</code></div>
+    <div class="type-row"><h2>Heading 2</h2><code>28px / heading-font</code></div>
+    <div class="type-row"><h3>Heading 3</h3><code>20px / heading-font</code></div>
+    <div class="type-row"><p>Body text</p><code>16px / body-font</code></div>
+    <div class="type-row"><small>Small / meta text</small><code>13px / body-font</code></div>
+  </div>
+</section>
+
+<section class="demo-section">
+  <h2>Spacing scale</h2>
+  <div class="spacing-scale">
+    @for (size of spacingSizes; track size.px) {
+      <div class="spacing-row">
+        <div class="spacing-box" [style.width.px]="size.px" [style.height.px]="size.px"></div>
+        <code>{{ size.px }}px</code>
+      </div>
+    }
+  </div>
+</section>
+
+<section class="demo-section">
+  <h2>Breakpoints</h2>
+  <table class="breakpoints-table">
+    <thead>
+      <tr><th>Variable</th><th>Value</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$screen-xs-min</td><td>480px</td><td>Extra small</td></tr>
+      <tr><td>$screen-ks-min</td><td>624px</td><td>Small-ish</td></tr>
+      <tr><td>$screen-sm-min</td><td>768px</td><td>Nav collapse threshold</td></tr>
+      <tr><td>$screen-mobile-min</td><td>868px</td><td>Mobile/tablet boundary</td></tr>
+      <tr><td>$screen-md-min</td><td>992px</td><td>Medium</td></tr>
+      <tr><td>$screen-ml-min</td><td>1080px</td><td>Medium-large</td></tr>
+      <tr><td>$screen-lg-min</td><td>1200px</td><td>Large</td></tr>
+      <tr><td>$screen-xl-min</td><td>1480px</td><td>Extra large</td></tr>
+      <tr><td>$cwd-container-fluid-max-width</td><td>1280px</td><td>Max content width</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="demo-section">
+  <h2>Logo usage</h2>
+  <p class="section-note">
+    The Cornell seal SVGs are white-fill and require a dark or red background. The
+    "Cornell University / AI Innovation Hub" wordmark in the masthead is rendered as
+    HTML text, not an image.
+  </p>
+  <div class="logo-demo">
+    <div class="logo-swatch dark">
+      <img src="assets/cornell_seal.svg" alt="Cornell seal on dark background">
+    </div>
+    <div class="logo-swatch red">
+      <img src="assets/cornell_seal.svg" alt="Cornell seal on red background">
+    </div>
+  </div>
+</section>
+
+<section class="demo-section">
+  <h2>Buttons</h2>
+  <div class="buttons-demo">
+    <button class="btn-primary">Primary</button>
+    <button class="btn-secondary">Secondary</button>
+    <a class="btn-link" href="#">Link button &rarr;</a>
+  </div>
+</section>

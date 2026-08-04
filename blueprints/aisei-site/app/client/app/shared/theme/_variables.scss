@@ -1,0 +1,36 @@
+// https://github.dev/CU-CommunityApps/cwd_framework_lite/tree/main/sass/components
+$cwd-container-fluid-max-width: 1280px;
+
+// @todo use css variables instead of scss variables
+:root {
+  --color-primary: #2d668e; // Cornell blue — M2 primary palette 500
+  --color-accent: #b31b1b; // Cornell red  — M2 accent palette 500
+  --color-accent-dark: #a01114; // Cornell red, darker — secondary button hover/fill
+  --color-on-primary: #fff;
+  --color-border: #e0e0e0;
+  --color-warning: #F8981D;  // Cornell brand orange
+  --color-on-warning: #222222; // Cornell dark gray — accessible on warning background
+
+  // WordPress-migration tokens (docs/wp-migration/style-guide.html) — dark-bg only
+  // accents for the hero band, not general UI colors.
+  --color-hero-bg: #1a1a1a;
+  --color-hero-bg-light: #3d3d3d;
+  --color-hero-accent-1: #a66dd5;
+  --color-hero-accent-2: #c6b20f;
+  --color-footer-bg: #333333;
+  --color-footer-text: #bbbbbb;
+  --color-link: #1176ac;
+
+  --heading-font: "freight-sans-pro", Georgia, serif;
+  --body-font: "freight-sans-pro", Verdana, Geneva, Tahoma, sans-serif;
+}
+
+$grid-gutter-width: 30px;
+$screen-xs-min: 480px;
+$screen-ks-min: 624px;
+$screen-sm-min: 768px;
+$screen-mobile-min: 868px;
+$screen-md-min: 992px;
+$screen-ml-min: 1080px;
+$screen-lg-min: 1200px;
+$screen-xl-min: 1480px;
