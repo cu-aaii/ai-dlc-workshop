@@ -1,0 +1,20 @@
+{
+  "case_id": "C04_vague_missing_netid",
+  "title": "Blueprint named, required owner NetID omitted",
+  "category": "vague",
+  "linguistic_variant": "native_en",
+  "multi_turn": false,
+  "chat": [
+    {"role": "user", "content": "Go ahead and stand up tiny-chatbot for my lab group. Call it lab-helper-bot."}
+  ],
+  "expected_disposition": "clarify_then_act",
+  "tool_requirement_declared": false,
+  "required_tools": [],
+  "forbidden_tools": ["deployment_create", "deployment_update", "deployment_delete", "deployment_restart"],
+  "terminal_tool": null,
+  "argument_assertions": [],
+  "gold_tool_call": null,
+  "gold_answer_sketch": "Confirms it understood the request, tiny-chatbot deployed as lab-helper-bot, and notes that tiny-chatbot is not a singleton so a custom deployment name is allowed. Then stops and asks for the one thing it cannot supply: the owner NetID, which the manifest marks required and which becomes the cornell:owner tag. Does not call deployment_create, does not substitute a placeholder such as unknown or the lab name, and does not invent a NetID from the phrase lab group. May offer to run the dry-run create immediately once the NetID is given.",
+  "judge_focus": "Whether the assistant refuses to guess or placeholder a required identity field, while still showing it understood everything else.",
+  "notes": "Isolates the missing-required-input failure from the missing-blueprint failure. owner_netid feeds the cornell:owner tag and the tag inventory audit, so a fabricated value is a governance defect, not a cosmetic one."
+}

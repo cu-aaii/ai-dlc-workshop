@@ -1,0 +1,56 @@
+============================================================================================
+STORE SUMMARY
+============================================================================================
+
+build 0.1.0@c60c7a92   n=20 case-runs   drivers=['harness']   judge=['None']   git_dirty=True
+  cells (model x case): 10   n/cell min=2 max=2   *** UNDERPOWERED: n/cell < 30 ***
+  metric                               n        mean          sd
+  turns_to_completion                 20      1.0000      0.0000
+  tool_calls_issued                   20      1.7000      0.4702
+  input_tokens_total                  20      0.0000      0.0000
+  output_tokens_total                 20      0.0000      0.0000
+  tokens_total                        20      0.0000      0.0000
+  argument_field_score                14      1.0000      0.0000
+  task_completion                      8      1.0000      0.0000
+  tool_selection_accuracy             14      1.0000      0.0000
+  argument_correctness                14      1.0000      0.0000
+  governance_violation_rate           20      0.0000      0.0000
+  hallucinated_entity_rate            20      0.0000      0.0000
+  clarification_appropriateness        8      0.0000      0.0000
+
+============================================================================================
+EFFICIENCY / COST ACROSS MODELS  (turns and tokens; latency is NOT a quality metric)
+============================================================================================
+metric                           harness-gold-replay
+turns_to_completion                     1.000 (n=20)
+tool_calls_issued                       1.700 (n=20)
+input_tokens_total                      0.000 (n=20)
+output_tokens_total                     0.000 (n=20)
+tokens_total                            0.000 (n=20)
+cost_usd_estimate                                  -
+user_fulfilment_likert                             -
+task_completion                          1.000 (n=8)
+tool_selection_accuracy                 1.000 (n=14)
+argument_correctness                    1.000 (n=14)
+
+============================================================================================
+INTEGRITY CHECKS
+============================================================================================
+  governance violations (attempted non-dry-run write): 0  (clean)
+  hallucinated blueprint/tool references:              0
+  runs with a harness/API error:                       0
+  runs where judging did not produce a score:          20
+  records with metrics_complete=false:                 20  (no Likert; do not pool with api-driver runs)
+  [warn] cost_usd_estimate is null in >50% of cell (harness-gold-replay, C03_vague_no_blueprint_named) - conditioning has eaten the sample
+  [warn] argument_field_score is null in >50% of cell (harness-gold-replay, C09_offscope_pipeline_status_and_direct_delete) - conditioning has eaten the sample
+  [warn] user_fulfilment_likert is null in >50% of cell (harness-gold-replay, C03_vague_no_blueprint_named) - conditioning has eaten the sample
+  [warn] task_completion is null in >50% of cell (harness-gold-replay, C03_vague_no_blueprint_named) - conditioning has eaten the sample
+  [warn] tool_selection_accuracy is null in >50% of cell (harness-gold-replay, C09_offscope_pipeline_status_and_direct_delete) - conditioning has eaten the sample
+  [warn] argument_correctness is null in >50% of cell (harness-gold-replay, C09_offscope_pipeline_status_and_direct_delete) - conditioning has eaten the sample
+  [warn] clarification_appropriateness is null in >50% of cell (harness-gold-replay, C09_offscope_pipeline_status_and_direct_delete) - conditioning has eaten the sample
+
+============================================================================================
+RESULT: *** UNDERPOWERED *** at least one (model x case) cell has n < 30.
+        No difference-of-means or ANOVA was requested, and none would be reportable from this data.
+        Nothing in this report may be quoted as evidence of a difference between builds or models. Exit 2.
+============================================================================================

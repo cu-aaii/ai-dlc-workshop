@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "cornell-builder",
+  "owner": {
+    "name": "Cornell AI-DLC workshop team",
+    "url": "https://github.com/cu-aaii/ai-dlc-workshop"
+  },
+  "description": "The Cornell Builder MCP, packaged for Claude Code and Claude Cowork.",
+  "plugins": [
+    {
+      "name": "cornell-builder",
+      "displayName": "Cornell Builder (AI-DLC)",
+      "source": "./",
+      "description": "Deploy Cornell AWS infrastructure from plain language, via the builder-mcp server.",
+      "category": "deployment",
+      "keywords": ["aws", "cloudformation", "infrastructure", "cornell"]
+    }
+  ]
+}
