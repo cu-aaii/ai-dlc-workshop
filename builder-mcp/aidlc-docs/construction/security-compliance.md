@@ -23,6 +23,33 @@ The two findings to fix first: **F1** (workflow-file injection via `propose_chan
 pre-review code execution in GitHub Actions) and **F4** (no application logging at all,
 which makes every other control unauditable).
 
+## Remediation status (code-level pass, 2026-08-04)
+
+Code-level remediation applied on branch `c/builder/tim`. Central additions:
+`src/builder_mcp/validation.py` (path denylist, input caps, NetID pattern, `safe_error`)
+and a `_guarded` decorator in `server.py` (per-tool logging + never-raise). Findings that
+need infra changes or a mob/platform decision stay open below.
+
+| # | Status | Detail |
+|---|---|---|
+| F1 | **Fixed (code)** | `validation.file_path_problem` refuses `.github/` (incl. workflows), `..`, leading `/`\|`\` , Windows-drive absolutes, and non-`[A-Za-z0-9._/-]` characters; enforced on every path `deployment_update` writes and on `deployment_create`'s shell files. `deployment_update` additionally allowlists target repos to the workshop repo and `<org>/deploy-*`. Org-level Actions policy on `deploy-*` repos and the GitHub App migration remain platform follow-ups. |
+| F2 | **Open — superseded in part** | The Cognito-specific aspects (shared `BuilderClient` credential; client secret retrievable via `DescribeUserPoolClient`) are superseded by the Entra ID authorizer swap now in flight (separate agent owns it). Object-level authorization (verify caller vs `deployment.yaml` owner) still needs that identity to exist first — open. |
+| F3 | **Fixed (code)** | `owner_netid` validated against `^[a-z]{2,4}[0-9]{1,5}$`; `title` ≤ 200, `description` ≤ 10000; `files` capped at 50 entries / 512 KB total; every path through the F1 denylist. |
+| F4 | **Fixed (code)** | Stdlib logging, module-level loggers; one structured INFO line per tool call (tool, subject, dry_run, outcome incl. error class) via `_guarded`; details at DEBUG; secret-fetch failure now logs at WARNING (`config.py`). Configured only in `server.main()`, level from `BUILDER_MCP_LOG_LEVEL` (default INFO). No secrets or file contents logged. |
+| F5 | **Fixed (code)** | `_guarded` guarantees no tool ever raises to the transport (C3). `catalog._load_remote`/`_load_local` raise a caller-safe `CatalogError` instead of a silent empty catalog or a naked `httpx` exception. `deployment_create`/`deployment_update`/`deployment_delete` execute paths report `completed_steps` + `cleanup` guidance on partial failure. |
+| F6 | **Fixed (code)** | `validation.safe_error` used everywhere (incl. `aws_ops._friendly`): exception class + one-line summary, redacting tokens/bearer values, ARNs, 12-digit account ids, and URL query strings; full detail goes to the DEBUG log instead. |
+| F7 | **Deferred** | Rate limiting / restart cap needs an infra + mob decision (token bucket vs AgentCore quota). |
+| F8 | **Deferred** | Alarms, dashboards, log retention are infra-template work (reassigned with the infra freeze). |
+| F9 | **Partially fixed** | Base image now pinned by digest (`sha256:531f855b…`, multi-arch index digest of `python3.13-bookworm-slim`, captured 2026-08-03) and the runtime stage runs as non-root `app` (also closes advisory F15). `pip-audit` in `tools/check` and SBOM generation remain open (CI/pipeline work). |
+| F10 | **Reassigned** | `infra/builder-mcp.yml` is frozen for the Entra ID swap; the wildcard-exception comments move to the agent owning that template. |
+| F16 | **Fixed (code)** | Branch is `propose/<uuid4-hex[:8]>` — no `PYTHONHASHSEED` dependence, no cross-title collisions by construction. |
+| F17 | **Fixed (code)** | `GitHubOps` is a context manager with `close()`; all `server.py` call sites use `with GitHubOps(...)`. |
+| F13 | **Partially fixed** | Remote catalog load now surfaces a clear narrative on non-200 (403 hints at the anonymous rate limit) instead of raising/going silently empty. Ref pinning and size caps remain open. |
+
+Blocking findings not listed above (none) — all ten are Fixed, Partially fixed,
+Deferred, Reassigned, or Superseded as annotated. Deferred/Reassigned/Open items block
+per the extension until their owning track closes them.
+
 ## Findings
 
 Severity: **BLOCKING** = a verification criterion of the rule is not met (the extension

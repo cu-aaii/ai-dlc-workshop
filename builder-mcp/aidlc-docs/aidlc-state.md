@@ -11,15 +11,16 @@ share this repo and a root-level `aidlc-docs/` would collide across teams.
 - [x] Reverse Engineering — SKIPPED (deploy path already documented in CLAUDE.md / pipeline/README.md)
 - [x] Requirements Analysis — answers received 2026-08-03; `requirements.md` generated
       (Q4 answered by assumption ⭐A — mob to confirm)
-- [x] User Stories — Part 1 answered by mob (journey-based, 4 personas, G/W/T + checklist,
-      whole-journey coverage, build demo-blocking gaps, PR-reviewer sign-off); Part 2
-      generated: 28 stories / 4 personas / 18 Served, 8 Partial, 2 Not served.
-      **Awaiting mob approval of generated stories** — approval opens GATE 3
+- [x] User Stories — Part 1 answered by mob; Part 2 generated: 28 stories / 4 personas /
+      18 Served, 8 Partial, 2 Not served. **Approved by delegation 2026-08-04** (mob moved
+      to unit adoption on the story map)
 - [x] Workflow Planning — reconstructed retroactively in `inception/plans/execution-plan.md`
-- [ ] Application Design — **REOPENED.** Was never ratified; five modules were designed
-      unilaterally → **GATE 3** (opens after Gate 2)
-- [ ] Units Generation — **REOPENED.** "One unit" was walked into, not chosen; it is why no
-      parallel work was possible → **GATE 3**
+- [x] Application Design — **CLOSED 2026-08-04 (Gate 3)**: five-unit decomposition
+      verified by import analysis (side-chat), ratified by the mob;
+      `inception/application-design/unit-of-work.md` + dependency matrix
+- [x] Units Generation — **CLOSED 2026-08-04 (Gate 3)**: U1–U5 + shared kernel + UOW-0;
+      story map complete (28/28 assigned); ownership contract SPEC C8.
+      **Priority: U1 & U2 critical, U3 next.** UOW-0 (server.py split) lands before adoption
 
 ### 🟢 CONSTRUCTION PHASE
 - [x] Code Generation — server (seven tools), infra/builder-mcp.yml (AgentCore stack),
@@ -30,8 +31,12 @@ share this repo and a root-level `aidlc-docs/` would collide across teams.
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Deploy — **handed off**: Marty deploys from his account/system using
-      deploy/HANDOFF.md; this machine's job ended at "verified locally + on GitHub"
-- [ ] Post-deploy verify — deploy/verify.py against the live runtime
+      deploy/HANDOFF.md; this machine's job ended at "verified locally + on GitHub".
+      Inbound auth is **Entra ID client-credentials** (productionizing question P2
+      answered 2026-08-03 by platform-lead directive; Cognito removed — DECISION-20).
+      New hand-created pre-flight: Azure app registration + two SSM parameters
+      (`/entra/builder-mcp/*`) + `entra-client-secret` in Secrets Manager (see HANDOFF)
+- [ ] Post-deploy verify — deploy/verify.py against the live runtime (Entra token flow)
 
 ## Intent Analysis
 - **Request type**: New project (component) inside existing repo

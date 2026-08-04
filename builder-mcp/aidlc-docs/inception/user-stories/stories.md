@@ -93,6 +93,9 @@ shows exactly what would be created, so that mistakes cost seconds, not cleanup.
 
 **Coverage:** **Served** — `deployment_create` (dry-run-first is mandatory UX, C3).
 
+*Refining dry-run as a confirm UX is deprioritized to the backlog (mob, 2026-08-03);
+the criteria above stand as the mechanical contract (BACKLOG "UX").*
+
 ### ST-06 · Be guided through the inputs, not interrogated
 **Persona:** Builder.
 As a Builder, I want to be walked through required inputs with multiple-choice options
@@ -107,6 +110,9 @@ where enums exist, so that I never have to guess a free-text value (NFR6).
 `deployment_create` dry-run errors drive the conversation, but true MCP elicitation is
 impossible on the stateless transport (GOTCHA-ELICITATION); the dry_run two-step is the
 stand-in confirm UX (C4).
+
+*Refining the dry-run two-step as a confirm UX is deprioritized to the backlog
+(mob, 2026-08-03); the criteria above stand (BACKLOG "UX").*
 
 ### ST-07 · No deployment without an owner
 **Persona:** Builder (secondary: Platform Operator).
@@ -270,8 +276,12 @@ current pinned version, so that a transient failure doesn't require a PR.
   `deployment_update`).
 - **Given** `dry_run=true` (default), **When** I call it, **Then** I see what would be
   restarted before anything starts.
+- **Given** a restart in progress, **When** the re-run has not gone green within
+  **30 minutes**, **Then** that restart is treated as failed, counts against the cap
+  of 3 (ST-20), and the narrative says so (mob, 2026-08-03).
 
-**Coverage:** **Served** — `deployment_restart`.
+**Coverage:** **Served** — `deployment_restart` (the 30-minute time box itself is the
+same future guardrail as the cap — see ST-20).
 
 ### ST-18 · Every resource visible to inventory and cost
 **Persona:** Platform Operator.
@@ -311,6 +321,9 @@ unbounded retries can't mask real failures or burn pipeline runs.
   the platform team.
 - **Given** the cap triggers, **When** the refusal is returned, **Then** it is a
   narrative with the count and window, not a bare error.
+- **Given** a restart whose re-run has not gone green within **30 minutes**, **When**
+  the time box expires, **Then** that restart is treated as failed, counts against the
+  cap of 3, and the narrative says so (mob, 2026-08-03).
 
 **Coverage:** **Not served** — agreed future guardrail (BACKLOG "Operations &
 guardrails"); needs restart-count state the stateless server (C4) doesn't keep.
@@ -328,6 +341,10 @@ alone, so that incident response doesn't require console archaeology.
 **Coverage:** **Served** — `deployment_read` + `deployment_health`.
 
 ## Stage 7 — Evolve
+
+> **Scope: post-MVP** (mob, 2026-08-03). Stage 7 is marked post-MVP by the mob —
+> stories retained for the roadmap, excluded from MVP acceptance. Stage 8 remains in
+> MVP scope.
 
 ### ST-22 · Change it the same way it was born
 **Persona:** Builder.
@@ -451,7 +468,9 @@ before rehearsal:
 - [ ] **Beat 2 — Blueprint match**: `blueprint_search` returns the catalog ranked with
       summaries and cost baseline (ST-01, ST-02, ST-04 criterion 1).
 - [ ] **Beat 3 — Repo appears**: `deployment_create` dry-run shown, then real run
-      creates the deployment repo (ST-05, ST-08). *Pre-req:* org-scoped GitHub
+      creates the deployment repo (ST-05, ST-08). *Show the dry-run briefly as the
+      tool's default mechanics — the confirm-UX polish is backlogged (mob,
+      2026-08-03; BACKLOG "UX").* *Pre-req:* org-scoped GitHub
       credential in place — without it writes degrade to dry-run (GAP-D1).
 - [ ] **Beat 4 — PR opened**: registration PR visible, one-action diff, convention
       stack name (ST-08, ST-11). *Pre-req:* same credential; a second person available
@@ -478,11 +497,11 @@ Demo-blocking = blocks one of beats 1–6 above. Per Q-S5 = B, demo-blocking gap
 | GAP-01 · `deployment_list` — fleet/own-deployments inventory | ST-19, ST-18 | No | Log (new BACKLOG item; C3 contract change) |
 | GAP-02 · Parameter-aware cost estimate + platform overhead | ST-04 | No (baseline shown at beat 2 suffices) | Log (BACKLOG "Cost", exists) |
 | GAP-03 · Restart cap (3 per window) | ST-20 | No | Log (BACKLOG "Operations & guardrails", exists) |
-| GAP-04 · Release system + release notes (FR8) | ST-23, ST-25 | No | Log (versioning options doc awaiting mob decision) |
-| GAP-05 · Conversational blueprint-contribution/scaffold tool | ST-24 | No | Log (new BACKLOG item; C3 contract change) |
+| GAP-04 · Release system + release notes (FR8) | ST-23, ST-25 | No | Log — **post-MVP** (Stage 7 scope, mob 2026-08-03; versioning options doc awaiting mob decision) |
+| GAP-05 · Conversational blueprint-contribution/scaffold tool | ST-24 | No | Log — **post-MVP** (Stage 7 scope, mob 2026-08-03; C3 contract change) |
 | GAP-06 · Push notification on pipeline state change | ST-15 | No (polling covers beat 5) | Log (needs state the C4 stateless server doesn't keep) |
 | GAP-07 · Offboarding package content spec | ST-27 | No | Log (FR7 marks it "later") |
-| GAP-08 · Upgrade composition (version-diff aware PR, release notes in body) | ST-25 | No | Log (upgrade-bot is P1, BACKLOG "Platform") |
+| GAP-08 · Upgrade composition (version-diff aware PR, release notes in body) | ST-25 | No | Log — **post-MVP** (Stage 7 scope, mob 2026-08-03; upgrade-bot is P1, BACKLOG "Platform") |
 
 **Not-served stories:** ST-19 (`deployment_list`), ST-20 (restart cap). Neither blocks
 a demo beat; both are logged above. Every other story is Served or Partial.

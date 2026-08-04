@@ -14,7 +14,10 @@ from __future__ import annotations
 import json
 import re
 
-DEPLOYMENT_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,28}[a-z0-9]$")
+# 2-30 chars, lowercase alphanumeric with single hyphens between; consecutive hyphens
+# are forbidden (the lookahead) because pascal_case would otherwise collide distinct
+# names ('a-a' and 'a--a' both map to 'AA' — non-injectivity found by property testing).
+DEPLOYMENT_NAME_PATTERN = re.compile(r"^(?!.*--)[a-z0-9][a-z0-9-]{0,28}[a-z0-9]$")
 
 
 def pascal_case(name: str) -> str:
@@ -117,12 +120,17 @@ def deployment_repo_files(
     owner_netid: str,
     parameters: dict[str, str],
     workshop_repo_full: str,
+    shell_location: str = "repo",
 ) -> dict[str, str]:
-    """The thin shell a deployment repo starts with (proposal D1: reference, never copy).
+    """The thin shell a deployment starts with (proposal D1: reference, never copy).
 
-    The repo holds the deployment's identity and parameters; the blueprint's code stays in
+    The shell holds the deployment's identity and parameters; the blueprint's code stays in
     the catalog and is referenced by pinned version. This is the builder's iteration home:
-    deployment_update targets this repo, and its spec regenerates from deployment.yaml.
+    deployment_update targets it, and its spec regenerates from deployment.yaml.
+
+    `shell_location` only varies the README wording: 'repo' (target state) describes a
+    dedicated deploy-<name> repo; 'folder' (testing phase) describes the same shell living
+    at outputs/<name>/ inside the workshop repo.
     """
     deployment_manifest = {
         "apiVersion": "builder.cornell.edu/v1",
@@ -141,11 +149,26 @@ def deployment_repo_files(
     }
     import yaml as _yaml
 
+    if shell_location == "folder":
+        home = f"folder (`outputs/{deployment_name}/` in {workshop_repo_full})"
+        update_hint = (
+            f"- To change this deployment, open a pull request against "
+            f"{workshop_repo_full}\n  touching these `outputs/{deployment_name}/...` "
+            "paths (your AI harness's\n  `deployment_update` tool does this). Nobody -- "
+            "human or agent -- has direct write access."
+        )
+    else:
+        home = "repo"
+        update_hint = (
+            "- To change this deployment, open a pull request (your AI harness's "
+            "`deployment_update`\n  tool does this). Nobody -- human or agent -- has "
+            "direct write access."
+        )
     readme = f"""# {deployment_name}
 
 Deployment of the **{blueprint_name}** blueprint (v{blueprint_version}), owned by `{owner_netid}`.
 
-This repo is a thin shell: `deployment.yaml` records which blueprint version this
+This {home} is a thin shell: `deployment.yaml` records which blueprint version this
 deployment pins and the parameters it was created with. The blueprint's code lives in the
 catalog ({workshop_repo_full}) and is *referenced*, never copied, so platform patches reach
 this deployment as version-bump pull requests.
@@ -153,8 +176,7 @@ this deployment as version-bump pull requests.
 - Stack: `{stack_name}` (us-east-1)
 - Deploys on merge to the tracked branch of {workshop_repo_full} -- merge is the only
   trigger; there is no deploy button.
-- To change this deployment, open a pull request (your AI harness's `deployment_update`
-  tool does this). Nobody -- human or agent -- has direct write access.
+{update_hint}
 """
     return {
         "deployment.yaml": _yaml.safe_dump(deployment_manifest, sort_keys=False),

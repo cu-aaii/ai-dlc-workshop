@@ -8,9 +8,12 @@ neither -- that boundary is the point of the design (proposal D3).
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def _find_repo_root() -> Path | None:
@@ -34,6 +37,13 @@ class Settings:
     aws_region: str
     github_token: str | None  # absent -> GitHub write operations return dry-run plans
     repo_root: Path | None    # absent -> read catalog/pipeline from GitHub
+    # Where deployment_create puts the deployment shell:
+    #   'folder' (testing-phase default) -> outputs/<name>/ in the workshop repo, on the
+    #             same branch as the registration PR -- one PR, no repo creation. Used
+    #             while the team's GitHub credential cannot create org repos.
+    #   'repo'   -> a new cu-aaii/deploy-<name> repo (the D1/D5 target state), stashed
+    #             behind this switch and reactivated by BUILDER_MCP_DEPLOYMENT_MODE=repo.
+    deployment_mode: str = "folder"
 
     @property
     def pipeline_name(self) -> str:
@@ -58,7 +68,21 @@ class Settings:
             aws_region=region,
             github_token=_resolve_github_token(region),
             repo_root=Path(root) if root else _find_repo_root(),
+            deployment_mode=_resolve_deployment_mode(),
         )
+
+
+def _resolve_deployment_mode() -> str:
+    """'folder' | 'repo' from BUILDER_MCP_DEPLOYMENT_MODE; anything else degrades to
+    'folder' with a warning rather than crashing (NFR7 -- a bare start must succeed)."""
+    mode = os.environ.get("BUILDER_MCP_DEPLOYMENT_MODE", "folder").strip().lower()
+    if mode not in ("folder", "repo"):
+        logger.warning(
+            "BUILDER_MCP_DEPLOYMENT_MODE %r is not 'folder' or 'repo'; using 'folder'",
+            mode,
+        )
+        return "folder"
+    return mode
 
 
 def _resolve_github_token(region: str) -> str | None:
@@ -81,5 +105,13 @@ def _resolve_github_token(region: str) -> str | None:
             SecretId=secret_name
         )
         return response.get("SecretString") or None
-    except Exception:
+    except Exception as error:
+        # Degrade to read-only rather than crash (NFR7) — but never silently
+        # (SECURITY-03): the operator must be able to see why writes became dry-runs.
+        logger.warning(
+            "could not fetch GitHub token secret %r (%s); GitHub writes degrade to "
+            "dry-run plans",
+            secret_name,
+            error.__class__.__name__,
+        )
         return None

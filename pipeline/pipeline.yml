@@ -671,8 +671,9 @@ Resources:
                   "RemoteGitRepository": "${RemoteGitRepository}"
                   }
 
-        # Container images, built before anything deploys. One action per named target in
-        # the root Dockerfile; CONTAINER_DIGEST is exported so the deploy action below can
+        # Container images, built before anything deploys. One action per component
+        # Dockerfile (CONTAINER_CONTEXT is the component directory, CONTAINER_TARGET its
+        # named target); CONTAINER_DIGEST is exported so the deploy action below can
         # pin by digest rather than tag (see pipeline/codebuild.yml).
         - Name: 'Build'
           Actions:
@@ -690,6 +691,7 @@ Resources:
                 EnvironmentVariables: >-
                   [
                   {"name": "CONTAINER_TARGET", "value": "builder-mcp", "type": "PLAINTEXT"},
+                  {"name": "CONTAINER_CONTEXT", "value": "builder-mcp", "type": "PLAINTEXT"},
                   {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
                   ]
 
@@ -742,6 +744,15 @@ Resources:
                 TemplatePath: 'GitRepositoryArtifact::builder-mcp/infra/builder-mcp.yml'
                 # ContainerImageUri arrives as the digest the Build stage just pushed, so
                 # the runtime always runs exactly the image this commit produced.
+                # TESTING PHASE: "AuthMode": "open" masks the Entra inbound authorizer
+                # (open = AgentCore's default AWS IAM SigV4 -- never anonymous). The two
+                # stashed Entra overrides, to re-add when flipping AuthMode to "entra":
+                #   "EntraTenantId": "<raw tenant id>",
+                #   "EntraClientId": "<raw client id>"
+                # or restore the stashed SSM-valued parameter form in
+                # builder-mcp/infra/builder-mcp.yml and pass the /entra/builder-mcp/*
+                # parameter names instead. Restore steps: builder-mcp/deploy/HANDOFF.md,
+                # section "Testing phase: AuthMode=open".
                 ParameterOverrides: !Sub >-
                   {
                   "Application": "${Application}",
@@ -749,7 +760,8 @@ Resources:
                   "Owner": "${Owner}",
                   "BlueprintVersion": "0.1.0",
                   "ContainerImageUri": "#{BuilderMcpContainer.CONTAINER_DIGEST}",
-                  "GitHubTokenSecretName": "${Application}/${Environment}/builder-mcp/github-token"
+                  "GitHubTokenSecretName": "${Application}/${Environment}/builder-mcp/github-token",
+                  "AuthMode": "open"
                   }
 
             # The knowledge base ingests and then verifies its own contents inside the deploy,

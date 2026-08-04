@@ -100,3 +100,17 @@ def test_deployment_repo_shell_pins_version_and_never_copies():
     # the shell references the template, it does not contain it
     assert "AWSTemplateFormatVersion" not in files["deployment.yaml"]
     assert "merge is the only\n  trigger" in files["README.md"] or "merge is the only" in files["README.md"]
+
+
+def test_deployment_shell_folder_variant_describes_the_outputs_folder():
+    files = deployment_repo_files(
+        "hello-world", "0.1.0", "blueprints/hello-world/infra/hello-world.yml",
+        "team-x-hello", "aidlc-main-team-x-hello", "tmf77",
+        {"owner_netid": "tmf77"}, "cu-aaii/ai-dlc-workshop",
+        shell_location="folder",
+    )
+    assert set(files) == {"deployment.yaml", "README.md"}
+    # same manifest either way; only the README wording knows where the shell lives
+    assert "version: 0.1.0" in files["deployment.yaml"]
+    assert "outputs/team-x-hello/" in files["README.md"]
+    assert "This repo is a thin shell" not in files["README.md"]

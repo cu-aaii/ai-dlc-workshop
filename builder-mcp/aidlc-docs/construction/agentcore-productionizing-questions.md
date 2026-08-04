@@ -35,7 +35,12 @@ AgentCore requires one of two inbound auth modes; "no auth" is not an option.
   today thing.
 - X) Other
 
-[Answer]:
+[Answer]: X — **Entra ID now**, by platform-lead directive (Marty, 2026-08-03),
+superseding the earlier Cognito assumption (⭐B / DECISION-16). Cornell is an M365 shop
+and Entra was already the stated end state; Marty hand-creates the Azure app registration
+and its ids reach the stack via SSM parameters (`/entra/builder-mcp/*`). Still
+client-credentials (app identity) — per-user NetID identity via authorization-code flow
+stays a P1 item (BACKLOG). See DECISION-20.
 
 ## P3 — Account, tags, and blast radius for today's CLI deploy
 

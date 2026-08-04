@@ -7,6 +7,7 @@ somewhere past 75-100 blueprints; revisit then, don't pre-build vector search.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,13 @@ import httpx
 import yaml
 
 from .config import Settings
+
+logger = logging.getLogger(__name__)
+
+
+class CatalogError(Exception):
+    """Catalog could not be loaded. The message is a caller-safe narrative: tools
+    surface it verbatim as {"error": ...} instead of an empty, silent catalog."""
 
 
 @dataclass
@@ -75,29 +83,53 @@ def load_catalog(settings: Settings) -> list[Blueprint]:
 
 
 def _load_local(repo_root: Path) -> list[Blueprint]:
+    blueprints_dir = repo_root / "blueprints"
+    if not blueprints_dir.is_dir():
+        raise CatalogError(
+            f"blueprint catalog unavailable: no 'blueprints' directory under "
+            f"{repo_root} — check BUILDER_MCP_REPO_ROOT points at a workshop checkout"
+        )
     blueprints = []
-    for manifest in sorted((repo_root / "blueprints").glob("*/blueprint.yaml")):
+    for manifest in sorted(blueprints_dir.glob("*/blueprint.yaml")):
         blueprints.append(Blueprint.from_manifest(yaml.safe_load(manifest.read_text(encoding="utf-8"))))
+    logger.debug("loaded %d blueprints from %s", len(blueprints), blueprints_dir)
     return blueprints
 
 def _load_remote(settings: Settings) -> list[Blueprint]:
     headers = {"Accept": "application/vnd.github+json"}
     if settings.github_token:
         headers["Authorization"] = f"Bearer {settings.github_token}"
-    with httpx.Client(base_url="https://api.github.com", headers=headers, timeout=15) as client:
-        listing = client.get(f"/repos/{settings.workshop_repo_full}/contents/blueprints")
-        listing.raise_for_status()
-        blueprints = []
-        for entry in listing.json():
-            if entry.get("type") != "dir":
-                continue
-            raw = client.get(
-                f"/repos/{settings.workshop_repo_full}/contents/blueprints/{entry['name']}/blueprint.yaml",
-                headers={"Accept": "application/vnd.github.raw+json"},
-            )
-            if raw.status_code == 200:
-                blueprints.append(Blueprint.from_manifest(yaml.safe_load(raw.text)))
-        return blueprints
+    try:
+        with httpx.Client(base_url="https://api.github.com", headers=headers, timeout=15) as client:
+            listing = client.get(f"/repos/{settings.workshop_repo_full}/contents/blueprints")
+            if listing.status_code != 200:
+                raise CatalogError(
+                    f"blueprint catalog unavailable: GitHub returned HTTP "
+                    f"{listing.status_code} listing blueprints/ in "
+                    f"{settings.workshop_repo_full}"
+                    + (
+                        " (likely the anonymous rate limit; configure a token)"
+                        if listing.status_code == 403
+                        else ""
+                    )
+                )
+            blueprints = []
+            for entry in listing.json():
+                if entry.get("type") != "dir":
+                    continue
+                raw = client.get(
+                    f"/repos/{settings.workshop_repo_full}/contents/blueprints/{entry['name']}/blueprint.yaml",
+                    headers={"Accept": "application/vnd.github.raw+json"},
+                )
+                if raw.status_code == 200:
+                    blueprints.append(Blueprint.from_manifest(yaml.safe_load(raw.text)))
+            logger.debug("loaded %d blueprints from GitHub", len(blueprints))
+            return blueprints
+    except httpx.HTTPError as error:  # network/timeout — never a silent empty catalog
+        raise CatalogError(
+            "blueprint catalog unavailable: could not reach GitHub "
+            f"({error.__class__.__name__})"
+        ) from error
 
 
 def search(catalog: list[Blueprint], query: str) -> list[tuple[float, Blueprint]]:
