@@ -181,9 +181,23 @@ off should drop the requirement to a Sites scope alone, which is a much smaller 
 `GBHYGKPMYL` is a **shape** reference only — copy its structure if you like, but do not treat it as
 proof the shape ingests.
 
+**The consent hypothesis is now confirmed, and the shape is now proven — elsewhere.**
+`sharepoint-runbook.md` documents a managed SharePoint data source built end to end on a separate
+tenant and AWS account, which ingested successfully holding `Sites.Selected` and nothing else on
+both Microsoft Graph and the SharePoint REST API. No `GroupMember.Read.All`, no `User.Read.All`, no
+scope error. `aclEnabled: false` is sufficient on its own: `crawlIdentities` then defaults to
+`false` without being set. So an unpinning PR's consent ask is two `Sites.Selected` grants plus one
+per-site grant, not five tenant-wide permissions.
+
+That evidence is from another account, so it says nothing about `GBHYGKPMYL`, about
+`dev/workshop/entra/sharepoint`, or about whether this tenant's `siteUrls` is right — the paragraph
+above still stands on all three. What it does establish is that the auth path itself works and what
+it costs, which is what "reachable" was short of.
+
 Independently of all that, SharePoint stays pinned on **scope**: adding a second data source means
 extending the verifier, which asserts on a single ingestion job and would otherwise let an empty
-second source pass green. `infra/azure/sharepoint-entra.tf.sample` records the shape.
+second source pass green. `infra/azure/sharepoint-entra.tf.sample` records the shape, and
+`sharepoint-runbook.md` records the procedure.
 
 The self-managed connector remains rejected: preview, and its docs state only OpenSearch Serverless
 is available with it — the continuous OCU floor, on a shared account, for a demo.

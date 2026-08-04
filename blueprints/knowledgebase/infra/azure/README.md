@@ -45,6 +45,14 @@ In order, because each step is blocked by the previous one:
 1. **Decide the auth story.** Realistically: a new Entra app registration with a certificate,
    certificate in Secrets Manager, `ENTRA_ID_APP_ONLY`. The existing client secret is a dead end
    for the managed connector.
+
+   **This step now has a worked answer.** `../../docs/sharepoint-runbook.md` is that path
+   validated end to end on a separate tenant and account: certificate generation, the two
+   resource applications that both need grants, the per-site `Sites.Selected` grant, the
+   Secrets Manager and IAM shapes, and a pre-flight script that separates an Entra fault from
+   a Bedrock one before any Bedrock resource exists. It also confirms the consent ask is a
+   `Sites` scope alone as long as `aclEnabled` is `false` — see `../../docs/decisions.md`.
+   It changes no template; steps 2–4 below are still open.
 2. **Wire the Terraform stage** — a CodeBuild action that runs `terraform apply` with state
    somewhere durable. Note the org allowed-actions policy permits `hashicorp/setup-terraform@*`
    in GitHub Actions, which is a hint the platform team anticipated this, but the *pipeline* stage

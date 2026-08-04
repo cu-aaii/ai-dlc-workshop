@@ -159,4 +159,6 @@ See `docs/warnings.md`.
 - `docs/decisions.md` — the forks taken, what was rejected, and the evidence
 - `docs/assumptions.md` — what must already be true for this to deploy
 - `docs/warnings.md` — cost, silent-failure modes, immutable fields
+- `docs/sharepoint-runbook.md` — a validated end-to-end SharePoint procedure, for
+  whoever unpins it. Reference only; changes no template.
 - `skills/knowledgebase/SKILL.md` — how Claude Code reproduces this to standard
