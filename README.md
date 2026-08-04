@@ -29,6 +29,7 @@ blueprints/                 THE DEPLOY SURFACE — one directory per blueprint
   knowledgebase/              Bedrock managed knowledge base; verifies its own ingestion
   entra-probe/                one Entra app registration; proves the Terraform path
   tiny-chatbot/               canned-response Lambda behind a Function URL; parked
+  aisei-site/                 an existing Angular + Hono app as a Lambda container; parked
   course-chatbot/             the workshop MVP — scaffold only, deploys nothing yet
 packages/                   components, one package each
   builder-mcp/                the Cornell Builder MCP server (track A)
@@ -42,18 +43,23 @@ pipeline/                   the deploy path
 bootstrap/                  account baseline — deployed BY HAND, once per account
   account-bootstrap.yml       deploy role, artifact bucket, GitHub connection
 observability/              seeing what's running (track E) — scaffold only
+demo/                       terminal walkthrough of the builder path; the no-Teams fallback
 docs/
   aidlc-rules/                the AI-DLC methodology — vendored from awslabs, do not edit
   aidlc/                      how things here were built — a record, not a backlog
   decisions/                  one file per decision made on purpose
-tools/check                 the checks that gate a merge; CI runs this exact script
+tools/
+  check                       the checks that gate a merge; CI runs this exact script
+  dev                         start builder-mcp and its local browser console together
 .github/workflows/
   pr-checks.yml               runs tools/check. No AWS calls, no credentials.
 .mcp.json                   GitHub MCP server for Claude Code — needs one env var, see below
+.env.example                template for the gitignored .env that tools/dev sources
 ```
 
-Every directory has its own README explaining what goes in it, except `docs/aidlc-rules/` — see
-below for why that one is left exactly as upstream ships it.
+Most directories have their own README explaining what goes in it. `docs/aidlc-rules/` is the
+deliberate exception — see below for why it is left exactly as upstream ships it. `packages/`,
+`docs/` and `tools/` have none; their conventions live in `CLAUDE.md`.
 
 **Two paths cannot move.** `pipeline/pipeline.yml`, because the running pipeline deploys itself
 from that literal path and a commit that relocates it breaks the stage that would have picked up
