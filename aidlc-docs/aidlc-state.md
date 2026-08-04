@@ -273,7 +273,13 @@ cleanup — deliberately not done.
       - [x] U-01 — **APPROVED 2026-08-03** — 9 patterns, zero infrastructure components. **RESILIENCY-14 SATISFIED**;
             **RESILIENCY-04/-15 ASSIGNED to U-02's NFR Design (2nd deferral)**
       - [ ] U-02 — inherits RESILIENCY-04/-15 as a named obligation
-- [ ] Infrastructure Design — EXECUTE (SECURITY-01, -06, -14 SRI, RESILIENCY-08, container build)
+- [ ] Infrastructure Design — **applicability to U-01 QUESTIONED, not assumed** (see
+      `construction/plans/u-01-infrastructure-design-applicability.md`). U-01 has **zero** infrastructure
+      components; the plan's own justification for this stage (SECURITY-01, -06, -14 SRI, RESILIENCY-08,
+      container build) is entirely U-02's. **First stage where the per-unit split does not fit** — both
+      container images contain U-01's code, so the infrastructure is indivisible where the logic was not.
+      - [ ] U-01 — awaiting the skip/thin-pass/combined decision
+      - [ ] U-02 — full pass under every option; carries §6.4
 - [ ] Code Generation — EXECUTE (ALWAYS)
 - [ ] Build and Test — EXECUTE (ALWAYS)
 
