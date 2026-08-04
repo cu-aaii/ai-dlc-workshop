@@ -2967,3 +2967,71 @@ noted in the affected artifacts; the history stays as it happened.
 
 `docs/decisions/0001` keeps its filename for the same reason — it was accepted under that name, and a
 decision record that silently renames itself is not a record.
+
+---
+
+## CONSTRUCTION — Code Generation (front door unit)
+
+**Timestamp**: 2026-08-04T17:45:00Z
+**Artifact**: `construction/front-door/code/code-generation.md`
+**Status**: **RETRO-FITTED**, and labelled as such on its first line.
+
+Neither of Code Generation's two parts happened in order: no plan, no approval gate, and
+`core-workflow.md` unread until after the code existed. The document is an honest reconstruction
+rather than the plan it is supposed to be.
+
+**Three places the missing plan actually cost something**, all found later: packaging settled by a
+character count instead of by Infrastructure Design; the knowledge base coupling that violated FR-4;
+and the whole unit built in the wrong directory.
+
+**Six design decisions recorded that no earlier stage had made** — lazy `_Runtime`, `log_id` separate
+from `activity_id`, unconfigured `BOT_APP_ID` refusing everything, retrieval inside `_ask()`, numbered
+passage tags, and the `or`-not-`.get` greeting read. All were made by the author alone; a plan would
+have surfaced them for approval.
+
+**§6 separates verified from asserted**, which matters more than the test count. Verified: JWT
+validation, the always-200 contract, retrieval degradation, log-id bounding, template validity,
+parameter completeness. **Asserted, never once exercised**: the image builds for arm64, the Lambda
+answers in Teams, and the gateway accepts this request shape.
+
+---
+
+## CONSTRUCTION — Build and Test
+
+**Timestamp**: 2026-08-04T17:55:00Z
+**Artifacts**: `construction/build-and-test/` — `build-instructions.md`,
+`unit-test-instructions.md`, `integration-test-instructions.md`, `build-and-test-summary.md`
+
+**No separate `performance-test-instructions.md`**, and the framework allows it ("if applicable"):
+there is no SLA and no load test is warranted at workshop scale. The one performance property that is
+*functional* — the Teams 10–15s budget, which FR-9's violation makes cover the entire round trip — is
+in the integration document beside the command that measures it.
+
+**Split by verifiability.** The build and unit-test documents were delegated to a Haiku subagent
+because every command in them either runs or does not; the integration document was written directly,
+because it encodes operational detail (which tenant each `az` command needs, the two secrets that
+deploy green and answer nothing, the first-merge-does-not-deploy behaviour) that a subagent without
+that context would have had to invent.
+
+**Integration Step 0 is a five-second `curl` against the gateway**, placed first deliberately: it is
+the cheapest test of the riskiest untested assumption. A wrong auth header is a silent `401` that
+looks exactly like a bad secret.
+
+### Two defects found by the subagent, both real
+
+1. **A dead link.** `blueprints/teams-bot/Dockerfile` pointed at
+   `docs/decisions/0001-teams-bot-base-image-unpinned-for-demo.md`, which does not exist — the bulk
+   rename during the course-chatbot → teams-bot move had rewritten the decision record's filename
+   inside the comment. Fixed, with a note that the file keeps its original name because the decision
+   was accepted under it.
+2. **`tools/check` did not run this blueprint's tests at all.** It ran stack validation, cfn-lint,
+   `packages/builder-mcp`'s suite and the Terraform checks — and had no step for
+   `blueprints/teams-bot/tests`. **The 42 tests existed, passed, and gated nothing.** So "`tools/check`
+   is green" and "42 tests pass" were two separate claims reported as one, in this session and in
+   commit messages.
+
+   **Fixed in `tools/check`**, which now runs them. Recorded because the shape of the mistake is worth
+   keeping: a suite nobody runs automatically is documentation, not a gate — and it was invisible
+   precisely because both claims were true.
+
+**CONSTRUCTION phase complete.** All six stages executed or explicitly skipped with justification.

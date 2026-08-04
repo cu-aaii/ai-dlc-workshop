@@ -17,7 +17,8 @@
 # boto3 because the AWS Lambda Python base image ships it. Switching bases would break that
 # assumption silently.
 # ⚠️ UNPINNED BASE IMAGE — dated exception to SECURITY-10, expires 2026-08-05.
-# See docs/decisions/0001-teams-bot-base-image-unpinned-for-demo.md.
+# See docs/decisions/0001-course-chatbot-base-image-unpinned-for-demo.md -- filename says
+# course-chatbot because the decision was accepted under that name, before this blueprint moved.
 #
 # This tag is MUTABLE: AWS moves it as patches land, so two builds of this commit can differ. The
 # deployed artifact is still immutable (the Build stage exports CONTAINER_DIGEST and the deploy pins

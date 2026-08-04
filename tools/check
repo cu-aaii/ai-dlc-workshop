@@ -66,6 +66,19 @@ echo '==> builder-mcp tests'
   uv run --quiet pytest -q
 )
 
+echo
+echo '==> teams-bot tests'
+# Added because these were invisible to the PR gate: the suite existed, passed, and gated nothing,
+# so "tools/check is green" and "the tests pass" were two different claims that read as one.
+#
+# Dependencies are named inline rather than taken from the blueprint's requirements.lock: that lock
+# is the Lambda image's runtime set and carries no test dependencies, and the blueprint has no
+# pyproject.toml to resolve a dev group from. The versions here track requirements.txt -- if that
+# file's ranges change, change these too.
+uv run --quiet --python 3.13 \
+  --with 'PyJWT[crypto]>=2.8,<3' --with 'anthropic>=0.92,<2' --with boto3 --with pytest \
+  pytest blueprints/teams-bot/tests -q
+
 # Module list comes from the same script that enforces the pipeline mirroring, so there is one
 # definition of "a Terraform module in this repo" rather than a glob duplicated here.
 modules=$(uv run --quiet pipeline/validate_stacks.py --list-tf)
