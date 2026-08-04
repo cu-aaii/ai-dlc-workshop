@@ -353,3 +353,12 @@
 **Context**: CONSTRUCTION — NFR Design for U-01 complete; two artifacts generated. RESILIENCY-14 satisfied, RESILIENCY-04/-15 assigned onward with a deferral count. Awaiting explicit approval before Infrastructure Design.
 
 ---
+
+## NFR Design U-01 — Approval
+**Timestamp**: 2026-08-03T00:00:00Z
+**Approval Prompt**: "# 🎨 NFR Design Complete - U-01 Domain Core … ✅ **Continue to Next Stage** — approve and proceed to **Infrastructure Design**" — presented with the nine patterns, the eight N/A pattern families, the **three implementation traps** found by working the answers through (dataclass-generated `__hash__` vs `MappingProxyType`; `Snapshot.skipped_reasons` having the same exposure my Q1 text omitted; `assert` being stripped under `python -O` while NFR-R3 needs P8 on a production path), the honest restatement of RESILIENCY-14's strength (a blocking rule discharged via review-only NFR-T7), and RESILIENCY-04/-15 assigned onward with deferral count 2.
+**User Input**: "approve and proceed"
+**Decision**: **APPROVED** — NFR Design for U-01 closed. Accepted: the nine patterns, the zero-infrastructure finding, the three implementation requirements arising from analysis, RESILIENCY-14 as satisfied, and RESILIENCY-04/-15 as assigned to U-02's NFR Design.
+**Context**: CONSTRUCTION — next stage per the execution plan is Infrastructure Design. **Applicability to U-01 is itself in question** and is being raised rather than assumed: `logical-components.md` established that U-01 contributes zero infrastructure components.
+
+---

@@ -3,7 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - NFR Design U-01 complete, awaiting approval
+- **Current Stage**: **CONSTRUCTION** - Infrastructure Design (applicability to U-01 raised as a question)
+- **NFR Design U-01 Approved**: 2026-08-03 — user response "approve and proceed"
 - **NFR Requirements U-01 Approved**: 2026-08-03 — user response "approve and proceed"
 - **Functional Design U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
 - **INCEPTION COMPLETE**: 2026-08-03
@@ -269,7 +270,7 @@ cleanup — deliberately not done.
       - [x] U-01 — 26 requirements (**15 automated, 11 review-only**), 7 tech-stack decisions — **APPROVED 2026-08-03**
       - [ ] U-02
 - [ ] NFR Design — **U-01 complete (awaiting approval)**; U-02 pass follows
-      - [x] U-01 — 9 patterns, zero infrastructure components. **RESILIENCY-14 SATISFIED**;
+      - [x] U-01 — **APPROVED 2026-08-03** — 9 patterns, zero infrastructure components. **RESILIENCY-14 SATISFIED**;
             **RESILIENCY-04/-15 ASSIGNED to U-02's NFR Design (2nd deferral)**
       - [ ] U-02 — inherits RESILIENCY-04/-15 as a named obligation
 - [ ] Infrastructure Design — EXECUTE (SECURITY-01, -06, -14 SRI, RESILIENCY-08, container build)
