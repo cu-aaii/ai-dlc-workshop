@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - NFR Design for U-01 (plan + 6 questions, awaiting answers)
+- **Current Stage**: **CONSTRUCTION** - NFR Design U-01 complete, awaiting approval
 - **NFR Requirements U-01 Approved**: 2026-08-03 — user response "approve and proceed"
 - **Functional Design U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
 - **INCEPTION COMPLETE**: 2026-08-03
@@ -148,10 +148,40 @@ Artifacts: `construction/u-01-domain-core/functional-design/` — `domain-entiti
    constructs fresh + single PutObject; API only reads), so key loss is unobservable by construction.
    P1 is correspondingly **scoped to the same major version**, stated rather than hidden.
 
-### ⚠️ Cross-unit obligations flowing to U-02
-- `Freshness.INVALID` needs a **sixth row** in C-03's degraded-state table: **503 / `error`**, not 200
-- `skipped_count`, `duplicates_removed`, `raw_returned` must reach the UI, or Q1 = A's "surface the
-  count" half is never delivered
+### ⚠️ Cross-unit obligations flowing to U-02 — now four
+1. `Freshness.INVALID` needs a **sixth row** in C-03's degraded-state table: **503 / `error`**, not 200
+2. `skipped_count`, `duplicates_removed`, `raw_returned` must reach the UI, or Q1 = A's "surface the
+   count" half is never delivered
+3. C-01 must log enough at its own boundary to identify a skipped item — U-01 deliberately cannot (NFR-S1)
+4. **RESILIENCY-04 and -15 are ASSIGNED to U-02's NFR Design.** Deferral count: **2**
+   (Requirements Analysis → U-01 NFR Design → U-02 NFR Design). Recorded with the count so a third is
+   visible as a pattern rather than looking like a first.
+
+## NFR Design U-01 — outputs
+`construction/u-01-domain-core/nfr-design/` — `nfr-design-patterns.md`, `logical-components.md`.
+Q1-Q6 all **A**: `MappingProxyType` immutability · hashable, **no memoization** · `CoreError` hierarchy ·
+flat `__all__` surface · property suite **is** the RESILIENCY-14 test · RESILIENCY-04/-15 → U-02.
+
+**Nine patterns; zero infrastructure components** — eight mandated pattern families recorded N/A with
+reasons (retry/circuit-breaker presupposes a call that can fail; U-01 makes none).
+
+**Three implementation traps found in analysis, not restated from the answers:**
+1. `@dataclass(frozen=True, eq=True)` **auto-generates `__hash__`** from the field tuple, which would call
+   `hash()` on a `MappingProxyType` and raise `TypeError`. An **explicit `__hash__`** using
+   `frozenset(tags.items())` is required, and it must agree with `__eq__` or P1/P2/P6 break as what looks
+   like a serialization bug. Also: `__post_init__` needs `object.__setattr__`, and the `dict()` copy is
+   mandatory — wrapping the caller's mapping without copying leaves them a mutable reference into a
+   supposedly immutable object.
+2. **Q1's text named only `tags`; `Snapshot.skipped_reasons` has identical exposure.** Same treatment
+   extended to it.
+3. **`assert` is stripped under `python -O`**, so P8 — which NFR-R3 requires on a production read path —
+   must raise `InvalidSnapshot` explicitly. `assert` added to the forbidden-grep list.
+
+**Weakened claim recorded honestly**: RESILIENCY-14 is a *blocking* rule now discharged via NFR-T7
+(generator coverage), which is **review-only**. So a blocking rule rests on something no tool checks.
+NFR-T5 and NFR-T7 are the two review-only requirements carrying disproportionate weight.
+
+### ⚠️ Flagged for the user, not decided
 
 ### Amendment A3 — layout superseded by `src/` conformance (2026-08-03)
 Not a repo change — a conformance correction found by checking `tiny-chatbot` and `aisei-site` empirically
@@ -238,7 +268,10 @@ cleanup — deliberately not done.
 - [ ] NFR Requirements — **U-01 complete (awaiting approval)**; U-02 pass follows
       - [x] U-01 — 26 requirements (**15 automated, 11 review-only**), 7 tech-stack decisions — **APPROVED 2026-08-03**
       - [ ] U-02
-- [ ] NFR Design — **IN PROGRESS: U-01** (6 questions issued). RESILIENCY-04/-14/-15 come due; Q5/Q6 handle their disposition rather than re-deferring silently. U-02 pass follows.
+- [ ] NFR Design — **U-01 complete (awaiting approval)**; U-02 pass follows
+      - [x] U-01 — 9 patterns, zero infrastructure components. **RESILIENCY-14 SATISFIED**;
+            **RESILIENCY-04/-15 ASSIGNED to U-02's NFR Design (2nd deferral)**
+      - [ ] U-02 — inherits RESILIENCY-04/-15 as a named obligation
 - [ ] Infrastructure Design — EXECUTE (SECURITY-01, -06, -14 SRI, RESILIENCY-08, container build)
 - [ ] Code Generation — EXECUTE (ALWAYS)
 - [ ] Build and Test — EXECUTE (ALWAYS)
