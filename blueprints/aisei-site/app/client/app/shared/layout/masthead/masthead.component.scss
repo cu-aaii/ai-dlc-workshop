@@ -1,0 +1,59 @@
+:host {
+  display: block;
+
+  .cu-masthead {
+    background: var(--color-accent);
+    color: var(--color-on-primary);
+  }
+
+  .masthead-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    padding-top: 40px;
+    padding-bottom: 40px;
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      color: var(--color-on-primary);
+      text-decoration: none;
+
+      small {
+        font-size: 16px;
+        opacity: 0.9;
+      }
+
+      strong {
+        font-family: var(--heading-font);
+        font-size: 48px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+    }
+
+    img.seal {
+      height: 120px;
+      width: 120px;
+      flex-shrink: 0;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .masthead-inner {
+      padding-top: 24px;
+      padding-bottom: 24px;
+
+      .brand strong {
+        font-size: 28px;
+      }
+
+      img.seal {
+        height: 64px;
+        width: 64px;
+      }
+    }
+  }
+}
