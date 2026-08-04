@@ -48,11 +48,27 @@ logging.basicConfig()
 LOG = logging.getLogger("teams-bot")
 LOG.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
 
-MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "1024"))
+DEFAULT_MAX_TOKENS = 1024
+# Parsed in _Config, not here. int() on an environment variable is exactly the module-scope
+# failure _Runtime's docstring warns about: a non-numeric value would raise during Lambda INIT,
+# before `handler` exists to catch it, and Azure Bot Service would retry forever (FR-10).
+# os.environ.get on its own cannot raise, which is why EFFORT is safe at this scope.
+
 # Claude 5 models think by default. Effort is the lever for a chat-latency budget -- lower it
 # rather than disabling thinking, which is more expensive in every sense and degrades output.
 # Teams gives us 10-15 seconds before showing the user 504:GatewayTimeout, so this matters.
 EFFORT = os.environ.get("EFFORT", "low")
+
+# The gateway call is the longest thing in a request, and the Anthropic SDK defaults to a
+# ten-minute timeout with two retries of its own. Inherited, that default outlives the caller:
+# Teams gives up at 10-15s and a Function URL stops buffering at 30s, so the user sees
+# 504:GatewayTimeout while this Lambda runs on to its own 60s ceiling, still billing, and then
+# posts an answer to a request nobody is waiting for.
+MODEL_TIMEOUT_SECONDS = 12.0
+# Zero, deliberately. Two attempts cannot both fit inside the ack budget, so a retry would
+# guarantee the timeout it is meant to prevent. One attempt that fails inside budget leaves
+# enough room for GENERIC_FAILURE to reach the user as an actual message.
+MODEL_MAX_RETRIES = 0
 
 # Bounds an inbound message, so one caller cannot drive an arbitrarily large or arbitrarily
 # expensive request (SECURITY-05).
@@ -105,6 +121,7 @@ class _Config:
         self.gateway_base_url = os.environ.get("GATEWAY_BASE_URL", "")
         self.knowledge_base_id = os.environ.get("KNOWLEDGE_BASE_ID", "")
         self.model_id = _param(os.environ.get("MODEL_ID_PARAM", ""), "claude-haiku-4-5")
+        self.max_tokens = self._max_tokens()
         # `or`, not a .get default: the stack passes GREETING_TEXT through unconditionally, so
         # an unset parameter arrives as an empty string rather than as a missing key -- and a
         # .get default would then be skipped, greeting people with nothing.
@@ -112,6 +129,23 @@ class _Config:
             "Hi! Ask me a question and I'll do my best to answer it."
         )
         self.system_prompt = self._load_prompt()
+
+    @staticmethod
+    def _max_tokens() -> int:
+        """A garbage value degrades the answer's length, it does not take the bot off the air.
+
+        Same reasoning as the system prompt below: this runs inside the handler's try/except, so
+        the worst case is a logged warning and a default, rather than an invocation that fails
+        before `handler` is reached.
+        """
+        raw = os.environ.get("MAX_TOKENS", "")
+        if not raw:
+            return DEFAULT_MAX_TOKENS
+        try:
+            return int(raw)
+        except ValueError:
+            LOG.warning("MAX_TOKENS=%r is not an integer, using %d", raw, DEFAULT_MAX_TOKENS)
+            return DEFAULT_MAX_TOKENS
 
     def _load_prompt(self) -> str:
         """An S3-hosted prompt wins when configured, because a syllabus does not fit in a
@@ -176,6 +210,10 @@ class _Runtime:
         self.model = Anthropic(
             base_url=self.config.gateway_base_url,
             api_key=_secret(os.environ.get("GATEWAY_API_KEY_ARN", "")) or "unset",
+            # Both explicit, because the SDK's defaults are sized for batch work, not for a
+            # request a person is waiting on in a chat window. See the constants.
+            timeout=MODEL_TIMEOUT_SECONDS,
+            max_retries=MODEL_MAX_RETRIES,
         )
 
 
@@ -251,7 +289,7 @@ def _ask(rt: _Runtime, question: str) -> str:
 
     reply = rt.model.messages.create(
         model=rt.config.model_id,
-        max_tokens=MAX_TOKENS,
+        max_tokens=rt.config.max_tokens,
         system=f"{rt.config.system_prompt}\n\n{grounding}",
         messages=[{"role": "user", "content": question}],
         # effort rides in extra_body so this works on any SDK version, typed or not. Sampling
@@ -259,7 +297,14 @@ def _ask(rt: _Runtime, question: str) -> str:
         # the system prompt instead.
         extra_body={"output_config": {"effort": EFFORT}},
     )
-    return "".join(b.text for b in reply.content if b.type == "text").strip()
+    answer = "".join(b.text for b in reply.content if b.type == "text").strip()
+    if not answer:
+        # A response can carry content and still carry no text -- most plausibly when max_tokens
+        # is spent while thinking. Raising hands this to _dispatch's except, which replies with
+        # GENERIC_FAILURE: a quotable reference the user can report beats a blank chat bubble
+        # that tells them nothing and leaves nothing in CloudWatch either.
+        raise ValueError("model returned no text content")
+    return answer
 
 
 def _body(event: dict[str, Any]) -> dict[str, Any]:

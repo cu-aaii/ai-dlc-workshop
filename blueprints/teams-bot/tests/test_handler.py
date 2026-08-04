@@ -32,6 +32,7 @@ Run:
 from __future__ import annotations
 
 import base64
+import importlib
 import json
 import os
 import sys
@@ -68,6 +69,7 @@ class _StubConfig:
         self.gateway_base_url = "https://gateway.example.edu"
         self.knowledge_base_id = "kb-1"
         self.model_id = "claude-haiku-4-5"
+        self.max_tokens = handler.DEFAULT_MAX_TOKENS
         self.greeting = "Hi! I'm the assistant for CS 1110. Ask me anything about it."
         self.system_prompt = "You are a teaching assistant for CS 1110."
         for key, value in overrides.items():
@@ -114,23 +116,26 @@ class _TextBlock:
 
 
 class _StubAnthropicResponse:
-    def __init__(self, text):
-        self.content = [_TextBlock(text)]
+    def __init__(self, text, blocks=None):
+        # `blocks` overrides `text` entirely, so a test can hand back a response carrying no
+        # text block at all -- what the SDK returns when max_tokens is spent while thinking.
+        self.content = blocks if blocks is not None else [_TextBlock(text)]
 
 
 class _StubMessages:
-    def __init__(self, reply_text="An answer."):
+    def __init__(self, reply_text="An answer.", blocks=None):
         self.reply_text = reply_text
+        self.blocks = blocks
         self.calls: list[dict] = []
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        return _StubAnthropicResponse(self.reply_text)
+        return _StubAnthropicResponse(self.reply_text, self.blocks)
 
 
 class _StubModel:
-    def __init__(self, reply_text="An answer."):
-        self.messages = _StubMessages(reply_text)
+    def __init__(self, reply_text="An answer.", blocks=None):
+        self.messages = _StubMessages(reply_text, blocks)
 
 
 class _StubRuntime:
@@ -347,3 +352,120 @@ def test_nonempty_greeting_env_is_used_verbatim(monkeypatch):
     config = handler._Config()
 
     assert config.greeting == "Welcome! Ask me anything about the course."
+
+
+# --- the model call is bounded by the Teams ack budget -----------------------------------------
+#
+# The gateway call is the highest-latency thing in a request, and the SDK's own default timeout
+# is ten minutes with its own retries on top. Left at that default, a slow gateway means the
+# caller sees 504:GatewayTimeout while this Lambda keeps running, keeps billing, and then posts
+# a reply to a request the caller already abandoned. These two tests are what keep the bound
+# explicit rather than inherited.
+
+
+def _runtime_with_no_aws_calls(monkeypatch):
+    """A real ``_Runtime``, built without touching SSM, S3 or Secrets Manager.
+
+    Every unset ARN short-circuits inside ``_secret``, and ``TokenProvider``/``Anthropic``/the
+    boto3 clients are all network-free to construct -- so this exercises the real constructor,
+    not a double of it. That matters here: the point is what the production code passes to
+    ``Anthropic()``.
+    """
+    _clear_ssm_and_s3_backed_env(monkeypatch)
+    for name in ("BOT_CLIENT_SECRET_ARN", "GATEWAY_API_KEY_ARN"):
+        monkeypatch.delenv(name, raising=False)
+    return handler._Runtime()
+
+
+def test_the_model_client_is_given_an_explicit_timeout(monkeypatch):
+    rt = _runtime_with_no_aws_calls(monkeypatch)
+
+    assert rt.model.timeout == handler.MODEL_TIMEOUT_SECONDS
+    # Teams shows the user 504:GatewayTimeout at 10-15s. A bound outside that window is not a
+    # bound -- it just moves the failure somewhere the user cannot be told about it.
+    assert handler.MODEL_TIMEOUT_SECONDS <= 15
+
+
+def test_the_model_client_does_not_retry(monkeypatch):
+    """Two attempts cannot both fit the ack budget, so a retry guarantees the 504 it is meant to
+    avoid. One attempt that fails inside budget becomes a reply the user can actually read."""
+    rt = _runtime_with_no_aws_calls(monkeypatch)
+
+    assert rt.model.max_retries == 0
+
+
+# --- max_tokens is parsed lazily, never at import ----------------------------------------------
+
+
+def test_a_bad_max_tokens_value_does_not_break_import():
+    """The regression this guards is specific: an ``int()`` at module scope runs during Lambda
+    INIT, and an exception there fails the invocation *before* ``handler`` is reached -- so the
+    function returns 5xx whatever ``handler`` promises, and Azure Bot Service retries a request
+    that can never succeed, forever (FR-10). ``_Runtime`` is lazy for exactly this reason; the
+    parse has to be too.
+    """
+    os.environ["MAX_TOKENS"] = "twelve"
+    try:
+        importlib.reload(handler)
+    finally:
+        # Restore before monkeypatch-free teardown, so the module other tests hold is clean.
+        del os.environ["MAX_TOKENS"]
+        importlib.reload(handler)
+
+
+def test_a_bad_max_tokens_value_falls_back_to_the_default(monkeypatch):
+    _clear_ssm_and_s3_backed_env(monkeypatch)
+    monkeypatch.setenv("MAX_TOKENS", "twelve")
+
+    assert handler._Config().max_tokens == handler.DEFAULT_MAX_TOKENS
+
+
+def test_a_valid_max_tokens_value_is_used(monkeypatch):
+    _clear_ssm_and_s3_backed_env(monkeypatch)
+    monkeypatch.setenv("MAX_TOKENS", "2048")
+
+    assert handler._Config().max_tokens == 2048
+
+
+# --- an answer with no text is a failure, not a blank message -----------------------------------
+
+
+def test_an_empty_answer_replies_with_the_generic_failure():
+    """A blank Teams bubble surfaces nothing to the user and nothing to CloudWatch. Route it
+    through the same reply an exception gets, so the failure is both visible and quotable."""
+    rt = _StubRuntime(model=_StubModel(reply_text="   "))
+    activity = bf.parse_activity(
+        {
+            "id": "a1",
+            "type": "message",
+            "text": "When is the midterm?",
+            "conversation": {"id": "conv-1"},
+            "serviceUrl": SERVICE_URL,
+        }
+    )
+
+    handler._dispatch(rt, activity)
+
+    assert rt.teams.replies == [
+        (activity, handler.GENERIC_FAILURE.format(ref=activity.log_id))
+    ]
+
+
+def test_a_response_carrying_no_text_block_replies_with_the_generic_failure():
+    """What the SDK returns when max_tokens is spent while thinking: content, but no text in it."""
+    rt = _StubRuntime(model=_StubModel(blocks=[_TextBlock("", type="thinking")]))
+    activity = bf.parse_activity(
+        {
+            "id": "a1",
+            "type": "message",
+            "text": "When is the midterm?",
+            "conversation": {"id": "conv-1"},
+            "serviceUrl": SERVICE_URL,
+        }
+    )
+
+    handler._dispatch(rt, activity)
+
+    assert rt.teams.replies == [
+        (activity, handler.GENERIC_FAILURE.format(ref=activity.log_id))
+    ]
