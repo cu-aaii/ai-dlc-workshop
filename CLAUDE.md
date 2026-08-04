@@ -224,6 +224,12 @@ and CI gets it from `hashicorp/setup-terraform`. Never document or run the bare 
   pins the interpreter, so `uv run` fetches a 64-bit CPython. Without it, on a machine whose only
   Python is `x86`, `cryptography` has no wheel and the install disappears into a failing Rust
   build.
+- **An explicit resource name plus a replacing update is a self-collision.** `AWS::IAM::ManagedPolicy`
+  replaces on a `PolicyDocument` change, so a named policy's replacement fails with *"a policy called
+  X already exists"* and rolls the stack back — observed on `main`, red for every track, from a
+  one-line policy edit. Renaming in the same change is the fix, and IAM refuses to delete a policy
+  that is still attached, so check `list-entities-for-policy` first. Same trap for any named IAM
+  resource.
 - **`AWS::SSM::Parameter` takes `Tags` as a map**, not the usual list of `Key`/`Value` pairs.
   Every other resource here uses the list form.
 - **CodeConnections connections need a human browser handshake.** CloudFormation creates them

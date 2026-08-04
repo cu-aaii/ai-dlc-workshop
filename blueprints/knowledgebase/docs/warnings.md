@@ -220,6 +220,37 @@ Without account access, the first real execution is on `main` in the shared acco
 verdict is readable — not the failure. Either way, tell the other tracks before merging rather
 than after.
 
+## Changing `RetrievalPolicy`'s document rolls the stack back
+
+`AWS::IAM::ManagedPolicy` **replaces** on a `PolicyDocument` change, and this one carries an explicit
+`ManagedPolicyName`. So CloudFormation creates the replacement before deleting the original, and the
+create fails against the name the original still holds:
+
+```
+A policy called aidlc-main-knowledgebase-retrieval already exists.
+Duplicate names are not allowed.
+```
+
+This happened on `main`: a one-line edit dropping `bedrock:RetrieveAndGenerate` — an action a managed
+knowledge base does not support — failed `BlueprintDeploy` and left `UPDATE_ROLLBACK_COMPLETE`. Red
+for every track, and the change did not land.
+
+Editing that policy therefore takes a PR that also **renames** it, and the rename has a second
+precondition: IAM refuses to delete a managed policy that is attached to anything, so the delete half
+of the replacement fails and rolls back again. Check first:
+
+```sh
+aws iam list-entities-for-policy \
+  --policy-arn arn:aws:iam::<account>:policy/aidlc-main-knowledgebase-retrieval
+```
+
+Empty today. Once Track C attaches it, this stops being a two-line change. Consumers read the ARN
+from `/aidlc/main/knowledgebase/retrieval-policy-arn`, so a rename does not break anyone who follows
+the documented path — only anyone who hardcoded the name.
+
+The general form, worth carrying beyond this blueprint: **an explicit name plus a replacing update is
+a self-collision.** It applies to every named IAM resource here.
+
 ## A failed *first* create blocks every subsequent merge
 
 This is the sharpest edge here, and it is CloudFormation's, not ours.

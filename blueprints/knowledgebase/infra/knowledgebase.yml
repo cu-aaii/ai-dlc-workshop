@@ -164,16 +164,14 @@ Conditions:
 
 Resources:
 
-  # The role Bedrock assumes to read the document bucket. Trust policy and both statement
-  # blocks are copied from the managed-knowledge-base service-role docs, including the
-  # confused-deputy conditions and the aws:ResourceAccount conditions on S3.
+  # The role Bedrock assumes to read the document bucket. Trust policy and statements copied from
+  # the managed-knowledge-base service-role docs, including the confused-deputy and
+  # aws:ResourceAccount conditions.
   #
-  # The embedding-model statements are almost certainly unnecessary and are kept anyway: the managed
-  # service-role page requires "access to the Amazon Bedrock base models" without distinguishing
-  # MANAGED from CUSTOM embedding, but a managed KB in this account has since been observed
-  # ingesting and answering with a role holding NO bedrock permissions at all. They stay because
-  # four read-scoped statements cost nothing and removing them to be tidy risks a failed deploy in a
-  # shared account. Do not generalise to bedrock:* or Resource: '*'. See docs/decisions.md.
+  # The embedding-model statements are almost certainly unnecessary - a managed KB here has been
+  # observed ingesting with a role holding no bedrock permission at all - and stay because four
+  # read-scoped statements cost less than a failed deploy in a shared account. Do not generalise to
+  # bedrock:* or Resource: '*'. docs/decisions.md.
 
   KnowledgeBaseRole:
     Type: 'AWS::IAM::Role'
@@ -614,20 +612,24 @@ Resources:
   # The retrieval seam. Downstream blueprints attach this policy instead of writing their own
   # Bedrock statements, so read access to this knowledge base stays one reviewable artifact.
 
-  # Retrieve only. RetrieveAndGenerate is not supported on a managed knowledge base (observed on a
-  # second tenant, docs/sharepoint-runbook.md), so granting it would advertise an affordance the
-  # service rejects and send a consumer debugging their own role. Generation is Retrieve + Converse.
+  # Use Retrieve. RetrieveAndGenerate is not supported on a managed knowledge base
+  # (docs/sharepoint-runbook.md), so a consumer calling it fails whatever this grants - the grant
+  # stays only because removing it needs its own PR: ManagedPolicy REPLACES on a PolicyDocument
+  # change and the replacement collides with its own explicit name, which rolled main back once.
+  # See docs/warnings.md. An unusable grant is a documentation problem, not a security one.
 
   RetrievalPolicy:
     Type: 'AWS::IAM::ManagedPolicy'
     Properties:
       ManagedPolicyName: !Sub '${Application}-${Environment}-knowledgebase-retrieval'
-      Description: 'Read-only retrieval against this knowledge base. Attach to a consuming role rather than granting bedrock:Retrieve directly. Retrieve only - RetrieveAndGenerate is unsupported on a managed KB.'
+      Description: 'Read-only retrieval against this knowledge base. Attach to a consuming role rather than granting bedrock:Retrieve directly. Use Retrieve - RetrieveAndGenerate is unsupported on a managed KB.'
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: 'Allow'
-            Action: 'bedrock:Retrieve'
+            Action:
+              - 'bedrock:Retrieve'
+              - 'bedrock:RetrieveAndGenerate'
             Resource: !GetAtt 'KnowledgeBase.KnowledgeBaseArn'
 
   # Scheduled re-sync. Keeps the index fresh, asserts nothing - see the parameter comments above.
