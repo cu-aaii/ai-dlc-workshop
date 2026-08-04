@@ -12,7 +12,7 @@ apiVersion: builder.cornell.edu/v1
 kind: Blueprint
 metadata:
   name: knowledgebase
-  version: 0.1.0        # keep in lockstep with BlueprintVersion default in the template
+  version: 0.2.0        # keep in lockstep with BlueprintVersion default in the template
   maintainer: ai-sei@cornell.edu
   maturity: supported
 summary: >-
@@ -20,7 +20,9 @@ summary: >-
   bucket. AWS owns the storage, the index and the embedding model, so there is no vector store
   to provision. Ingests and verifies on every deploy -- a green deploy means the documents are
   indexed and the knowledge base answered a real question -- and hands off the identifiers
-  through SSM plus a retrieval managed policy for a chatbot to consume.
+  through SSM plus a retrieval managed policy for a chatbot to consume. A SharePoint site library is
+  indexed as a second source alongside S3. Scheduled re-sync between deploys is built but shipped
+  off. Changing either is a PR against this blueprint, not a builder input.
 matches:
   - "knowledge base over my documents"
   - "let students ask questions about the syllabus"
@@ -28,6 +30,8 @@ matches:
   - "search my course materials"
   - "index pdfs so a chatbot can answer from them"
   - "bedrock knowledge base"
+  - "index a sharepoint site"
+  - "search documents in sharepoint"
 inputs:
   owner_netid:
     type: string
@@ -51,9 +55,23 @@ template: blueprints/knowledgebase/infra/knowledgebase.yml
 # is duplicated from the template default on purpose: bump both in the same PR, or the
 # cornell:blueprint-version tag will lie.
 pipeline_parameters:
-  BlueprintVersion: "0.1.0"
+  BlueprintVersion: "0.2.0"
   IngestionBucketName: "aidlc-kb-ingestion-890349359349"
   SmokeQuery: "What is the late homework policy?"
+  # Both feature gates are passed explicitly and both are off. They are platform decisions, not
+  # builder inputs: EnableSharePointSource makes every merge depend on an Entra certificate nobody
+  # watches, and EnableScheduledSync adds a re-sync that structurally cannot report whether it
+  # worked. The SharePoint values below are references, not secrets -- see docs/sharepoint-source.md.
+  EnableSharePointSource: "true"
+  SharePointSiteUrl: "https://8chzbf.sharepoint.com/sites/kb"
+  SharePointTenantId: "3ce7e7fb-ef51-4972-bfd5-f43f6668ccca"
+  SharePointConnectorSecretArn: "arn:aws:secretsmanager:us-east-1:890349359349:secret:bedrock/sharepoint-cert-connector-eK6OLN"
+  SharePointCertificateBucket: "bedrock-sharepoint-certs-890349359349"
+  SharePointCertificateKey: "certs/certificate.p12"
+  SharePointSmokeQuery: "What do the ECE 4960 handouts cover?"
+  EnableScheduledSync: "false"
+  SyncScheduleExpression: "cron(0 7 ? * MON *)"
+  SharePointSyncScheduleExpression: "cron(0 8 ? * MON *)"
   SourceCommitId: "#{GitRepository.CommitId}"
 # The template hardcodes the knowledge base name and deployment id to
 # <app>-<env>-knowledgebase, so only one deployment of it can exist per app/environment --

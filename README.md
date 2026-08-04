@@ -29,6 +29,8 @@ blueprints/                 THE DEPLOY SURFACE — one directory per blueprint
   knowledgebase/              Bedrock managed knowledge base; verifies its own ingestion
   entra-probe/                one Entra app registration; proves the Terraform path
   tiny-chatbot/               canned-response Lambda behind a Function URL; parked
+  aisei-site/                 an existing Angular + Hono app as a Lambda container; parked
+  teams-bot/                  Microsoft Teams chatbot; on the deploy path, needs onboarding
   course-chatbot/             the workshop MVP — scaffold only, deploys nothing yet
 packages/                   components, one package each
   builder-mcp/                the Cornell Builder MCP server (track A)
@@ -42,18 +44,23 @@ pipeline/                   the deploy path
 bootstrap/                  account baseline — deployed BY HAND, once per account
   account-bootstrap.yml       deploy role, artifact bucket, GitHub connection
 observability/              seeing what's running (track E) — scaffold only
+demo/                       terminal walkthrough of the builder path; the no-Teams fallback
 docs/
   aidlc-rules/                the AI-DLC methodology — vendored from awslabs, do not edit
   aidlc/                      how things here were built — a record, not a backlog
   decisions/                  one file per decision made on purpose
-tools/check                 the checks that gate a merge; CI runs this exact script
+tools/
+  check                       the checks that gate a merge; CI runs this exact script
+  dev                         start builder-mcp and its local browser console together
 .github/workflows/
   pr-checks.yml               runs tools/check. No AWS calls, no credentials.
 .mcp.json                   GitHub MCP server for Claude Code — needs one env var, see below
+.env.example                template for the gitignored .env that tools/dev sources
 ```
 
-Every directory has its own README explaining what goes in it, except `docs/aidlc-rules/` — see
-below for why that one is left exactly as upstream ships it.
+Most directories have their own README explaining what goes in it. `docs/aidlc-rules/` is the
+deliberate exception — see below for why it is left exactly as upstream ships it. `packages/`,
+`docs/` and `tools/` have none; their conventions live in `CLAUDE.md`.
 
 **Two paths cannot move.** `pipeline/pipeline.yml`, because the running pipeline deploys itself
 from that literal path and a commit that relocates it breaks the stage that would have picked up
@@ -168,9 +175,9 @@ Three steps, in order. Only the first two are ever done by hand.
 
 ## PR checks
 
-The stack-and-module registry check, `cfn-lint`, the `builder-mcp` test suite, and
-`terraform fmt`/`validate`. Lint, validate and unit tests only — no AWS calls, no credentials, no
-Terraform backend access, so they come back in about a minute.
+The stack-and-module registry check, `cfn-lint`, the `builder-mcp` and `teams-bot` test suites,
+and `terraform fmt`/`validate`. Lint, validate and unit tests only — no AWS calls, no credentials,
+no Terraform backend access, so they come back in about a minute.
 
 Run them before you push:
 
@@ -180,9 +187,9 @@ tools/check
 
 CI runs that exact script, so green locally means green on your PR.
 
-**Two prerequisites: `uv` and `terraform`.** uv fetches Python, pyyaml, cfn-lint and the
-`builder-mcp` test dependencies on demand at pinned versions, so there is nothing Python to install
-globally and no venv to activate. Terraform is a single binary with no uv equivalent:
+**Two prerequisites: `uv` and `terraform`.** uv fetches Python, pyyaml, cfn-lint and both test
+suites' dependencies on demand at pinned versions, so there is nothing Python to install globally
+and no venv to activate. Terraform is a single binary with no uv equivalent:
 
 ```sh
 brew install uv                                    # macOS
@@ -259,14 +266,65 @@ stage action names the component's directory as the context and its named target
 step with where the component lives: a stale `CONTAINER_CONTEXT` fails the build on a missing path
 and says nothing about the move that caused it.
 
+## The knowledge base, for the teams consuming it
+
+`blueprints/knowledgebase` is deployed and queryable. Two identifiers are all a consumer needs, and
+both are in SSM rather than a CloudFormation `Export`, so nothing couples your stack's lifecycle
+to ours:
+
+```sh
+aws ssm get-parameter --name /aidlc/main/knowledgebase/knowledge-base-id     --query Parameter.Value --output text
+aws ssm get-parameter --name /aidlc/main/knowledgebase/retrieval-policy-arn  --query Parameter.Value --output text
+```
+
+Attach that managed policy to your role instead of writing your own `bedrock:Retrieve` statement,
+then call `bedrock-agent-runtime:Retrieve`. Two shapes to get right on a **managed** knowledge base,
+both observed rather than assumed:
+
+- retrieval takes `managedSearchConfiguration`; `vectorSearchConfiguration` is rejected outright;
+- **`retrieve-and-generate` is not supported**, whatever your IAM says. Retrieve, then `Converse`
+  with the chunks. The policy grants `Retrieve` only, so that limit shows up as a readable denial
+  instead of a puzzling service error.
+
+| | |
+|---|---|
+| Indexed today | One syllabus PDF from `aidlc-kb-ingestion-890349359349`. **One document is not a corpus** — expect mediocre relevance, and scores that don't track it. |
+| Freshness | A merge re-ingests and re-verifies. Nothing else does: `EnableScheduledSync` exists and is off, and a scheduled sync cannot report its own result anyway. |
+| SharePoint | **On.** The ECE 4960 handouts in `sites/kb` — 25 documents, rehearsed at zero failures before the flag flipped. Every team's merge now depends on the Entra consent, the per-site grant and an unexpired certificate; the platform team manages that side by hand. |
+| Proof it works | A green `BlueprintDeploy` asserts the documents are indexed **and** answerable — the stack fails otherwise. `DocumentsIndexed` and `SmokeQueryResult` are stack outputs. |
+| Costs while idle | Per-GB stored plus per-retrieve. It does not stop when the workshop ends, and no OpenSearch collection exists to add an hourly floor. |
+
+Changing the corpus means `IngestionBucketName` plus a `SmokeQuery` the new corpus can answer, in
+`pipeline/pipeline.yml`, `blueprints/knowledgebase/blueprint.yaml` **and** the template. If that
+smoke query stops being answerable, every team's deploy goes red — the verifier is doing its job.
+Details in `blueprints/knowledgebase/README.md`.
+
 ## Not here yet
 
-The deploy path works, the Cornell Builder is written, and the Terraform stage and the managed
-Bedrock Knowledge Base have both landed. Still to come, per the workshop spec: the
-`course-chatbot` blueprint itself — `blueprints/course-chatbot/` has the Lambda handler and a
-README of what's missing, but no template, no image target and no pipeline action, so it deploys
-nothing — its Teams bot and Strands agent, and `observability/`. Each has a scaffolded directory
+The deploy path works, the Cornell Builder is written, and the Terraform stage, the managed
+Bedrock Knowledge Base and the `teams-bot` chatbot have all landed. Still to come, per the
+workshop spec: the `course-chatbot` blueprint itself — `blueprints/course-chatbot/` has the Lambda
+handler and a README of what's missing, but no template, no image target and no pipeline action,
+so it deploys nothing — its Strands agent, and `observability/`. Each has a scaffolded directory
 with a README saying what goes in it and how to wire it.
+
+`teams-bot` is the catalog's Teams-fronted chatbot, and it is fully wired: template registered,
+image built by the Build stage on arm64, one CloudFormation action passing every parameter. Being
+wired is not the same as answering, and the gap between them looks like a bug rather than
+onboarding. Two things are done by hand, once:
+
+- **Inject the two secret values.** CloudFormation creates both secrets with
+  `GenerateSecretString` placeholders, because a template that carried `SecretString` would reset
+  the live credential on every pipeline self-deploy. So the stack reaches `CREATE_COMPLETE`
+  authenticating with a random string, and CloudWatch shows `401`.
+- **Point a bot registration at the stack's `FunctionUrl` output** (`az bot update --endpoint`).
+  Nothing reaches the Lambda from Teams until that exists.
+
+One more thing that reads as a failure and isn't: a merge that *adds* a Build stage action updates
+the pipeline but does not run the new action, because an execution uses the structure that was in
+place when it started. The first execution after such a merge reports every stage green and
+deploys nothing. Start a second one. The runbook for all of this is in
+`blueprints/teams-bot/README.md`.
 
 The Terraform stage exists but only reaches **Entra**. Managing Azure *resources* with `azurerm`
 additionally needs an Azure subscription in the tenant and an Azure RBAC role assignment for the

@@ -35,10 +35,15 @@ wrong for anything finished — the "Manifest" column below is the catalog, not 
 |---|---|---|
 | `hello-world` | yes | Fully deploys. Proves the pipeline and the tagging convention, and is the reference for every convention below. |
 | `notify-topic` | yes | Fully deploys. One SNS topic with an optional email subscription — the simplest "tell me when X happens" channel, with no compute. |
-| `knowledgebase` | yes | Bedrock managed knowledge base over an existing S3 document bucket. Verifies its own ingestion at deploy time, so a green deploy is the acceptance test. SharePoint and web sources pinned. |
+| `knowledgebase` | yes | Bedrock managed knowledge base over an S3 document bucket **and** a SharePoint site library, both verified at deploy time — a green deploy means every source is indexed and answerable. Scheduled re-sync is built and off. Web source not built. |
 | `entra-probe` | no | Fully deploys. Proves the Terraform-from-CodeBuild path reaches the Entra tenant. Terraform only — no AWS resources, so there is no CloudFormation template to advertise. |
 | `tiny-chatbot` | yes | Registered `deployed_by: manual` and parked. Flipped to `pipeline` in the PR that wires its Build stage action. |
+| `aisei-site` | yes | Parked. The public AI-SEI landing page as a Lambda container. |
 | `course-chatbot` | **no, on purpose** | **Scaffold — deploys nothing.** Lambda handler and READMEs only: no template, no image target, no registry entry, no pipeline action. Withheld from the catalog until its template exists, so the Builder cannot offer a blueprint that can't deploy. Tracks C and D. |
+
+The "no" rows are not oversights, and `tools/check` knows the difference: each is a
+`MANIFEST_EXEMPT` entry in `pipeline/validate_stacks.py` with the reason it is not in the
+catalog. A blueprint directory with neither a manifest nor an exemption fails PR checks.
 
 ## Required of every blueprint
 
@@ -69,6 +74,23 @@ same PR as the template. Until then, no manifest: an absent blueprint is better 
 **Every parameter passed explicitly by the pipeline.** A blueprint should deploy identically
 by hand and through the pipeline. Parameter defaults exist to make a manual deploy possible,
 not to be the real values.
+
+**A `blueprint.yaml`, or a `MANIFEST_EXEMPT` entry saying why not.** "Invisible to the Builder"
+above is enforced, not just documented: `tools/check` fails a blueprint directory with no
+manifest, so withholding one is a decision recorded in `pipeline/validate_stacks.py` rather than
+something that happens by forgetting.
+
+The field contract is C1 in `packages/builder-mcp/SPEC.md`. Three rules in it are load-bearing
+and easy to miss, and `tools/check` now enforces all three:
+
+- A manifest must **never** contain the CloudFormation template-format-version key, even in a
+  comment. `validate_stacks.py` finds templates by text scan, so naming it turns the manifest
+  into an unregistered template and hands it to cfn-lint.
+- `metadata.version` stays in lockstep with the template's `BlueprintVersion` default. Out of
+  lockstep, the version the catalog shows a builder is not the version the
+  `cornell:blueprint-version` tag records on the deployed stack.
+- `metadata.name` matches the directory name, because the catalog keys deployments off the
+  former and the loader finds manifests by the latter.
 
 ## Required of every blueprint that renders a UI
 

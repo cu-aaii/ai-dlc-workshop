@@ -11,11 +11,10 @@
 # Web Adapter (github.com/awslabs/aws-lambda-web-adapter) runs as an extension that starts
 # the server's own `node dist/server/index.js` and forwards each invocation to it over
 # HTTP on $PORT -- so app/server needs no Lambda-specific code. Built by the ARM CodeBuild
-# project (linux/arm64). The blueprint is parked (deployed_by: manual) until its Build
-# action is wired; pin both base images by digest (SECURITY-10, like builder-mcp's
-# Dockerfile) in the PR that wires the Build action.
+# project (linux/arm64). Both base images are pinned by digest (SECURITY-10, like
+# builder-mcp's Dockerfile); resolved with `crane digest --platform=linux/arm64 <image>`.
 
-FROM node:24-alpine AS build
+FROM node:24-alpine@sha256:0e6f1567e269207c28295276928277a030139cbc5a0fb7d5bd2674f0401a9082 AS build
 
 WORKDIR /app
 COPY app/package.json app/package-lock.json ./
@@ -24,10 +23,10 @@ COPY app/ .
 RUN npm run build
 RUN npm prune --omit=dev
 
-FROM node:24-alpine AS aisei-site
+FROM node:24-alpine@sha256:0e6f1567e269207c28295276928277a030139cbc5a0fb7d5bd2674f0401a9082 AS aisei-site
 
 WORKDIR /var/task
-COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1@sha256:cd0ad9539cbf223feb1cabd8f4deb7064b6270f185614274b940a36590cdc8f9 /lambda-adapter /opt/extensions/lambda-adapter
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./

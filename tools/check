@@ -44,6 +44,32 @@ fi
 echo '==> stack registry'
 uv run --quiet pipeline/validate_stacks.py
 
+echo '==> template size'
+# CloudFormation rejects a template over 51,200 bytes when it arrives in a request body, which is
+# how every by-hand `aws cloudformation deploy --template-file` sends it. knowledgebase.yml crossed
+# that line once already and the failure happens before the request reaches AWS, so it is invisible
+# to cfn-lint and to a builder with no account access. 48,000 leaves room to add a resource without
+# tripping it; past that, move comment prose into the blueprint's docs/ rather than deleting it.
+#
+# The pipeline stages templates through S3, where the ceiling is 1 MB, so this guards the rehearsal
+# path rather than the merge path. The rehearsal path is the one nobody notices breaking.
+size_warn=48000
+size_max=51200
+size_failed=0
+for t in $(uv run --quiet pipeline/validate_stacks.py --list); do
+  bytes=$(wc -c <"$t" | tr -d ' ')
+  if [ "$bytes" -ge "$size_max" ]; then
+    printf 'error: %s is %s bytes, at or over the %s-byte request-body limit\n' "$t" "$bytes" "$size_max" >&2
+    printf '       by-hand deploys of it now require --s3-bucket\n' >&2
+    size_failed=1
+  elif [ "$bytes" -ge "$size_warn" ]; then
+    printf '  %s: %s bytes (limit %s -- getting close)\n' "$t" "$bytes" "$size_max"
+  fi
+done
+[ "$size_failed" -eq 0 ] || exit 1
+echo 'template size: under the request-body limit'
+
+echo
 echo '==> cfn-lint'
 # Template paths come from the registry and contain no spaces, so word splitting is what we
 # want here: cfn-lint takes them as separate arguments.
@@ -120,6 +146,19 @@ echo '==> dashboard types'
   uv run --quiet mypy
 )
 echo 'dashboard types: clean'
+
+echo
+echo '==> teams-bot tests'
+# Added because these were invisible to the PR gate: the suite existed, passed, and gated nothing,
+# so "tools/check is green" and "the tests pass" were two different claims that read as one.
+#
+# Dependencies are named inline rather than taken from the blueprint's requirements.lock: that lock
+# is the Lambda image's runtime set and carries no test dependencies, and the blueprint has no
+# pyproject.toml to resolve a dev group from. The versions here track requirements.txt -- if that
+# file's ranges change, change these too.
+uv run --quiet --python 3.13 \
+  --with 'PyJWT[crypto]>=2.8,<3' --with 'anthropic>=0.92,<2' --with boto3 --with pytest \
+  pytest blueprints/teams-bot/tests -q
 
 # Module list comes from the same script that enforces the pipeline mirroring, so there is one
 # definition of "a Terraform module in this repo" rather than a glob duplicated here.
