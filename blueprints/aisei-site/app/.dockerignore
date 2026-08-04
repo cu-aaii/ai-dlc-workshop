@@ -1,0 +1,9 @@
+node_modules
+dist
+.angular
+.git
+.env
+.vscode
+.claude
+.devcontainer
+*.md
