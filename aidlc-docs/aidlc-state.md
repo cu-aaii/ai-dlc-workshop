@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - NFR Requirements for U-01 (plan + 8 questions, awaiting answers)
+- **Current Stage**: **CONSTRUCTION** - NFR Requirements U-01 complete, awaiting approval
 - **Functional Design U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
 - **INCEPTION COMPLETE**: 2026-08-03
 - **Units Approved**: 2026-08-03 — user response "Approve & Continue"
@@ -152,6 +152,35 @@ Artifacts: `construction/u-01-domain-core/functional-design/` — `domain-entiti
 - `skipped_count`, `duplicates_removed`, `raw_returned` must reach the UI, or Q1 = A's "surface the
   count" half is never delivered
 
+### Amendment A3 — layout superseded by `src/` conformance (2026-08-03)
+Not a repo change — a conformance correction found by checking `tiny-chatbot` and `aisei-site` empirically
+rather than reasoning from `CLAUDE.md`. Approved Q3 = A's flat layout is superseded by
+`blueprints/dashboard/src/dashboard/{core,collector,api}/` — one package, namespaced imports, no generic
+top-level `core`. `unit-of-work.md`'s layout block annotated, original preserved. **Independently confirms
+A2.2**: both real blueprints put the `Dockerfile` at their own root. No requirement, story, unit or
+property changed.
+
+## NFR Requirements U-01 — outputs
+`construction/u-01-domain-core/nfr-requirements/` — `nfr-requirements.md`, `tech-stack-decisions.md`.
+Decisions Q1-Q8 all **A**: `src/` layout · one blueprint-level `pyproject.toml` · properties gated in
+`tools/check` · mypy **strict scoped to `dashboard.core`** · `max_examples=100` · exceptions carry a
+**category only, never a tag value or ARN** (NetID privacy) · ARN parsed by `str.split`, no regex ·
+linear, verified at 10,000 records.
+
+**U-01 runtime dependencies: none — standard library only.** Consequences: the arm64 wheel risk flagged at
+Units Generation is **empty** for this blueprint; US-09/Q11 = B are nearly moot for U-01; and a runtime
+dependency appearing under `core/` is a boundary-violation signal, not a dependency decision.
+
+**Three corrections recorded at this stage, all mine**: (1) `tools/check` **already runs pytest** for
+builder-mcp, so Q3 = A adds a third block to an existing pattern rather than a new capability — my Q3
+preamble understated the script; (2) Q8's wording said the 10k check would be a "property test", which
+collides with `max_examples=100` — it is a **single example-based test**, oracle excluded; (3) Q1 = A's tree
+implied a generic top-level `core` importable, refined to one namespaced package.
+
+**⚠️ Specified but unexecuted**: `tools/check` needs `uv` **and** `terraform`, neither installed here, so
+every "automated" verification in `nfr-requirements.md` currently describes **intent, not observed
+behaviour**. Must not be blurred at Build and Test.
+
 ### ⚠️ Flagged for the user, not decided
 `CLAUDE.md` now says `docs/aidlc/` is "this repo's own AI-DLC record," and builder-mcp's record was
 relocated to `docs/aidlc/builder-mcp/`. By that convention this blueprint's record belongs at
@@ -175,7 +204,9 @@ cleanup — deliberately not done.
 - [ ] Functional Design — **U-01 complete (awaiting approval)**; U-02 pass follows
       - [x] U-01 Domain Core — 3 artifacts, BR-01..BR-08, **10 PBT properties** (PBT-01 satisfied) — **APPROVED 2026-08-03**
       - [ ] U-02 Dashboard Platform — incl. `frontend-components.md` for C-06
-- [ ] NFR Requirements — **IN PROGRESS: U-01** (8 questions issued). U-02 pass follows.
+- [ ] NFR Requirements — **U-01 complete (awaiting approval)**; U-02 pass follows
+      - [x] U-01 — 26 requirements (**15 automated, 11 review-only**), 7 tech-stack decisions
+      - [ ] U-02
 - [ ] NFR Design — EXECUTE (RESILIENCY-04, -14, -15 user decisions are due here)
 - [ ] Infrastructure Design — EXECUTE (SECURITY-01, -06, -14 SRI, RESILIENCY-08, container build)
 - [ ] Code Generation — EXECUTE (ALWAYS)

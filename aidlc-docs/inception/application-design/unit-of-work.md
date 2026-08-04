@@ -109,6 +109,15 @@ pipeline edit. This was stated as the price of Q1 = A and is accepted, not disco
 
 ## Code organization (Q3 = A)
 
+> **⚠️ SUPERSEDED 2026-08-03 — see `inception/amendments/repo-baseline-2026-08-03.md` §A3.**
+> The flat layout below was approved before the monorepo reorganization. Both blueprints written since use
+> `src/`, and `CLAUDE.md` documents that shape, so the layout is now
+> `blueprints/dashboard/src/dashboard/{core,collector,api}/` — one package, namespaced imports, no generic
+> top-level `core`. Decided at NFR Requirements Q1 = A; full layout in
+> `construction/u-01-domain-core/nfr-requirements/tech-stack-decisions.md` TSD-1. The Dockerfile-at-root
+> decision and its context reasoning are unaffected and are now confirmed by both real blueprints.
+> Original text preserved below as approved.
+
 ```
 blueprints/dashboard/
   blueprint.yaml      manifest parsed by builder_mcp/catalog.py — required, or the

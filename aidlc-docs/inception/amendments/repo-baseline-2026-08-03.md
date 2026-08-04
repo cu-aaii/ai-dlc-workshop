@@ -250,3 +250,49 @@ dependency graph are unaffected. A2 is a **path-and-packaging** amendment: two c
 (§A2.2 Dockerfile, §A2.1 doc reference), one new constraint to satisfy (§A2.3), and one flagged decision
 left to the user (§A2.1, whether `aidlc-docs/` relocates). **§6.4 remains open and unchanged** — none of
 these commits altered the pipeline's stage order.
+
+---
+
+# Amendment A3 — Layout superseded by `src/` conformance
+
+**Date**: 2026-08-03
+**Trigger**: NFR Requirements for U-01, Q1 = A. Not a repo change this time — a **conformance correction**
+found by checking the two blueprints written since the A2 reorganization instead of reasoning from
+`CLAUDE.md` alone.
+
+## What changed
+
+Units Generation Q3 = A (approved) specified flat siblings under the blueprint:
+`core/`, `collector/`, `api/`, `ui/`, `infra/`.
+
+Both blueprints written since use **`src/`**, and `CLAUDE.md` documents the shape as "`blueprint.yaml` +
+`infra/` (+ `src/`, `infra/azure/`)":
+
+- `blueprints/tiny-chatbot/` → `blueprint.yaml`, `infra/`, `Dockerfile`, `src/app.py`, `README.md`
+- `blueprints/aisei-site/` → `blueprint.yaml`, `infra/`, `Dockerfile`, `app/`, `README.md`
+
+**Superseded**: the layout block in `inception/application-design/unit-of-work.md` (approved). Original
+wording preserved with a pointer here — same discipline as A1 and A2.
+
+**New layout** (see `construction/u-01-domain-core/nfr-requirements/tech-stack-decisions.md` TSD-1):
+
+```
+blueprints/dashboard/src/dashboard/{core,collector,api}/
+```
+
+## Two things this amendment also settles
+
+**The `Dockerfile`-at-blueprint-root decision is now confirmed empirically, not just from a doc.** A2.2
+corrected the root-Dockerfile assumption by reading `CLAUDE.md`. Both real blueprints put the `Dockerfile`
+at their own root, which is independent confirmation. The context reasoning is unchanged: both images need
+the core package, so a `collector/`-scoped context cannot work.
+
+**A generic top-level `core` package was avoided.** Q1 = A's tree implied three top-level importables, so
+U-02 would `import core`. Refined to one package with subpackages — `from dashboard.core import ...` —
+giving namespaced imports, one hatchling target, and a boundary check that stays a single grep. Recorded in
+Part A2 Interaction 4 as a decision made rather than asked, because the argument is one-sided.
+
+## What A3 does not change
+
+No requirement, no story, no unit, no property. `core/`'s AWS-free boundary survives verbatim; it moves
+from `core/` to `src/dashboard/core/`. §6.4 remains open.
