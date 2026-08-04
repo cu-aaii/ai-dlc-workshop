@@ -3,7 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - Code Generation U-01 complete, awaiting approval
+- **Current Stage**: **CONSTRUCTION** - Build and Test U-01 complete, awaiting approval
+- **Code Generation U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
 - **NFR Design U-01 Approved**: 2026-08-03 — user response "approve and proceed"
 - **NFR Requirements U-01 Approved**: 2026-08-03 — user response "approve and proceed"
 - **Functional Design U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
@@ -214,6 +215,47 @@ now a permanent annotated regression row, and `conftest.py`'s duplicate derivati
 3. **`DeploymentName` parameter added** to the marker template, implementing Q9b's `singleton: false`
    rather than leaving it a manifest field with no template support.
 
+## Build and Test U-01 — the Code Generation caveat is DISCHARGED
+`construction/build-and-test/` — `build-instructions.md`, `unit-test-instructions.md`,
+`build-and-test-summary.md`.
+
+Code Generation closed saying the ten properties were "written but never executed as properties".
+**They have now run.** `pip` and `venv` were available and U-01 has no runtime dependencies, so a
+throwaway `/tmp` virtualenv was enough for real `pytest` + `hypothesis` + `mypy`. No repo file was
+changed to enable it.
+
+| Check | Result |
+|---|---|
+| Property + example tests | **60 passed** (17 property, 43 example) |
+| Hypothesis | **100 examples/property**, `deadline=None`, profile verified loaded |
+| mypy strict over `dashboard.core` | **clean**, zero `# type: ignore` |
+| Boundary grep | clean |
+| NFR-P2 | 10,000 records in **~0.013 s** (bound 10 s) |
+| **Mutation testing** | **9/9 mutants killed** (after fixing the one survivor) |
+| `tools/check` end to end · `cfn-lint` | **still not run** — need `uv` / `terraform` |
+
+### 🐛 Three defects found only by executing
+1. **`[tool.hypothesis]` in `pyproject.toml` did nothing** — Hypothesis has no pyproject config source.
+   NFR-T2 was satisfied *by coincidence* (its default is also 100). Profile moved into `conftest.py`
+   with `deadline=None`; verified loaded.
+2. **`mypy>=1.10` resolved to 2.3, where `disallow_untyped_defs` is ON by default** — a major
+   behavioural change inside the version floor. Pinned `mypy>=2,<3`; test modules relaxed per NFR-M3.
+   `dashboard.core` had **zero errors from the first run**.
+3. **A missing annotation plus a `draw()` inside a short-circuiting `and`.** The type error was a
+   *symptom of a real test-quality bug*: under short-circuiting the draw never fired when the list was
+   empty, so the Hypothesis choice-sequence shape varied with earlier values, degrading shrinking.
+
+### 🔬 Mutation testing found a vacuous property
+Breaking `sort_keys=True` killed **nothing**: P2 only serialized the *same object* twice, which a
+Python dict satisfies unsorted. Added a second arm comparing an **equal twin built with reversed tag
+insertion order** — now caught. **Side benefit: P5's oracle independence is now evidenced**, since
+breaking `group_by_tag`'s ordering made P5 fail, which a copied oracle could not do.
+
+**Harness honesty**: the first mutation sweep reported "NOTHING FAILED" nine times because it used
+`timeout`, which macOS lacks — a green-looking run that executed nothing. And `cp` is aliased to prompt,
+which hung and left a file mutated mid-run; recovered via `git checkout --` and verified against HEAD.
+Recorded because "all passed" and "never ran" look identical from a distance.
+
 ### ⚠️ Flagged for the user, not decided
 
 ### Amendment A3 — layout superseded by `src/` conformance (2026-08-03)
@@ -307,6 +349,47 @@ now a permanent annotated regression row, and `conftest.py`'s duplicate derivati
 3. **`DeploymentName` parameter added** to the marker template, implementing Q9b's `singleton: false`
    rather than leaving it a manifest field with no template support.
 
+## Build and Test U-01 — the Code Generation caveat is DISCHARGED
+`construction/build-and-test/` — `build-instructions.md`, `unit-test-instructions.md`,
+`build-and-test-summary.md`.
+
+Code Generation closed saying the ten properties were "written but never executed as properties".
+**They have now run.** `pip` and `venv` were available and U-01 has no runtime dependencies, so a
+throwaway `/tmp` virtualenv was enough for real `pytest` + `hypothesis` + `mypy`. No repo file was
+changed to enable it.
+
+| Check | Result |
+|---|---|
+| Property + example tests | **60 passed** (17 property, 43 example) |
+| Hypothesis | **100 examples/property**, `deadline=None`, profile verified loaded |
+| mypy strict over `dashboard.core` | **clean**, zero `# type: ignore` |
+| Boundary grep | clean |
+| NFR-P2 | 10,000 records in **~0.013 s** (bound 10 s) |
+| **Mutation testing** | **9/9 mutants killed** (after fixing the one survivor) |
+| `tools/check` end to end · `cfn-lint` | **still not run** — need `uv` / `terraform` |
+
+### 🐛 Three defects found only by executing
+1. **`[tool.hypothesis]` in `pyproject.toml` did nothing** — Hypothesis has no pyproject config source.
+   NFR-T2 was satisfied *by coincidence* (its default is also 100). Profile moved into `conftest.py`
+   with `deadline=None`; verified loaded.
+2. **`mypy>=1.10` resolved to 2.3, where `disallow_untyped_defs` is ON by default** — a major
+   behavioural change inside the version floor. Pinned `mypy>=2,<3`; test modules relaxed per NFR-M3.
+   `dashboard.core` had **zero errors from the first run**.
+3. **A missing annotation plus a `draw()` inside a short-circuiting `and`.** The type error was a
+   *symptom of a real test-quality bug*: under short-circuiting the draw never fired when the list was
+   empty, so the Hypothesis choice-sequence shape varied with earlier values, degrading shrinking.
+
+### 🔬 Mutation testing found a vacuous property
+Breaking `sort_keys=True` killed **nothing**: P2 only serialized the *same object* twice, which a
+Python dict satisfies unsorted. Added a second arm comparing an **equal twin built with reversed tag
+insertion order** — now caught. **Side benefit: P5's oracle independence is now evidenced**, since
+breaking `group_by_tag`'s ordering made P5 fail, which a copied oracle could not do.
+
+**Harness honesty**: the first mutation sweep reported "NOTHING FAILED" nine times because it used
+`timeout`, which macOS lacks — a green-looking run that executed nothing. And `cp` is aliased to prompt,
+which hung and left a file mutated mid-run; recovered via `git checkout --` and verified against HEAD.
+Recorded because "all passed" and "never ran" look identical from a distance.
+
 ### ⚠️ Flagged for the user, not decided
 `CLAUDE.md` now says `docs/aidlc/` is "this repo's own AI-DLC record," and builder-mcp's record was
 relocated to `docs/aidlc/builder-mcp/`. By that convention this blueprint's record belongs at
@@ -350,7 +433,10 @@ cleanup — deliberately not done.
 - [ ] Code Generation — **U-01 complete (awaiting approval)**; U-02 follows
       - [x] U-01 — 8 Python files + README, `tools/check` extended, template repurposed & registered.
             **~45 behavioural assertions actually executed and passing**; one real bug found and fixed
-- [ ] Build and Test — EXECUTE (ALWAYS)
+- [ ] Build and Test — **U-01 complete (awaiting approval)**; U-02 follows
+      - [x] U-01 — **60 tests passing** (17 property, 43 example), mypy clean, boundary clean,
+            **mutation score 9/9**. Three defects found by running things.
+      - [ ] U-02
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations — PLACEHOLDER

@@ -23,7 +23,10 @@ dependencies = []
 dev = [
     "pytest>=8",
     "hypothesis>=6.100",
-    "mypy>=1.10",
+    # Pinned to 2.x deliberately, not ">=1.10". mypy 2.0 turned `disallow_untyped_defs` ON by
+    # default, which changes what an unconfigured run means -- so a floor spanning both majors
+    # would make strictness depend on when the environment was resolved. Verified against 2.3.
+    "mypy>=2,<3",
 ]
 
 [build-system]
@@ -36,11 +39,10 @@ packages = ["src/dashboard"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-# max_examples 100 matches packages/builder-mcp and sits inside the PBT rules' cap of 200.
-# Shrinking and seed reporting are Hypothesis defaults and are deliberately NOT disabled (PBT-08):
-# a shrunk minimal counterexample is most of the value of property testing.
-[tool.hypothesis]
-max_examples = 100
+# NOTE: Hypothesis is configured in tests/conftest.py, NOT here. It has no pyproject.toml
+# config source, so a `[tool.hypothesis]` table would be silently ignored -- which is exactly
+# what happened on the first draft of this file. The profile lives in code, the way
+# packages/builder-mcp does it.
 
 # Strict typing is scoped to the core package ONLY (NFR-M3). It is nearly free over frozen
 # dataclasses and pure functions, and expensive over boto3 response shapes -- where it produces
@@ -53,3 +55,15 @@ files = ["src", "tests"]
 [[tool.mypy.overrides]]
 module = "dashboard.core.*"
 strict = true
+
+# The tests are type-checked for real type errors but NOT for annotation completeness.
+#
+# NFR-M3 scoped strict mode to the core package only. mypy 2.x defaults `disallow_untyped_defs`
+# to on, so without this the 37 test functions would each need a `-> None` that documents nothing
+# -- churn that buys no safety and dilutes the signal from the core package, which is where
+# strictness is nearly free and actually pays.
+[[tool.mypy.overrides]]
+module = ["conftest", "test_properties", "test_examples"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false

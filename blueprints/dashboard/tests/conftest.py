@@ -25,6 +25,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from hypothesis import settings as hyp_settings
 from hypothesis import strategies as st
 
 from dashboard.core import (
@@ -35,6 +36,20 @@ from dashboard.core import (
     Snapshot,
     build_snapshot,
 )
+
+# Hypothesis settings live HERE, in code, and not in pyproject.toml. Hypothesis has no
+# pyproject config source, so a `[tool.hypothesis]` table is read by nobody -- the first draft of
+# this suite had one, and the 100-example cap it claimed to set was only being honoured because it
+# happens to equal Hypothesis's own default. Caught by asking the library what profile it was
+# actually using rather than trusting the file.
+#
+# max_examples 100 matches packages/builder-mcp and sits inside the PBT rules' cap of 200.
+# deadline=None because a per-example wall-clock deadline flakes on shared CI, and a flaky gate
+# teaches people to retry rather than to look.
+# Shrinking and seed reporting are Hypothesis defaults and are deliberately NOT disabled (PBT-08):
+# a shrunk minimal counterexample is most of the value of property-based testing.
+hyp_settings.register_profile("dashboard-pbt", max_examples=100, deadline=None)
+hyp_settings.load_profile("dashboard-pbt")
 
 # --------------------------------------------------------------------------------------------
 # Primitives
@@ -136,7 +151,11 @@ def raw_items(draw: st.DrawFn) -> dict[str, Any]:
     }
 
 
-malformed_raw_items = st.one_of(
+# The annotation is required, not decorative: `st.just({})` gives mypy no key or value type to
+# infer, so without it this name is unsolved and the ambiguity propagates into every function that
+# draws from it -- which is how it first surfaced, as a confusing arg-type error on an unrelated
+# `draw(st.booleans())` several lines away.
+malformed_raw_items: st.SearchStrategy[dict[str, Any]] = st.one_of(
     st.just({}),
     st.just({"ResourceARN": ""}),
     st.just({"ResourceARN": "not-an-arn"}),
@@ -163,11 +182,24 @@ def raw_item_lists(draw: st.DrawFn) -> list[dict[str, Any]]:
     valid) simultaneously, which is the combination P8's accounting identity exists to police.
     """
     items = draw(st.lists(raw_items(), min_size=0, max_size=8))
-    if items and draw(st.booleans()):
+
+    # Both booleans are drawn unconditionally, into locals, rather than inline in the conditions.
+    # Two independent reasons:
+    #
+    # 1. A `draw()` inside a short-circuiting `and` is skipped whenever the left operand is falsy,
+    #    so the draw sequence would depend on whether `items` came out empty. Hypothesis shrinks by
+    #    simplifying the underlying choice sequence, and a sequence whose *shape* varies with
+    #    earlier values gives the shrinker less to work with.
+    # 2. mypy cannot solve the generic `DrawFn.__call__` in that position and reports a confusing
+    #    arg-type error several lines away from the real construct. Hoisting fixes it.
+    add_duplicate = draw(st.booleans())
+    vary_duplicate_tags = draw(st.booleans())
+
+    if items and add_duplicate:
         # Shape 4: re-append an existing item, sometimes with different tags so "last wins"
         # (BR-04) is observable rather than a no-op.
         duplicate = dict(draw(st.sampled_from(items)))
-        if draw(st.booleans()):
+        if vary_duplicate_tags:
             duplicate["Tags"] = [{"Key": "cornell:owner", "Value": "changed"}]
         items.append(duplicate)
     items.extend(draw(st.lists(malformed_raw_items, min_size=0, max_size=3)))

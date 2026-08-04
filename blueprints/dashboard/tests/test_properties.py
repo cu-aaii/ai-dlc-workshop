@@ -6,7 +6,8 @@ complements rather than duplicates them (PBT-10). The split mirrors
 
 Framework: Hypothesis (PBT-09). Shrinking and seed reporting are Hypothesis defaults and are **not**
 disabled (PBT-08) -- a shrunk minimal counterexample is most of the value here. Runtime is bounded by
-`max_examples = 100` in `pyproject.toml`, inside the rules' cap of 200.
+`max_examples = 100`, registered as a profile in `tests/conftest.py` (**not** in `pyproject.toml`,
+which Hypothesis does not read), inside the rules' cap of 200.
 
 Ten properties, identified at Functional Design and extended during NFR analysis. Each test names
 its PBT category and the business rule it verifies:
@@ -14,7 +15,7 @@ its PBT category and the business rule it verifies:
 | # | Property | Category | Rule |
 |---|---|---|---|
 | P1 | round-trip, same major version | round-trip | BR-08 |
-| P2 | serialization determinism | invariant | BR-08 |
+| P2 | serialization determinism (two arms) | invariant | BR-08 |
 | P3 | group sizes sum to total | invariant | BR-05 |
 | P4 | every record in exactly one group | invariant | BR-05 |
 | P5 | grouping matches the naive oracle | oracle | BR-05 |
@@ -44,6 +45,8 @@ from hypothesis import strategies as st
 from dashboard.core import (
     REQUIRED_TAGS,
     Freshness,
+    ResourceRecord,
+    Snapshot,
     classify_tag_gaps,
     deserialize_snapshot,
     evaluate_freshness,
@@ -95,6 +98,43 @@ def test_p2_serialization_is_deterministic(snapshot):
     assert serialize_snapshot(snapshot) == serialize_snapshot(
         deserialize_snapshot(serialize_snapshot(snapshot))
     )
+
+
+@given(snapshots(min_resources=1))
+def test_p2_equal_snapshots_built_differently_serialize_identically(snapshot):
+    """P2, the arm that actually requires `sort_keys` (invariant, BR-08).
+
+    **Added after mutation testing.** Removing `sort_keys=True` from `serialize_snapshot` left the
+    whole suite green, because the assertions above serialize the *same object* twice and a Python
+    dict already iterates deterministically. The real claim is about **equal** snapshots, not
+    repeated calls on one -- and two dicts with the same items inserted in a different order are
+    equal while iterating differently.
+
+    So this rebuilds every record with its tags inserted in reverse order. The snapshots compare
+    equal; only key-sorted output makes their bytes equal too.
+    """
+    reversed_tags = tuple(
+        ResourceRecord(
+            arn=record.arn,
+            service=record.service,
+            resource_type=record.resource_type,
+            region=record.region,
+            tags=dict(reversed(list(record.tags.items()))),
+        )
+        for record in snapshot.resources
+    )
+    twin = Snapshot(
+        schema_version=snapshot.schema_version,
+        collected_at=snapshot.collected_at,
+        resources=reversed_tags,
+        raw_returned=snapshot.raw_returned,
+        skipped_count=snapshot.skipped_count,
+        skipped_reasons=dict(reversed(list(snapshot.skipped_reasons.items()))),
+        duplicates_removed=snapshot.duplicates_removed,
+    )
+
+    assert twin == snapshot, "the twin must be equal, or this asserts nothing about equal snapshots"
+    assert serialize_snapshot(twin) == serialize_snapshot(snapshot)
 
 
 # --------------------------------------------------------------------------------------------
