@@ -103,7 +103,8 @@ mcp = _ServerClass(
         "Deployments go live — and are torn down — only when a human approves the pull "
         "request this server opens; there is no deploy or delete button, by design. "
         "Mutating tools default to dry_run=true; show the user the plan and get their "
-        "confirmation before re-calling with dry_run=false."
+        "confirmation before re-calling with dry_run=false — unless a tool's own "
+        "description says otherwise."
     ),
 )
 
@@ -151,9 +152,15 @@ def deployment_create(
     workshop repo on the same branch as the registration PR — one PR carries both; in
     'repo' mode (target state) a new deploy-<name> repo is created in the Cornell org.
 
-    Always call with dry_run=true first and show the user the plan (shell location, PR
-    to be opened, stack name, parameters, estimated cost) for confirmation. Nothing
-    deploys until a human approves the PR — merge is the only deploy trigger.
+    Let the requestor choose whether to preview, rather than deciding for them. Ask which
+    they want: dry_run=true renders the plan (shell location, PR to be opened, stack name,
+    parameters, estimated cost) and opens nothing; dry_run=false opens the registration PR
+    straight away. Default to offering the preview for a first deployment or an unfamiliar
+    blueprint, and take "just open it" at face value when they say so.
+
+    Neither choice deploys anything. Nothing reaches AWS until a human approves and merges
+    the PR — merge is the only deploy trigger — so the question is whether they want to read
+    the plan first, not whether something goes live.
     """
     netid_problem = owner_netid_problem(owner_netid)
     if netid_problem:
