@@ -95,20 +95,26 @@ and easy to miss, and `tools/check` now enforces all three:
 ## Required of every blueprint that renders a UI
 
 **If a blueprint renders anything a human reads** — a page, a chat surface, a dashboard, an emailed
-report — it conforms to [`contracts/ui-design-language.md`](../contracts/ui-design-language.md). The
-design language itself is [`aisei-site/`](aisei-site/): take tokens from
-`app/client/app/shared/theme/_variables.scss` and patterns from `app/docs/wp-migration/`, and never
-hardcode a hex in a component.
+report — it conforms to [`contracts/ui-design-language.md`](../contracts/ui-design-language.md). That
+contract is framework-agnostic and derives from **[brand.cornell.edu](https://brand.cornell.edu)**,
+which is the source of truth; it cites the page behind every rule. Existing blueprints with a UI are
+implementations of it, not substitutes for it — never hardcode a hex in a component.
 
 **Two parts of that contract cannot be waived — not by a builder, not by a reviewer, not by an agent:**
 
 - **Accessibility — WCAG 2.2 AA.** This is law, not preference: Cornell Policy 5.12, ADA Title II (the
   DOJ 2024 rule names WCAG 2.1 AA), and Section 504/508. 2.2 AA is a superset of all three, so
   conforming to it conforms to each.
-- **Cornell logo and wordmark usage.** Governed by [brand.cornell.edu](https://brand.cornell.edu/logos)
-  — exact size bands (simple 73–120px, seal never over 120px, reduced logo exactly 45px), clear space
-  of 1/4 the seal's diameter, fills restricted to carnelian/black/white, one mark per page, and no
-  redrawing the art in any form including CSS or hand-written SVG.
+- **Cornell marks.** Trademarks, governed by [brand.cornell.edu](https://brand.cornell.edu/logos) and
+  University Policy 4.10 — exact size bands (simple 73–120px, seal never over 120px, reduced logo
+  exactly 45px), clear space of 1/4 the seal's diameter, fills restricted to carnelian/black/white,
+  one mark per view, and *"do not redraw, reconstruct, or modify the logo in any way"* — including in
+  CSS or hand-written SVG.
+- **Lockups are for colleges and schools only.** *"This lockup is not used for anything other than a
+  college or school"*, and a non-academic identifier *"may not use a lockup configuration."* A
+  department that is not a college gets **no lockup** — it is named in plain text beside the
+  university mark, not locked to it. If a custom unit logo is wanted, **the builder supplies the
+  approved asset**; this platform never generates one.
 
 Everything below those two — tokens, components, spacing, layout — permits a **documented** deviation
 in `blueprints/<name>/docs/`.

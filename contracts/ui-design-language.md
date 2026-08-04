@@ -1,227 +1,301 @@
-# Contract — UI design language
+# Contract — Cornell UI design language
 
-**Applies to**: every blueprint that renders something a human reads — a web page, a chat surface, a
-dashboard, an emailed report, a generated document.
+**Applies to**: any application that renders something a human reads — a web page, a chat surface, a
+dashboard, an emailed report, a generated document. Framework-agnostic and
+implementation-agnostic by design: it constrains the output, not the toolchain.
 
-**Reference implementation**: [`blueprints/aisei-site/`](../blueprints/aisei-site/). Its
-`app/client/app/shared/theme/` holds the tokens, `app/docs/wp-migration/style-guide.html` and
-`component-library.html` are the visual spec, and `app/.claude/skills/wp-style-guide/` is the skill
-that keeps implementation pointed at them. **Build against those files, not against memory.**
+**Source of truth**: **[brand.cornell.edu](https://brand.cornell.edu)**. Every brand rule below is
+quoted or derived from a page listed in §12, and each section cites the page it comes from. **Where
+this file and brand.cornell.edu disagree, brand.cornell.edu is right and this file is a bug** — fix
+it here and note the date.
 
-**Enforcement**: [`.claude/skills/cornell-ui-compliance/`](../.claude/skills/cornell-ui-compliance/SKILL.md)
-triggers on any UI work and blocks non-compliant output. §2 and §3 have **no exemption path** — a
-violation is corrected before the work proceeds, and the correction is re-checked.
+**Enforcement**: [`.claude/skills/cornell-ui-compliance/`](../.claude/skills/cornell-ui-compliance/SKILL.md).
+§2 and §3 have **no exemption path** — a violation is corrected before the work proceeds, and the
+correction is re-measured.
 
 ---
 
-## 0. Authority, and what happens when sources disagree
-
-Three sources, in strict precedence order. Higher always wins.
+## 0. Precedence — what wins when sources disagree
 
 | # | Source | Status |
 |---|---|---|
-| **1** | **Accessibility law and Cornell Policy 5.12** | **Non-negotiable. Never waived, for any reason, by anyone.** §2 |
-| **2** | **Cornell brand guidelines** — [brand.cornell.edu](https://brand.cornell.edu/logos) | **Non-negotiable for logo and palette.** §3, §4 |
-| **3** | `blueprints/aisei-site/` design language | The house implementation. Binding *except* where 1 or 2 overrides it. §5 onward |
+| **1** | **Accessibility law and Cornell Policy 5.12** | **Non-negotiable. Never waived, by anyone.** §2 |
+| **2** | **Cornell brand guidelines** — brand.cornell.edu | **Non-negotiable for marks, color, and type.** §3–§6 |
+| **3** | A local implementation, theme, or component library | Binding on its own project *except* where 1 or 2 overrides it |
 
-This ordering is not decorative — **all three conflict in real, measured ways**, and §2.4 and §5.1
-list every conflict found with the number that settles it. Where the reference implementation is
-inaccessible, the reference implementation is wrong.
+This ordering is load-bearing rather than decorative: **the three genuinely conflict**, and §2.4 and
+§4.3 record every conflict found with the measurement that settles it. **An inaccessible
+implementation is wrong even when it is the house style, and even when its colors are on-brand.**
 
 ### Scope gating
 
 | Section | Binds when |
 |---|---|
-| §2 accessibility | **always**, no exceptions, no exemptions |
-| §3 Cornell logo | **always when a Cornell mark is present**; presence itself is required on public-facing UIs |
-| §4 palette · §5 tokens · §6 type · §7 layout · §8 delivery | **always**, any UI |
-| §9 charts and data marks | **only if** the UI plots data |
+| §2 accessibility | **always**, no exceptions |
+| §3 Cornell marks | **always when a Cornell mark is present**; presence itself is required on public-facing UIs |
+| §4 color · §5 type · §6 imagery · §7 layout · §8 delivery | **always**, any UI |
+| §9 data visualization | **only if** the UI plots data |
 | §10 conformance checklist | **always** — the reviewable artifact |
+
+### Declaring conformance
+
+A project with a UI states its conformance in its own README, and records any **§4-and-below**
+deviation in its own `docs/`.
+
+**Deviation is declarable below §3. It is not declarable for §2 or §3.** A project may document that
+it uses a different card treatment. It may not document that it fails contrast, or that it invented a
+logo.
 
 ---
 
-## 1. Declaring conformance
+## 1. Non-negotiable, restated plainly
 
-A blueprint with a UI states its conformance in its own `README.md`, and records any
-**§5-and-below** deviation in `blueprints/<name>/docs/`.
+Two rule sets cannot be waived — not by a builder, not by a reviewer, not by an agent, and not by
+whoever is asking loudest:
 
-There is no machine-readable declaration yet. The natural home would be a `ui:` block in
-`blueprints/<name>/blueprint.yaml`, but that manifest is **FROZEN** as a cross-team standard
-(`packages/builder-mcp/SPEC.md` §C1 — *no substantive changes without mob agreement*), so adding a key is a
-substantive change. **Raised as a proposal for mob agreement, not assumed here.**
+- **Accessibility (§2)** is a legal obligation. Cornell **Policy 5.12** requires it; the ADA and
+  Section 504/508 sit behind it.
+- **Cornell marks (§3)** are trademarks. **Policy 4.10** makes permission mandatory, and
+  brand.cornell.edu states the alteration rules in the imperative.
 
-**Deviation is declarable for §5 and below. It is not declarable for §2 or §3.** A blueprint may
-document that it uses a different card treatment. It may not document that it fails contrast.
+If someone insists on a violation, the response is to say plainly that these are legal and trademark
+obligations rather than preferences, offer the nearest compliant alternative, and route anything
+genuinely undocumented to `brand@cornell.edu` (marks) or Cornell's accessibility office. **Never
+comply and annotate.**
 
 ---
 
 ## 2. Accessibility — non-negotiable
 
-**This is law, not preference. There is no exemption, no "temporary" waiver, and no ticket to fix it
-later.** A UI that fails any criterion below is not shipped; it is corrected.
-
 ### The standard
 
-**WCAG 2.2 Level AA.** Chosen because it is a superset of every standard that applies to Cornell, so
-conforming to it conforms to all of them:
+**WCAG 2.2 Level AA.**
 
-| Obligation | Standard it names |
-|---|---|
-| **Cornell Policy 5.12** (web accessibility) | WCAG 2.0 AA — cited on Cornell's own colors page: *"a contrast ratio of at least 4.5:1 for normal text and 3:1 for large text"* |
-| **ADA Title II** — DOJ final rule, 2024 | WCAG 2.1 AA for public-entity web content |
-| **Section 504 / 508** context | WCAG 2.0 AA |
-| **This contract** | **WCAG 2.2 AA** — ⊇ 2.1 AA ⊇ 2.0 AA |
+Cornell **Policy 5.12 "Web Accessibility Standards"** requires new, newly added, or redesigned web
+content and applications to meet *"the most recently published Web Content Accessibility Guidelines
+(WCAG)"* — a moving reference, currently **WCAG 2.2**. Conforming to 2.2 AA therefore satisfies
+Policy 5.12 as written, and also satisfies the older versions named elsewhere: brand.cornell.edu's
+colors page cites the 2.0 AA numbers, and the DOJ's 2024 ADA Title II rule names 2.1 AA. **2.2 AA is
+a superset of both.**
 
-**"Large text" uses the stricter of the two definitions in play: over 24px, or 19px if bold.**
-Cornell's colors page says *"over 24 pixels — or 19 pixels if bold"*; WCAG says 24px / 18.66px bold.
-19px is stricter, so 19px is the rule.
+Policy 5.12 allows exceptions only where compliance would cause a *"fundamental alteration"* or
+*"undue financial and administrative burdens"*, and even then *"equally effective alternative means
+of access must be provided."* **A blueprint UI is new content being authored from scratch — neither
+exception applies to choosing an accessible color or writing a visible focus ring.** Do not treat
+that clause as a waiver.
 
-### The criteria that do the work
+### Thresholds
 
 | Criterion | Level | Requirement |
 |---|---|---|
-| **1.4.1** Use of Color | A | Color is never the only means of conveying information. Status carries an icon **and** a word |
-| **1.4.3** Contrast (Minimum) | AA | **4.5:1** text · **3:1** large text (>24px, or >19px bold) |
+| **1.4.1** Use of Color | A | Color is never the only means of conveying information |
+| **1.4.3** Contrast (Minimum) | AA | **4.5:1** text · **3:1** large text |
 | **1.4.11** Non-text Contrast | AA | **3:1** for UI components, component boundaries, focus indicators, and graphics required to understand content |
 | **1.4.10** Reflow | AA | Usable at 320px equivalent, no two-dimensional scrolling |
-| **1.4.12** Text Spacing | AA | Survives increased line-, letter-, word-spacing. Don't pin heights |
-| **1.4.13** Content on Hover or Focus | AA | Tooltips/popovers **dismissable** (Esc, pointer stationary), **hoverable**, **persistent** |
+| **1.4.12** Text Spacing | AA | Survives increased line-, letter-, word-spacing |
+| **1.4.13** Content on Hover or Focus | AA | Tooltips/popovers **dismissable**, **hoverable**, **persistent** |
 | **2.4.7** Focus Visible | AA | Every interactive element shows focus |
 | **2.4.11** Focus Not Obscured | AA | Sticky chrome must not cover the focused element |
-| **2.5.8** Target Size (Minimum) | AA | **24 × 24 CSS px** minimum for every interactive target |
-| **2.3.3** Animation from Interactions | AAA→enforced | `prefers-reduced-motion` honoured. `aisei-site` already does this; keep it |
+| **2.5.8** Target Size (Minimum) | AA | **24 × 24 CSS px** minimum per interactive target |
+| **2.3.3** Animation from Interactions | enforced here | `prefers-reduced-motion` honoured |
+
+**"Large text" is over 24px, or over 19px bold.** brand.cornell.edu's colors page states *"over 24
+pixels — or 19 pixels if bold"*; WCAG says 24px / 18.66px bold. **19px is stricter, so 19px is the
+rule.**
 
 ### How contrast is measured
 
 WCAG contrast ratio only: `(L1 + 0.05) / (L2 + 0.05)` on relative luminance. **Never judged by eye.**
 Every ratio in this document was computed; re-compute rather than trust.
 
-**One limitation, stated because it changes what you must do:** WCAG contrast is a *luminance* ratio.
-It does not test hue separation and will not flag two colors that collapse together for a colorblind
-reader. That is why 1.4.1's redundancy rules are enforced independently and are not treated as
-optional belt-and-braces.
+```js
+const chan = c => c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
+const rgb  = h => { h = h.replace('#','').toLowerCase();
+  if (h.length === 3) h = h.split('').map(c=>c+c).join('');
+  return [0,2,4].map(i => parseInt(h.slice(i,i+2),16)/255); };
+const lum  = h => { const [r,g,b] = rgb(h).map(chan); return 0.2126*r + 0.7152*g + 0.0722*b; };
+const cr   = (a,b) => { const [hi,lo] = [lum(a),lum(b)].sort((x,y)=>y-x); return (hi+0.05)/(lo+0.05); };
+```
 
-### 2.4 Accessibility overrides applied to the reference implementation
+**One limitation that changes what you must do:** WCAG contrast is a *luminance* ratio. It does not
+test hue separation and will not flag two colors that collapse together for a colorblind reader. That
+is why 1.4.1's redundancy rules are enforced independently, not as belt-and-braces.
 
-Measured failures in `blueprints/aisei-site/`, each with the fix. **These are corrections to the
-reference implementation, not deviations from it.**
+### 2.4 Failure modes to check for — each one measured
 
-| Finding | Measured | Required fix |
+These are the recurring ways a Cornell-palette UI fails AA. All values computed against the §4
+surfaces.
+
+| Failure mode | Measured | Required instead |
 |---|---|---|
-| **Global focus ring `#2e5690` is invisible on dark surfaces.** `_accessability.scss` applies it with `!important`, so the masthead, hero band, and footer — exactly the carnelian and dark regions — have a failing focus indicator | **1.08:1 on carnelian `#b31b1b`** · 2.36:1 on `#1a1a1a` · 1.71:1 on `#333333` · (7.37:1 on white, fine) | **Surface-aware focus ring.** White (`6.80:1` on carnelian, `17.40:1` on `#1a1a1a`) on dark and carnelian surfaces; black (21.00:1) or carnelian (6.80:1) on white and `#f7f7f7`. 3px, 2px offset, as now |
-| `--color-border #e0e0e0` used as a component boundary | **1.32:1** on white | Decorative dividers only. Any input border, control outline, or boundary that conveys a component's extent needs **≥3:1** |
-| `--color-warning #F8981D` used as a fill or indicator on white | **2.21:1** on white | Not a mark or boundary on light surfaces. Its text pairing is fine (`#222222` on it = 7.20:1). For a warning *graphic* on white use `#D47500` (3.31:1) |
-| White text on `#F8981D` | **2.21:1** | Prohibited. `--color-on-warning: #222222` exists for this reason — use it |
+| **One global focus-ring color, applied everywhere.** The single most common failure: a mid-tone blue ring that passes on white is invisible on a carnelian masthead or a dark footer | a `#2e5690`-class ring measures **1.08:1 on carnelian**, 2.36:1 on `#1a1a1a`, 1.71:1 on `#333333` — while passing 7.37:1 on white | **Surface-aware ring.** White on carnelian (6.80) and dark (15.91); black (21.00) or carnelian (6.80) on white and `#F7F7F7`. §4.4 has the per-surface table |
+| A near-white hairline used as a **component boundary** | `#e0e0e0` on white = **1.32:1** | Decorative dividers only. An input border or control outline needs **≥3:1** |
+| Cornell **orange `#F8981D`** as a fill, icon, or boundary on a light surface | **2.21:1** on white | `#D47500` (3.31:1). See §4.3 — this is a brand-palette color that fails AA |
+| Cornell **green `#6EB43F`** as a mark on a light surface | **2.54:1** on white | `#4B7B2B` (5.04:1) or `#578E32` (3.95:1) |
+| **White text on Cornell orange** | **2.21:1** | Dark gray `#222222` on it (7.20:1) |
+| **White-fill mark on a light surface** | **1.00:1** on white, 1.07:1 on `#F7F7F7` | The black or carnelian variant. §3.6 |
 
 ---
 
-## 3. Cornell logo and branding — non-negotiable
+## 3. Cornell marks — non-negotiable
 
-**Source of authority: [brand.cornell.edu/logos](https://brand.cornell.edu/logos) and the brand
-colors page. Values below are quoted from it.** Where this contract is silent, brand.cornell.edu
-governs and `brand@cornell.edu` is the escalation — never local judgment.
+**Source: [brand.cornell.edu/logos](https://brand.cornell.edu/logos),
+[/logos/academic](https://brand.cornell.edu/logos/academic),
+[/logos/non-academic](https://brand.cornell.edu/logos/non-academic),
+[/merchandising](https://brand.cornell.edu/merchandising), Policy 4.10.**
 
-### 3.1 Presence
+The logo is *"a trademark of Cornell University"* and the name *"Cornell University"* is registered
+(/merchandising). Policy 4.10 states the university *"allows the use of its name, and its logos,
+trademarks, insignias, and other indicia **only with permission**."*
 
-**Required on every public-facing or builder-facing UI.** Internal/admin-only surfaces and
-machine-facing output are exempt from *presence* — but any mark that **is** present obeys every rule
-below regardless of audience.
+### 3.1 Lockups are for colleges and schools only
 
-### 3.2 Size — exact, not approximate
+**This is the rule most often broken, and it is unambiguous.** From /logos/academic:
+
+> *"This lockup configuration is used exclusively to represent **colleges and schools**."*
+>
+> *"This lockup is **not** used for anything other than a college or school."*
+
+And from /logos/non-academic, for everything else:
+
+> a non-academic logo, wordmark, or identifier *"may share primacy with, and proximity to, the seal
+> logo but **may not use a lockup configuration**."*
+
+So:
+
+| Unit type | Lockup? |
+|---|---|
+| A **college or school** | **Yes** — the academic lockup represents it |
+| A **department or unit inside** a college or school | Only by being *"incorporated into their school's lockup"*, and only where it is *"part of the academic mission"*. It does not get a lockup of its own |
+| A **program, center, or institute** | **Not automatic.** *"For programs, centers and institutes, please contact us for a consultation."* |
+| Any **non-academic** office, service, or team | **No lockup, ever.** It may sit beside the seal logo with equal prominence — that is not a lockup |
+
+**Therefore: a department that is not a college or school does not get a lockup, and this platform
+will not compose one.** Not in an image, not in SVG, and not by setting the unit's name in type
+beside the mark to imitate one — that arrangement *is* the lockup configuration the rule forbids.
+
+**A non-eligible unit identifies itself in ordinary text**, set per §5 and named per the nomenclature
+rules ([/messaging/nomenclature](https://brand.cornell.edu/messaging/nomenclature/)), positioned as
+its own element rather than locked to the mark.
+
+### 3.2 A custom unit logo is the builder's to supply
+
+If a project wants a unit-specific mark, **the builder provides the approved asset.** The platform
+does not generate, derive, or synthesize one, because doing so would violate both the alteration
+prohibition (§3.7) and Policy 4.10's permission requirement.
+
+Routes to a legitimate asset, per brand.cornell.edu:
+
+- *"For logos and lockups that pertain to your college, school, or department, please contact your
+  **communications director**."* (/resources/downloads)
+- A consultation request or `brand@cornell.edu`, which is also the stated route for programs,
+  centers, and institutes.
+- Use of a name or logo is requested through the brand forms; Policy 4.10 governs the permission.
+
+**Until an approved asset exists, the UI ships with the university mark and the unit's name as text.**
+That is a complete, compliant outcome — not a placeholder.
+
+### 3.3 Presence
+
+**Required on every public-facing UI.** Internal/admin-only surfaces and machine-facing output are
+exempt from *presence* — but any mark that **is** present obeys every rule here regardless of
+audience.
+
+### 3.4 Size — exact, not approximate
+
+From /logos:
 
 | Variant | Rule |
 |---|---|
 | Simple Logo (web) | **73–120 px** |
 | Simple Seal (web) | **73–120 px**, and *"the dimension must not exceed 120 pixels"* |
 | Reduced Logo (web) | ***must be* 45 px tall** — a fixed value, not a range |
-| Bold Logo / Bold Seal (print) | greater than **3/4 inch** tall |
-| Reduced Wordmark (print) | used **below 3/4 inch** |
+| Bold Logo / Bold Seal (print) | greater than **3/4 inch** |
+| Reduced Wordmark (print) | below **3/4 inch** |
 
-The mark *"should always be reproduced at a size that is legible."* A responsive layout must not
-scale the mark outside its band at any breakpoint — this is the rule most often broken by fluid CSS.
+/logos/academic adds the lockup's own floor and its fallback: *"The seal is at least 73px square"*,
+and below that *"the design switches to the 45px logo lockup."*
 
-### 3.3 Clear space
+The mark *"should always be reproduced at a size that is legible."* **A responsive layout must not
+scale the mark outside its band at any breakpoint** — fluid CSS is the usual way this breaks. Both
+pages describe a mark that *"responds"* to its container, so switching variant by breakpoint is the
+intended mechanism; scaling one variant past its limits is not.
 
-*"Text, headlines, photographs, or illustrations should never be closer to the logo than **1/4 the
-diameter of the seal**."*
+### 3.5 Clear space and internal spacing
 
-At the 120px ceiling that is a **30px** exclusion zone; at 73px it is **~18px**; at the 45px reduced
-logo it is **~11px**. Padding, not margin collapse — verify against the rendered box.
+From /logos:
 
-### 3.4 Color
+> *"Text, headlines, photographs, or illustrations should never be closer to the logo than **1/4 the
+> diameter of the seal**."*
 
-**Logos are restricted to carnelian, black, or white.** No other fill, ever.
+At the 120px ceiling that is **30px**; at 73px, **~18px**; at the 45px reduced logo, **~11px**. Use
+padding — a collapsible margin is not an exclusion zone.
 
-- Carnelian `#B31B1B` · black `#000000` · white `#FFFFFF`
-- Recoloring **between those three** is permitted, and only the fill — never the geometry
-- Any other color, gradient, tint, or screen is prohibited
+For the lockup itself (/logos/academic): *"Hairline and seal logo are equal height"*, and *"The space
+between the first letter and seal logo is 1/2 width of the seal."*
 
-### 3.5 Background
+### 3.6 Color, and choosing a variant by background
 
-*"The logo may be printed on any background that provides sufficient contrast for the logo to appear
-clearly and legibly."*
+**Marks are restricted to carnelian, black, or white.** /logos/academic: *"Only black, red, or white
+are used for the Cornell seal."* /merchandising gives the print equivalents: Cornell red **PMS 187**,
+white, or black.
 
-Brand policy is **contrast-governed, not an allowlist** — which means it composes with §2's 1.4.11
-threshold rather than competing with it. The operative rule:
+Background rules are **contrast-governed, not an allowlist** (/logos):
 
-> **Pick the logo variant whose fill clears 3:1 against the surface behind it.**
+> *"The logo may be printed on any background that provides sufficient contrast for the logo to
+> appear clearly and legibly."*
 
-| Surface | Compliant variant | Measured |
+That composes with §2's 1.4.11 threshold instead of competing with it, giving one operative rule:
+
+> **Pick the variant whose fill clears 3:1 against the surface behind it.**
+
+| Surface | Compliant variant | Prohibited |
 |---|---|---|
-| White `#FFFFFF` | **black** (21.00:1) or **carnelian** (6.80:1) | white fill = **1.00:1 — prohibited** |
-| Light gray `#F7F7F7` | **black** (19.60:1) or **carnelian** (6.35:1) | white fill = **1.07:1 — prohibited** |
-| Carnelian `#B31B1B` | **white** (6.80:1) | black = 3.09:1, large-only — avoid |
-| Dark gray `#222222` | **white** (15.91:1) | carnelian = 2.34:1 — **prohibited** |
-| Hero `#1a1a1a` / footer `#333333` | **white** (17.40:1 / 12.63:1) | — |
-| Dark Warm gray `#A2998B` · Sea gray `#9FAD9F` | **black** (7.47:1 / 8.95:1) | white = 2.81 / 2.35 — **prohibited** |
+| White `#FFFFFF` | **black** (21.00) or **carnelian** (6.80) | white fill — **1.00:1** |
+| Light gray `#F7F7F7` | **black** (19.60) or **carnelian** (6.35) | white fill — **1.07:1** |
+| Carnelian `#B31B1B` | **white** (6.80) | black is 3.09 — large-only, avoid |
+| Dark gray `#222222` | **white** (15.91) | carnelian — **2.34:1** |
+| Dark Warm gray `#A2998B` | **black** (7.47) | white — **2.81:1** |
+| Sea gray `#9FAD9F` | **black** (8.95) | white — **2.35:1** |
+| A photograph | whichever variant clears 3:1 against the **darkest and lightest** pixels behind it | any variant over a busy mid-tone region |
 
-**Important correction to the reference implementation.** `aisei-site`'s style guide says the marks
-need *"a dark/red bg, never white."* That is true **of the white-fill assets it ships**, not of
-Cornell's policy. The three SVGs in `blueprints/aisei-site/app/client/assets/` are all white-fill, so
-they are dark-surface-only — but a **black or carnelian variant on white is fully brand-compliant**,
-and Cornell publishes those (`cornell_logo_simple_black.svg`, `cornell_seal_simple_web_black.svg`).
-
-**A UI on a white plane therefore has two compliant routes** — put the mark in a carnelian or dark
-masthead band, or obtain the black/carnelian variant. It must not put the white-fill asset on white.
-
-### 3.6 Repetition
-
-*"Cornell logo appears only once on a homepage or communications piece."* One mark per page. A
-masthead seal **and** a footer wordmark on the same page violates this.
+**A white-fill asset is a dark-surface asset.** On a predominantly white UI there are exactly two
+compliant routes: place the mark in a carnelian or dark band, or use the black/carnelian variant.
 
 ### 3.7 Prohibited, absolutely
 
-- ***"No watermarking, screening, or cropping of seal in any designs."***
-- ***"Do not attempt to create art for the Cornell logo, seal or wordmark for any application."***
-  Use the official asset. Do not redraw, trace, re-letter, or reconstruct it — including in code
-  (no CSS/SVG re-creation of the mark).
-- Any fill outside carnelian / black / white (§3.4)
-- Any variant outside its size band (§3.2)
-- Anything inside the clear-space zone (§3.3)
-- More than one mark per page (§3.6)
+- **"Do not redraw, reconstruct, or modify the logo in any way"** — the mark *"cannot be altered"*
+  (/merchandising).
+- **"Do not attempt to create art for the Cornell logo, seal or wordmark for any application"**
+  (/logos). This includes reconstructing it in CSS, hand-written SVG, or an icon font.
+- **"No watermarking, screening, or cropping of seal in any designs"** (/logos).
+- Any fill outside carnelian / black / white (§3.6).
+- Any variant outside its size band (§3.4).
+- Anything inside the clear-space zone (§3.5).
+- A lockup for any unit that is not a college or school (§3.1).
+- More than one mark per view: *"Cornell logo appears only once on a homepage or communications
+  piece"* (/logos).
 
-**Not addressed upstream** — rotation, distortion/stretching, drop shadows, outlines, and lockups
-with other marks. Given *"do not attempt to create art,"* the conservative reading applies and all of
-them are **prohibited here**: aspect ratio locked, no transforms, no effects, no co-branded lockup
-assembled locally. **Anything not explicitly permitted requires brand consultation** —
-`brand@cornell.edu` or the consultation form — not a local decision.
+**Not addressed upstream** — rotation, distortion/stretching, drop shadows, outlines, and locally
+assembled co-brand lockups. Given *"cannot be altered"* and *"do not attempt to create art"*, the
+conservative reading applies and all are **prohibited here**: aspect ratio locked, no transforms, no
+effects. **Anything not explicitly permitted requires brand consultation, not local judgment.**
 
-### 3.8 The wordmark-as-text question
+### 3.8 Trademark symbols
 
-`aisei-site` renders *"Cornell University / AI Innovation Hub"* as **HTML text, not an image**, which
-is what the live site does. Treat that as a **typographic lockup, not a logo**: it is subject to §6
-type rules and §2 contrast, and it does **not** count as the one permitted mark under §3.6. Whether
-it is an approved unit signature is a brand question, not ours — if a unit signature is wanted, get
-the official lockup asset rather than setting one in CSS.
+From /merchandising: the logo carries **™**; the logotype used by itself carries **®**. Symbols are
+omitted where size or reproduction would render them *"illegible"*, and are not required on banners,
+flags, or signs. In a web UI at 45–120px, the symbol is frequently illegible — omit it rather than
+render it as a smudge, and never redraw the mark to add one.
 
 ---
 
-## 4. Palette — Cornell official
+## 4. Color
 
-**Source: brand.cornell.edu colors page.** Proportions are Cornell's own: **~90% primary, ~7%
-secondary, ~3% accent.**
+**Source: [brand.cornell.edu/design-center/colors](https://brand.cornell.edu/design-center/colors).**
+Proportions are Cornell's: **~90% primary, ~7% secondary, ~3% accent.**
 
-### Primary — ~90%
+### 4.1 Primary — ~90%
 
 | Color | Hex | Vetted pairings |
 |---|---|---|
@@ -229,149 +303,187 @@ secondary, ~3% accent.**
 | Dark gray | `#222222` | White, Light gray |
 | White | `#FFFFFF` | Carnelian, Dark gray |
 
-**The "first and only" rule for red:** carnelian is *"the **first** color people see"* in multi-color
-media and the *"**only** color"* in limited-color media. It is brand-leading, and — per §9 — it is
-never a data-encoding color.
+**The "first and only" rule:** carnelian is *"the **first** color people see"* in multi-color media
+and the *"**only** color"* in limited-color media. It leads the composition — and per §9 it never
+encodes data.
 
-A practical decomposition of the 90%, if you want a working budget: **~55% white, ~20% carnelian,
-~15% dark gray.**
+A workable decomposition of the 90%: **~55% white, ~20% carnelian, ~15% dark gray.**
 
-### Secondary — ~7%
+### 4.2 Secondary — ~7%
+
+*"Neutral hues"* that support rather than drive a layout.
 
 | Color | Hex | Text on it |
 |---|---|---|
 | Light gray | `#F7F7F7` | Carnelian, Dark gray |
-| Dark Warm gray | `#A2998B` | **Black only** (7.47:1). White = 2.81:1, prohibited |
-| Sea gray | `#9FAD9F` | **Black only** (8.95:1). White = 2.35:1, prohibited |
+| Dark Warm gray | `#A2998B` | **Black only** (7.47:1). White = 2.81:1 — fails |
+| Sea gray | `#9FAD9F` | **Black only** (8.95:1). White = 2.35:1 — fails |
 
-*"Neutral hues"* that support rather than drive a layout.
+### 4.3 Accent — ~3%, with the AA measurement Cornell does not publish
 
-### Accent — ~3%
-
-Cornell publishes per-use variants because the base accents are not all text-safe. **This table adds
-the 1.4.11 measurement, which narrows it further.**
+Cornell publishes per-use variants because the base accents are not all text-safe. **The last column
+is measured here and narrows the set further.**
 
 | Accent | Base (graphics) | Text-safe | Large-text only | On white — **1.4.11 verdict** |
 |---|---|---|---|---|
-| Blue / link | `#006699` | `#006699` | — | **6.25:1 ✓** |
-| Green | `#6EB43F` | `#4B7B2B` | `#578E32` | base **2.54:1 ✗** · `#4B7B2B` 5.04 ✓ · `#578E32` 3.95 ✓ |
-| Orange | `#F8981D` | — | `#D47500` | base **2.21:1 ✗** · `#D47500` 3.31 ✓ |
-| Secondary Red | `#EF4035` | `#DF1E12` | — | `#EF4035` 3.85 ✓ · `#DF1E12` 4.85 ✓ |
-| Navy | `#073949` | `#073949` | — | **12.42:1 ✓** |
+| Blue / link | `#006699` | `#006699` | — | **6.25 ✓** |
+| Green | `#6EB43F` | `#4B7B2B` | `#578E32` | base **2.54 ✗** · 5.04 ✓ · 3.95 ✓ |
+| Orange | `#F8981D` | — | `#D47500` | base **2.21 ✗** · 3.31 ✓ |
+| Secondary Red | `#EF4035` | `#DF1E12` | — | 3.85 ✓ · 4.85 ✓ |
+| Navy | `#073949` | `#073949` | — | **12.42 ✓** |
 
-> **Accessibility override:** Cornell labels `#6EB43F` and `#F8981D` *"graphics only"*, which means
-> *don't set text in them* — **it does not mean they are safe as graphics on white.** Both fail
-> 1.4.11 (2.54:1 and 2.21:1). **Neither may be a mark, fill, icon, or boundary on a light surface.**
-> Use `#578E32` / `#4B7B2B` and `#D47500`. This is §0 precedence in action.
+> **Accessibility override.** Cornell labels `#6EB43F` and `#F8981D` *"graphics only"* — that means
+> *do not set text in them*. **It does not mean they are safe as graphics.** Both fail 1.4.11 on a
+> light surface (2.54:1, 2.21:1), so **neither may be a mark, fill, icon, or boundary there.** Use
+> `#578E32`/`#4B7B2B` and `#D47500`. This is §0 precedence in action: the palette is on-brand and the
+> usage would be inaccessible, so accessibility wins.
 
 Accents *"should not be used as full-color bleeds"* and must never become a unit's primary color.
 
-### Status — reserved
+### 4.4 Focus indicators, per surface (1.4.11 ≥3:1)
 
-Every UI has states. Mapped to Cornell accents that clear 4.5:1 as text on both light surfaces:
+| Surface | Usable ring colors |
+|---|---|
+| `#FFFFFF` | black 21.00 · carnelian 6.80 |
+| `#F7F7F7` | black 19.60 · carnelian 6.35 |
+| `#A2998B` | **black 7.47 only** |
+| `#9FAD9F` | **black 8.95 only** |
+| `#222222` | white 15.91 |
+| `#B31B1B` | white 6.80 |
+
+On the two mid-tone secondaries, **black is the only compliant ring.**
+
+### 4.5 Status — reserved
+
+Mapped to Cornell accents that clear 4.5:1 as text on both light surfaces:
 
 | Role | Hex | on `#FFFFFF` | on `#F7F7F7` |
 |---|---|---|---|
 | good | `#4B7B2B` | 5.04 ✓ | 4.70 ✓ |
-| warning | `#D47500` | 3.31 — **large text or graphic only** | 3.09 — same |
+| warning | `#D47500` | 3.31 — large text or graphic only | 3.09 — same |
 | critical | `#DF1E12` | 4.85 ✓ | 4.52 ✓ |
 
-**Always icon + word, never color alone** (1.4.1). **Status hues are reserved**: the green, orange,
+`#008800` is a tempting "good" and **fails**: 4.64 on white but **4.34 on `#F7F7F7`**.
+
+**Always icon + word, never color alone** (1.4.1). **Status hues are reserved** — the green, orange,
 and red families are not available for identity, category, or decoration.
 
-**Carnelian is never a status color.** It is 1.31:1 from `#b34f1b`-class oranges and 1.15:1 from
-`#cc0000`-class reds — a status chip on or beside carnelian chrome is unreadable as an alarm. Status
-lives on the white or light-gray plane.
+**Carnelian is never a status color.** It measures 1.15–1.40:1 against every status color, so a status
+chip on or beside carnelian chrome is unreadable as an alarm. Status lives on the white or light-gray
+plane.
 
 ---
 
-## 5. Tokens — use the reference implementation
+## 5. Typography
 
-Take tokens from `blueprints/aisei-site/app/client/app/shared/theme/_variables.scss`. **Never hardcode
-a hex in a component** — the `wp-style-guide` skill's rule, and it holds repo-wide. If a token is
-missing, add it to `_variables.scss` and its swatch to `style-guide.html` in the same change; the two
-must not drift.
+**Source: [brand.cornell.edu/design-center/typography](https://brand.cornell.edu/design-center/typography).**
 
-Available and correct as-is: `--color-accent #b31b1b`, `--color-accent-dark #a01114` (white on it =
-8.12:1), `--color-primary #2d668e` (6.17:1), `--color-link #1176ac` (4.99:1), `--color-on-warning
-#222222`, the hero band (`--color-hero-bg #1a1a1a`, white = 17.40:1), footer (`#333333` with
-`#bbbbbb` = 6.58:1), and the hero accents (`#a66dd5` = 4.78:1, `#c6b20f` = 8.10:1 on `#1a1a1a`).
-
-### 5.1 Tokens that need care
-
-| Token | Constraint |
+| Typeface | Role, as stated |
 |---|---|
-| `--color-border #e0e0e0` | **1.32:1** — decorative only. Never a component boundary (§2.4) |
-| `--color-warning #F8981D` | **2.21:1** — never a fill/indicator on light. Text on it must be `#222222` (§2.4) |
-| `--color-hero-accent-1/-2` | Dark-background only, for italic headline words. Not general UI colors — the reference skill says so and it is right |
-| `--color-primary #2d668e` | Defined but unused in live chrome. **Do not force it into hero/footer** just because it exists |
-| focus ring `#2e5690` | Must become surface-aware (§2.4) |
+| **Palatino** | *"the primary serif typeface for the university"*; *"appears on the Cornell logo"*. Licensed (purchase) |
+| **Freight Text Pro** | *"a more contemporary serif"*; *"appears on web properties, such as cornell.edu"*. Adobe Fonts |
+| **Freight Sans Pro** | sans serif, *"comes in a variety of weights and styles and is easily legible on screen"*. Adobe Fonts |
+
+For a web UI, that makes **Freight Sans Pro** the interface face and **Freight Text Pro** the serif —
+both Adobe Fonts, so **neither is a self-contained asset**; see §8.
+
+**Ship a real system fallback** (`system-ui, -apple-system, "Segoe UI", sans-serif`). If the webfont
+is blocked or slow, the UI must still be readable and still meet §2.
+
+Cornell does **not** publish weights, a type scale, line-height, or fallback stacks (§11). Those are
+local decisions — make them once, write them down, and keep them consistent.
+
+Two rules that are not optional:
+
+- **Large text is >24px, or >19px bold** (§2). A 15px caption gets no relief.
+- **Numerals that are read as data** use lining figures; add tabular figures only where numbers align
+  vertically. Large standalone values stay proportional.
 
 ---
 
-## 6. Type
+## 6. Imagery
 
-`aisei-site` tokens: `--heading-font: "freight-sans-pro", Georgia, serif` and `--body-font:
-"freight-sans-pro", Verdana, Geneva, Tahoma, sans-serif`.
+**Source: [brand.cornell.edu/design-center/photography](https://brand.cornell.edu/design-center/photography).**
 
-- **Ship a real system fallback.** `freight-sans-pro` is an Adobe Fonts (Typekit) family, so it is not
-  self-contained — see §8. If the webfont is blocked the UI must still be readable.
-- **Inputs stay ≥16px** — `_accessability.scss` enforces this to stop mobile auto-zoom. Keep it.
-- **Large text is >24px, or >19px bold** (§2). A 15px caption gets no relief and needs the full 4.5:1.
-- **Numerals**: `font-variant-numeric: lining-nums` for anything read as data; add `tabular-nums`
-  only where numbers align vertically. Large standalone values stay proportional.
+- *"Professional photography should be used as often as possible"*, *"particularly important for
+  external communications."*
+- *"All photographs should be printed at 300 dpi at the actual size."*
+- **The one explicit prohibition:** *"Do not increase the size of digital images as this can cause
+  the image to be distorted."*
+- Approved source: the Cornell Photos library at `photo.cornell.edu`.
+
+**Accessibility obligations that attach to imagery**, since brand.cornell.edu does not state them:
+
+- Every image needs a text alternative; decorative images are marked as such.
+- **Text over a photograph must clear 4.5:1 against the actual pixels behind it** — not against an
+  average. Use a scrim, a solid panel, or a crop that guarantees it.
+- A mark over a photograph follows §3.6: the chosen variant clears 3:1 against the darkest *and*
+  lightest region it covers.
+- Third-party imagery needs permissions
+  ([/design-center/copyright-licensing](https://brand.cornell.edu/design-center/copyright-licensing));
+  do not assume anything found online is usable.
 
 ---
 
-## 7. Layout
+## 7. Layout and interaction
 
-- `$cwd-container-fluid-max-width: 1280px`; breakpoints from `_variables.scss`
-  (`$screen-sm-min: 768px`, `$screen-md-min: 992px`, `$screen-lg-min: 1200px`, …). **Reuse them —
-  do not invent breakpoints.**
+Cornell publishes no grid, breakpoint, or spacing system (§11), so these are the accessibility
+obligations plus the conventions that keep a UI predictable.
+
 - **One control row above everything it scopes.** Filters and scope selectors sit above the content,
-  never inside individual cards. If sticky, satisfy **2.4.11**.
-- **1.4.10 Reflow** at 320px equivalent; **1.4.12 Text Spacing** survives increased spacing.
+  never inside individual cards — two cards must not be able to disagree about what they show. If
+  sticky, satisfy **2.4.11**.
+- **1.4.10 Reflow**: usable at 320px equivalent; **1.4.12 Text Spacing**: survives increased spacing,
+  so do not pin the height of legends, labels, or chips.
 - Size containers to include their labels — a height that fits content but not its caption or axis
   band produces a nested scrollbar.
-- Honour `prefers-reduced-motion` (already in `_accessability.scss`).
+- **Interactive targets ≥24×24 CSS px** (2.5.8).
+- **Tooltips enhance, never gate.** Every value reachable without hover; keyboard focus shows what
+  hover shows; dismissable, hoverable, persistent (1.4.13).
+- Honour `prefers-reduced-motion`.
+- **Do not add the legacy Cornell emergency banner script.** It was
+  [decommissioned](https://brand.cornell.edu/messaging/emergency-banner/) on 2021-03-31 and *"should
+  be removed"* where it survives.
 
 ---
 
 ## 8. Delivery and Content-Security-Policy
 
-**A blueprint UI serves a CSP with no `unsafe-inline` and no `unsafe-eval`.**
+**A UI serves a CSP with no `unsafe-inline` and no `unsafe-eval`.**
 
 - **No inline `<script>`**, including build-injected bootstrap
 - **No inline `<style>`**, and no runtime CSS-in-JS that injects one
 - **No `eval` / `new Function`**
 - **No inline `style="…"` carrying color** — use custom properties and classes
-- Declare the palette once as custom properties; reference roles, not hexes
+- Declare the palette once as custom properties and reference roles, never raw hexes, so a surface
+  change is a one-place edit
 
-**Model A — bundled SPA** (Angular, as `aisei-site`; or Vite). Emit CSS as hashed external files. The
-**dev server does not run under the production CSP** — verify against a production build or a
-violation ships unseen. With Vite specifically, `build.modulePreload.polyfill = false`: the polyfill
-is an inline script and will be blocked.
+**Bundled single-page apps**: emit CSS as hashed external files. **The dev server does not run under
+the production CSP** — it injects inline styles and a hot-reload bootstrap. Verify against a
+production build, or a violation ships unseen. Bundlers that emit an inline module-preload polyfill
+must have it disabled.
 
-**Model B — HTML served directly by compute** (Lambda, container). The simplest model and the most
-likely to violate the policy, because a self-contained page is the natural way to write it. **Send
-the CSP header from the handler**; a page with no CSP is non-conformant even if nothing inline is
-present. Move CSS/JS to separate routes. If it must stay one file, it takes a **declared exemption
-for §8 only** — never for §2 or §3.
+**HTML served directly by compute** (Lambda, container): the simplest model and the most likely to
+violate the policy, because a self-contained page is the natural way to write it. **Send the CSP
+header from the handler** — a page with no CSP is non-conformant even when nothing inline is present.
+Move CSS and JS to separate routes. A genuinely single-file page takes a **declared exemption for §8
+only** — never for §2 or §3.
 
-**Webfont**: self-host the `woff2` and keep `font-src 'self'`, or use the Typekit **CSS `<link>`** —
-never the JS loader, which injects an inline script. The link route needs `https://use.typekit.net` in
-`style-src` and `https://use.typekit.net https://p.typekit.net` in `font-src`.
+**The brand webfonts are third-party.** Either self-host the `woff2` files (licence permitting) and
+keep `font-src 'self'`, or use the Adobe Fonts **CSS `<link>`** — never the JS loader, which injects
+an inline script. The link route needs the Adobe Fonts origins in `style-src` and `font-src`.
 
 ---
 
-## 9. Charts and data marks
+## 9. Data visualization
 
-**Binds only if the UI plots data.**
+**Binds only if the UI plots data.** Cornell publishes no chart guidance (§11), so this section
+derives from §4's palette under §2's thresholds.
 
 ### Series palette
 
-Cornell's accent palette has essentially **one identity-neutral accent**, because green, orange, and
-red are reserved for status (§4) and the base green/orange fail 1.4.11 anyway.
+Once the green, orange, and red families are reserved for status (§4.5), and the base green and
+orange are excluded for failing 1.4.11 (§4.3), Cornell's palette leaves **two identity-safe accents**:
 
 | Slot | Color | Hex | on `#FFFFFF` | on `#F7F7F7` |
 |---|---|---|---|---|
@@ -379,34 +491,32 @@ red are reserved for status (§4) and the base green/orange fail 1.4.11 anyway.
 | 2 | Navy | `#073949` | 12.42 ✓ | 11.60 ✓ |
 | de-emphasis / "Other" | Dark gray | `#222222` | 15.91 ✓ | 14.85 ✓ |
 
-**Two identity slots, plus a de-emphasis gray. That is the honest ceiling** of Cornell's approved
-palette with status reserved — and it is consistent with the 3% accent cap, which cannot fund eight
-hues. Beyond two series: rank by the measure, keep the top two, fold the rest into "Other", and put
-the full breakdown in the table view.
+**Two identity slots plus a de-emphasis gray is the honest ceiling** — and it is consistent with a 3%
+accent budget, which cannot fund eight hues. Beyond two series: rank by the measure, keep the top
+two, fold the rest into "Other", and put the full breakdown in a table.
 
-**Marks live on white or `#F7F7F7`, never the dark band** — blue is 2.55:1 on `#222222` and fails.
+**Marks live on white or `#F7F7F7`.** Blue is 2.55:1 on `#222222` and fails there.
 
-### Redundancy is mandatory, and here is why
+### Redundancy is mandatory
 
-Contrast **between** the marks: blue↔navy **1.99**, blue↔dark gray **2.55**, navy↔dark gray **1.28**.
-All below 3:1, and not fixable by substitution — the approved palette contains no two identity-safe
-hues that reach 3:1 between themselves.
+Contrast **between** the marks: blue↔navy **1.99**, blue↔dark gray **2.55**, navy↔dark gray **1.28** —
+all below 3:1, and **not fixable by substitution: no two identity-safe Cornell hues reach 3:1 between
+themselves.**
 
 1.4.11 binds on *"graphics required to understand the content."* These charts make color redundant by
-construction, so each of the following is **required, not an enhancement**:
+construction, so each item is **required, not an enhancement**:
 
 - A legend whenever two or more series are present
 - **Direct labels on every series**
-- **A table-view twin for every chart** — every value reachable as text
+- **A table view of every chart** — every value reachable as text
 - **A 2px surface-colored gap between touching fills**
 
 Remove any one and the chart fails AA.
 
 ### Emphasis is the preferred form
 
-A hue against gray does clear 3:1 in the right direction, and with only two identity slots the
-emphasis pattern — one series in blue, the rest in `#222222` — is both the clearer chart and the
-stronger compliance position. **Prefer it whenever the story is about one series.**
+With two identity slots, **emphasis** — one series in blue, the rest in `#222222` — is both the
+clearer chart and the stronger compliance position. Prefer it whenever the story is about one series.
 
 ### Marks
 
@@ -422,10 +532,10 @@ Gridlines are decorative, so no contrast floor applies — **and therefore a gri
 only way to read a value.** A threshold or target line *is* a data mark: it clears 3:1 and it is
 labeled.
 
-Separation is done with a **2px surface gap** and a **2px surface ring** on overlapping markers, never
-a stroke around a mark.
+Separate marks with a **2px surface gap** and a **2px surface ring** on overlapping markers, never a
+stroke drawn around a mark.
 
-**Text never wears the series color.** Labels, values, legend, and axis text use ink tokens; identity
+**Text never wears the series color.** Labels, values, legend, and axis text use ink colors; identity
 comes from the swatch beside the text. A label inside a fill picks black or white by the fill's
 luminance and must itself clear 4.5:1.
 
@@ -435,9 +545,9 @@ luminance and must itself clear 4.5:1.
    small multiples, or index to a common base on one axis.
 2. **A value ramp on nominal categories** — double-encodes what bar length already shows.
 3. **Recolor-on-filter.** Bind hue to entity with a stable map computed once.
-4. **Carnelian as a data color** (§3, §4).
+4. **Carnelian as a data color** (§3, §4.1).
 5. **A number on every point.** Label the endpoint, the extreme, or the series that matters.
-6. **A one-bar bar chart or two-slice pie.** That is a stat tile.
+6. **A one-bar bar chart or two-slice pie.** That is a single number — show it as one.
 
 ---
 
@@ -445,75 +555,113 @@ luminance and must itself clear 4.5:1.
 
 **Accessibility — §2. No exemptions.**
 - [ ] Every text/background pair computed: ≥4.5:1 normal, ≥3:1 large (>24px / >19px bold)
-- [ ] Every UI component, boundary, focus ring, and meaningful graphic ≥3:1
-- [ ] Focus ring is **surface-aware** and visible on carnelian and dark bands
-- [ ] No information conveyed by color alone; status is icon + word
+- [ ] Every component boundary, focus ring, icon, and meaningful graphic ≥3:1
+- [ ] Focus rings should defer to user agent defualt (such as the browser) as much as possible (don't add styling for buttons or links that naturally gain focus)
+- [ ] Focus ring is **surface-aware** and visible on carnelian and dark surfaces
+- [ ] Nothing conveyed by color alone; status is icon + word
 - [ ] Interactive targets ≥24×24 CSS px
 - [ ] Tooltips dismissable, hoverable, persistent
 - [ ] Usable at 320px; survives increased text spacing; `prefers-reduced-motion` honoured
-- [ ] `#6EB43F` and `#F8981D` do not appear as marks/fills/boundaries on light surfaces
+- [ ] `#6EB43F` and `#F8981D` appear nowhere as marks/fills/boundaries on light surfaces
+- [ ] Text over imagery measured against actual pixels, not an average
 
-**Cornell logo — §3. No exemptions.**
-- [ ] Present on any public-facing UI
-- [ ] Official asset used — **not** redrawn, traced, or CSS/SVG-reconstructed
-- [ ] Size inside its band: simple 73–120px · seal ≤120px · reduced **exactly 45px**
-- [ ] Size band holds **at every breakpoint**
-- [ ] Clear space ≥ 1/4 the seal's diameter on all sides
+**Cornell marks — §3. No exemptions.**
+- [ ] Official asset used — **not** redrawn, reconstructed, or CSS/SVG-recreated
+- [ ] **No lockup unless the unit is a college or school.** A non-eligible unit's name is plain text, not locked to the mark
+- [ ] A custom unit mark, if any, was **supplied by the builder** as an approved asset — never generated here
+- [ ] Size in band: simple 73–120px · seal ≤120px · reduced **exactly 45px** — **at every breakpoint**
+- [ ] Clear space ≥ 1/4 the seal's diameter, as padding
 - [ ] Fill is carnelian, black, or white — nothing else
-- [ ] Variant's fill clears **3:1** against its actual background (§3.5 table)
-- [ ] **Exactly one** Cornell mark on the page
+- [ ] Variant's fill clears **3:1** against its actual background (§3.6)
+- [ ] **Exactly one** Cornell mark per view
 - [ ] No watermark, screen, crop, rotation, distortion, shadow, outline, or local lockup
+- [ ] ™/® omitted rather than rendered illegibly
 
-**Palette and tokens — §4, §5**
-- [ ] ~90% primary / ~7% secondary / ~3% accent, roughly respected
-- [ ] Carnelian reads first; it encodes nothing
-- [ ] Tokens from `_variables.scss`; no hardcoded hex in components
+**Color, type, imagery — §4–§6**
+- [ ] ~90% primary / ~7% secondary / ~3% accent, roughly respected; carnelian reads first
+- [ ] Carnelian encodes nothing
 - [ ] Status families not reused for identity or decoration
+- [ ] Cornell typefaces with a working system fallback; no hardcoded hex in a component
+- [ ] Images not upscaled; third-party imagery cleared
 
-**Type, layout, delivery — §6, §7, §8**
-- [ ] Cornell font stack with a working system fallback; inputs ≥16px
-- [ ] Existing breakpoints reused
+**Delivery — §8**
 - [ ] CSP sent with no `unsafe-inline`/`unsafe-eval`, verified against a **production** build
+- [ ] No legacy emergency-banner script
 
 **Charts — §9, if applicable**
 - [ ] ≤2 identity series + "Other"; marks on light surfaces only
-- [ ] Legend, direct labels, table-view twin, 2px gaps all present
+- [ ] Legend, direct labels, table view, 2px gaps all present
 
 ---
 
-## 11. Enforcement — what happens on a violation
+## 11. What brand.cornell.edu does not specify
 
-Wired as [`.claude/skills/cornell-ui-compliance/`](../.claude/skills/cornell-ui-compliance/SKILL.md),
-which triggers on any UI work.
+Recorded so local decisions are visible as decisions rather than mistaken for brand rules. For each,
+brand.cornell.edu is silent and the choice is the project's — but §2 still binds.
 
-**For §2 (accessibility) and §3 (logo), the loop is:**
+| Not published | Consequence |
+|---|---|
+| Type weights, type scale, line-height, fallback stacks | Choose once, document, keep consistent (§5) |
+| Grid, breakpoints, spacing scale | Local; must satisfy 1.4.10 and 1.4.12 (§7) |
+| Any chart or data-visualization guidance | §9 derives it from the palette under AA |
+| Rotation, distortion, shadows, outlines on the mark | Treated as **prohibited** under *"cannot be altered"* (§3.7) |
+| Whether a unit may commission its own logo, and the criteria | Route to a communications director or `brand@cornell.edu` (§3.2) |
+| Contrast values for the accent palette | Measured here (§4.3) — and two base accents fail |
+| Photo style principles, crops, text-over-image contrast | §6 supplies the accessibility half only |
+| Dark-mode or dark-theme guidance | None exists. A dark theme must re-derive accents against its surface and record the measurements |
+| Icon or illustration system | Local |
 
-1. **Stop.** Do not write, ship, or commit the violating output.
-2. **Name it precisely** — the rule, the measured value, the threshold. *"`#F8981D` on white is
-   2.21:1; 1.4.11 requires 3:1"*, not *"this may have contrast issues."*
-3. **Prompt for an adjustment**, offering at least one compliant alternative drawn from the approved
-   palette or asset set.
-4. **Re-check the adjustment against this contract.** A correction is not accepted on the author's
-   word — it is measured. If the adjustment introduces a new violation, return to step 1.
-5. **Loop until clean.** There is no iteration limit and no ship-anyway path.
-
-**A user may not waive §2 or §3, and neither may an agent.** If someone insists, the response is to
-say plainly that these are legal and brand obligations rather than preferences, offer the nearest
-compliant alternative, and — for anything genuinely outside the documented rules — route to
-`brand@cornell.edu` or Cornell's accessibility office. Not to comply and note it.
-
-§5 and below are different: a documented deviation in `blueprints/<name>/docs/` is legitimate.
+**Asset download note:** logo files sit behind an authenticated path
+([/resources/downloads](https://brand.cornell.edu/resources/downloads/)) — `cornell_logo_simple_web.zip`,
+`cornell_seal_simple_web.zip`, `cornell-reduced.zip`, `cornell-reduced-wordmark.zip`, plus the print
+`bold_*` archives. Obtain them from there; do not extract a mark from a screenshot or another site.
 
 ---
 
-## 12. Extending this contract
+## 12. Cross-reference index — every source consulted
 
-1. New color values come from **brand.cornell.edu**, then `aisei-site`'s tokens. Do not invent hexes.
-2. **Compute the WCAG ratio against every surface the color appears on.** Never eyeball.
-3. Apply the right threshold: 4.5:1 text, 3:1 large text and meaningful non-text.
-4. For a mark, also check it against the fills beside it. If no pair reaches 3:1 — the normal case
+Retrieved **2026-08-04**. brand.cornell.edu is the source of truth; this file is a derivative.
+
+| Page | URL | What it governs here |
+|---|---|---|
+| Logos | [brand.cornell.edu/logos](https://brand.cornell.edu/logos) | Size bands, clear space, background/contrast rule, seal prohibitions, one-mark-per-piece, "do not create art" | 
+| Logos — Academic | [/logos/academic](https://brand.cornell.edu/logos/academic) | **Lockups are colleges and schools only**; sub-unit incorporation; programs/centers/institutes need consultation; seal color limits; lockup spacing and the 73px→45px switch |
+| Logos — Non-academic | [/logos/non-academic](https://brand.cornell.edu/logos/non-academic) | **Non-academic identifiers may not use a lockup**; may sit beside the seal with equal primacy |
+| Colors | [/design-center/colors](https://brand.cornell.edu/design-center/colors) | Full palette, 90/7/3 proportions, "first and only" red rule, per-use accent variants, AA thresholds and the 24px/19px-bold definition |
+| Typography | [/design-center/typography](https://brand.cornell.edu/design-center/typography) | Palatino, Freight Text Pro, Freight Sans Pro and their stated roles |
+| Photography | [/design-center/photography](https://brand.cornell.edu/design-center/photography) | Professional photography, 300 dpi, no upscaling, `photo.cornell.edu` |
+| Copyright & Licensing | [/design-center/copyright-licensing](https://brand.cornell.edu/design-center/copyright-licensing) | Third-party media permissions (not Cornell marks) |
+| Stationery | [/design-center/stationery](https://brand.cornell.edu/design-center/stationery) | Nothing generalizable — routes to Print Services |
+| Merchandising | [/merchandising](https://brand.cornell.edu/merchandising) | **"Do not redraw, reconstruct, or modify the logo in any way"**; PMS 187 / white / black; ™ and ® usage; pre-production approval |
+| Policies | [/policies](https://brand.cornell.edu/policies) | **Policy 4.10** name/logo permission; **Policy 5.12** web accessibility ("most recently published WCAG", exception clause); 4.16 social media; 5.6 domains |
+| Nomenclature | [/messaging/nomenclature](https://brand.cornell.edu/messaging/nomenclature/) | Formal/standard/shorthand naming tiers; institution-before-location; approved and prohibited unit names |
+| Downloads | [/resources/downloads](https://brand.cornell.edu/resources/downloads/) | Asset filenames and size notes; **"contact your communications director"** for unit marks |
+| Emergency banner | [/messaging/emergency-banner](https://brand.cornell.edu/messaging/emergency-banner/) | Decommissioned 2021-03-31; the script should be removed |
+| Design Center index | [/design-center](https://brand.cornell.edu/design-center) | Subpage enumeration; confirms no web-standards or iconography section exists |
+
+**Not consulted**, as they bear on no UI rule: `/design-center/video`, `/design-center/music`,
+`/messaging` subpages other than nomenclature and the emergency banner, `/resources` terminology.
+
+**Brand contacts:** `brand@cornell.edu` · consultation, use-of-name, merchandise-approval and
+misuse-reporting forms are linked from brand.cornell.edu. Accessibility questions route to Cornell's
+accessibility office. Copyright questions: `copyright@cornell.edu`.
+
+---
+
+## 13. Changing this contract
+
+1. **Re-read brand.cornell.edu first.** It moves; this file does not move itself. If the two
+   disagree, that page is right.
+2. New color values come from the published palette. **Do not invent hexes.**
+3. **Compute the WCAG ratio against every surface the color appears on.** Never eyeball.
+4. Apply the right threshold: 4.5:1 text, 3:1 large text and meaningful non-text.
+5. For a mark, also check it against the fills beside it. If no pair reaches 3:1 — the normal case
    here — the §9 redundancy items are mandatory.
-5. **Record the ratio in the tables above**, so the next reader inherits measurements.
-6. Logo rules change only at brand.cornell.edu. If this file disagrees with that page, **that page is
-   right and this file is a bug** — fix it here and note the date.
-7. A blueprint-specific deviation belongs in that blueprint's `docs/`, and only for §5 and below.
+6. **Record every new ratio in the tables above**, so the next reader inherits measurements rather
+   than assertions.
+7. A project-specific deviation belongs in that project's `docs/`, and only below §3.
+8. Update §12 with the retrieval date whenever a rule is re-checked upstream.
+
+**The limitation worth repeating: WCAG contrast is luminance-only.** Two colors can pass every ratio
+here and still be indistinguishable to a colorblind reader. When adding a hue, check perceptual
+separation too, and keep the redundant coding regardless.
