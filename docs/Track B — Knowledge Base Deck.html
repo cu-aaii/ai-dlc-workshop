@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track B — Knowledge Base</title>
+<style>
+  :root {
+    --ink:        #2c3444;
+    --ink-soft:   #55607a;
+    --muted:      #7d879c;
+    --cornell:    #b31b1b;
+    --lav:        #b3a4e0;
+    --lav-deep:   #8b76c9;
+    --mint:       #9ecf9a;
+    --mint-deep:  #6aab6f;
+    --sand:       #e0c489;
+    --sand-deep:  #c9a253;
+    --sky:        #8fb6d8;
+    --sky-deep:   #5d8fb8;
+    --slate:      #b9bfc9;
+    --card:       rgba(255,255,255,0.72);
+    --card-line:  rgba(255,255,255,0.9);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: #0e1018;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- stage / scaling ---------- */
+  #stage {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #deck {
+    width: 1280px; height: 720px;
+    position: relative;
+    transform-origin: center center;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.55);
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  /* ---------- slide chrome ---------- */
+  .slide {
+    position: absolute; inset: 0;
+    padding: 62px 76px 74px;
+    display: none;
+    background:
+      radial-gradient(120% 90% at 88% 6%,  rgba(150,222,232,0.55) 0%, rgba(150,222,232,0) 55%),
+      radial-gradient(95%  80% at 8%  12%, rgba(180,166,226,0.48) 0%, rgba(180,166,226,0) 58%),
+      radial-gradient(110% 95% at 30% 100%, rgba(168,214,166,0.42) 0%, rgba(168,214,166,0) 60%),
+      radial-gradient(85%  70% at 100% 78%, rgba(232,214,166,0.40) 0%, rgba(232,214,166,0) 62%),
+      linear-gradient(160deg, #fdfdff 0%, #f6f9fb 100%);
+  }
+  .slide.active { display: block; }
+
+  h1.title {
+    font-size: 42px; font-weight: 300; letter-spacing: -0.7px;
+    color: var(--ink); line-height: 1.1;
+  }
+  h1.title b { font-weight: 500; }
+  .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--cornell); margin-bottom: 12px;
+  }
+  .rule { width: 62px; height: 3px; border-radius: 2px; margin: 18px 0 34px;
+          background: linear-gradient(90deg, var(--cornell), var(--sand-deep)); }
+
+  .lede { font-size: 20px; line-height: 1.5; color: var(--ink-soft); font-weight: 300; }
+  .lede strong { font-weight: 600; color: var(--ink); }
+
+  /* ---------- footer / nav ---------- */
+  .foot {
+    position: absolute; left: 76px; right: 76px; bottom: 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(120,130,150,0.28); }
+  .dots i.on { background: var(--cornell); }
+
+  /* ---------- title slide ---------- */
+  .slide.cover { display: none; padding: 0; }
+  .slide.cover.active { display: flex; }
+  .cover-inner { margin: auto; text-align: center; padding: 0 90px; }
+  .cover h1 { font-size: 70px; font-weight: 200; letter-spacing: -2.2px; line-height: 1.03; color: var(--ink); }
+  .cover h1 b { font-weight: 500; }
+  .cover .sub { font-size: 22px; font-weight: 300; color: var(--ink-soft); margin-top: 26px; }
+  .cover .meta { font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+                 color: var(--muted); margin-top: 40px; font-weight: 600; }
+  .cover .bar {
+    width: 118px; height: 4px; border-radius: 3px; margin: 34px auto 0;
+    background: linear-gradient(90deg, var(--cornell) 0%, var(--sand-deep) 34%, var(--mint-deep) 68%, var(--lav-deep) 100%);
+  }
+
+  /* ---------- two-lane before/after ---------- */
+  .lanes { display: grid; gap: 20px; }
+  .lane {
+    display: grid; grid-template-columns: 132px 1fr;
+    align-items: center; gap: 26px;
+    border-radius: 16px; padding: 22px 26px;
+    border: 1px solid var(--card-line);
+    box-shadow: 0 12px 30px rgba(60,70,95,0.07);
+  }
+  .lane.a { background: rgba(179,27,27,0.05); }
+  .lane.b { background: rgba(106,171,111,0.09); }
+  .lane .tag {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .lane.a .tag { color: var(--cornell); }
+  .lane.b .tag { color: var(--mint-deep); }
+  .lane .tag span { display: block; font-size: 27px; font-weight: 300; letter-spacing: -0.6px;
+                    text-transform: none; color: var(--ink); margin-top: 6px; }
+  .track { display: flex; align-items: center; gap: 14px; }
+  .pill {
+    background: #fff; border: 1px solid rgba(120,130,150,0.22); border-radius: 22px;
+    padding: 10px 18px; font-size: 15.5px; font-weight: 500; color: var(--ink);
+    box-shadow: 0 3px 9px rgba(60,70,95,0.06); white-space: nowrap;
+  }
+  .docs { display: flex; gap: 5px; }
+  .docs i {
+    width: 20px; height: 26px; border-radius: 3px; display: block;
+    background: #fff; border: 1px solid rgba(120,130,150,0.34);
+    box-shadow: 0 2px 5px rgba(60,70,95,0.07);
+  }
+  .arw { color: #98a1b2; font-size: 19px; line-height: 1; }
+  .hub {
+    border-radius: 13px; padding: 11px 20px; color: #fff; font-size: 15.5px; font-weight: 600;
+    background: linear-gradient(135deg, #7fa8cc, #a9c8e0);
+    box-shadow: 0 6px 16px rgba(60,70,95,0.16); white-space: nowrap;
+  }
+  .out {
+    background: #fff; border: 1px solid rgba(106,171,111,0.4); border-left: 4px solid var(--mint-deep);
+    border-radius: 10px; padding: 10px 16px; box-shadow: 0 4px 12px rgba(60,70,95,0.07);
+  }
+  .out .t { font-size: 15.5px; font-weight: 600; color: var(--ink); }
+  .out .s { font-size: 12.5px; color: var(--muted); margin-top: 3px; font-weight: 400; }
+  .cost { font-size: 27px; font-weight: 300; letter-spacing: -0.5px; white-space: nowrap; }
+  .lane.a .cost { color: var(--cornell); }
+  .lane.b .cost { color: var(--mint-deep); }
+  .cost small { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.1em;
+                text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+  .spacer { flex: 1; }
+
+  /* ---------- pipe diagram ---------- */
+  .pipe { display: grid; grid-template-columns: 1fr 1.1fr 1fr; align-items: center; gap: 0; }
+  .stack { display: grid; gap: 12px; }
+  .box {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 13px;
+    padding: 15px 20px; box-shadow: 0 10px 26px rgba(60,70,95,0.07);
+  }
+  .box .t { font-size: 16.5px; font-weight: 600; color: var(--ink); }
+  .box .s { font-size: 13px; font-weight: 300; color: var(--muted); margin-top: 3px; }
+  .box.src { border-left: 3px solid var(--sand-deep); }
+  .box.dst { border-left: 3px solid var(--lav-deep); }
+  .core {
+    margin: 0 30px; border-radius: 20px; padding: 30px 26px; text-align: center; color: #fff;
+    background: linear-gradient(135deg, #7fa8cc 0%, #a9c8e0 100%);
+    box-shadow: 0 8px 20px rgba(60,70,95,0.18), 0 20px 44px rgba(60,70,95,0.14);
+  }
+  .core .t { font-size: 24px; font-weight: 600; letter-spacing: -0.4px; }
+  .core .s { font-size: 14.5px; font-weight: 300; margin-top: 8px; opacity: 0.95; line-height: 1.45; }
+
+  /* ---------- proof visuals ---------- */
+  .proof { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 30px; align-items: center; }
+  .barwrap { }
+  .bigfig { font-size: 54px; font-weight: 200; letter-spacing: -2px; color: var(--ink); line-height: 1; }
+  .bigfig em { font-style: normal; color: var(--mint-deep); font-weight: 300; }
+  .caplab { font-size: 12.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+            color: var(--muted); margin-top: 12px; }
+  .track2 {
+    height: 26px; border-radius: 13px; background: rgba(120,130,150,0.16);
+    overflow: hidden; margin-top: 18px; border: 1px solid rgba(255,255,255,0.8);
+  }
+  .track2 span { display: block; height: 100%; width: 100%;
+    background: linear-gradient(100deg, #7fbf83, #a9d9a4); }
+  .zero { font-size: 15px; color: var(--ink-soft); font-weight: 300; margin-top: 12px; }
+  .zero b { color: var(--mint-deep); font-weight: 600; }
+  .ticksrow { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 18px; max-width: 210px; }
+  .ticksrow i {
+    width: 21px; height: 21px; border-radius: 6px; display: grid; place-items: center;
+    background: rgba(106,171,111,0.16); border: 1px solid rgba(106,171,111,0.38);
+  }
+  .ticksrow i::before { content: "✓"; font-size: 12px; color: var(--mint-deep); font-weight: 700; }
+
+  /* ---------- big statements ---------- */
+  .stmts { display: grid; gap: 0; }
+  .stmt {
+    display: grid; grid-template-columns: 44px 1fr; gap: 22px; align-items: baseline;
+    padding: 26px 0; border-bottom: 1px solid rgba(120,130,150,0.2);
+  }
+  .stmt:last-child { border-bottom: 0; }
+  .stmt .x { font-size: 26px; color: var(--cornell); font-weight: 300; line-height: 1; }
+  .stmt .txt { font-size: 30px; font-weight: 300; letter-spacing: -0.5px; color: var(--ink); line-height: 1.25; }
+  .stmt .txt small { display: block; font-size: 16px; font-weight: 300; color: var(--muted);
+                     margin-top: 8px; letter-spacing: 0; }
+
+  /* ---------- ask ---------- */
+  .ask { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+  .ask .item { text-align: center; }
+  .ask .ring {
+    width: 84px; height: 84px; margin: 0 auto 20px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 30px; font-weight: 300; color: #fff;
+    box-shadow: 0 8px 20px rgba(60,70,95,0.16);
+  }
+  .ask .item:nth-child(1) .ring { background: linear-gradient(135deg, #dcbe80, #e9d6a6); }
+  .ask .item:nth-child(2) .ring { background: linear-gradient(135deg, #7fa8cc, #a9c8e0); }
+  .ask .item:nth-child(3) .ring { background: linear-gradient(135deg, #b0a0dd, #c9bde9); }
+  .ask .t { font-size: 22px; font-weight: 500; color: var(--ink); letter-spacing: -0.3px; }
+  .ask .s { font-size: 15px; font-weight: 300; color: var(--muted); margin-top: 9px; line-height: 1.45; }
+
+  .closing {
+    position: absolute; left: 76px; right: 76px; bottom: 54px; text-align: center;
+    font-size: 26px; font-weight: 300; letter-spacing: -0.4px; color: var(--ink);
+  }
+  .closing .dim { color: var(--muted); }
+
+  /* ---------- speaker notes ---------- */
+  #notes {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: rgba(10,12,18,0.94); color: #d8dde8;
+    font-size: 14px; line-height: 1.55; padding: 16px 26px;
+    border-top: 2px solid var(--cornell);
+    display: none; z-index: 40; max-height: 34vh; overflow-y: auto;
+  }
+  #notes.on { display: block; }
+  #notes b { color: #fff; }
+  #notes .hd { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+               color: #8b93a6; margin-bottom: 7px; font-weight: 700; }
+
+  #hint {
+    position: fixed; right: 14px; top: 12px; z-index: 40;
+    font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+    color: rgba(255,255,255,0.4); font-weight: 600;
+    transition: opacity .5s; pointer-events: none;
+  }
+
+  @media print {
+    html, body { overflow: visible; background: #fff; }
+    #stage { position: static; display: block; }
+    #deck { transform: none !important; width: 100%; height: auto; box-shadow: none; }
+    .slide { display: block !important; position: relative; page-break-after: always;
+             width: 1280px; height: 720px; }
+    #notes, #hint { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="hint">← → navigate · N notes · F fullscreen</div>
+
+<div id="stage">
+<div id="deck">
+
+  <!-- ============ 1. COVER ============ -->
+  <section class="slide cover active"
+    data-notes="Six slides. The words are in these notes, not on the screen — the slides carry the idea, you carry the detail. One sentence to land before you move on: your own documents can answer questions, and show where the answer came from. Audience is college leadership; nobody needs to know what is underneath, and nothing in this deck asks them to.">
+    <div class="cover-inner">
+      <div class="eyebrow" style="color:var(--cornell)">Cornell University &nbsp;·&nbsp; AI Platform &nbsp;·&nbsp; Track B</div>
+      <h1>Ask your own<br><b>documents</b></h1>
+      <div class="sub">And get an answer that shows where it came from</div>
+      <div class="bar"></div>
+      <div class="meta">AI-DLC Workshop &nbsp;·&nbsp; August 2026</div>
+    </div>
+  </section>
+
+  <!-- ============ 2. THE POINT ============ -->
+  <section class="slide"
+    data-notes="This is the whole point, so spend time here. Top lane is today: the answer exists — it is in the syllabus, the handbook, the handout — but reaching it costs somebody's afternoon, so people ask a human instead and the same questions get answered by hand every term. Bottom lane is what we built: same question, answered from the same documents, with the sources shown so a reader can check rather than trust. Nothing was moved and nothing was rewritten. Say that explicitly — the documents did not go anywhere.">
+    <div class="eyebrow">The point</div>
+    <h1 class="title">Same documents. <b>Different distance to the answer.</b></h1>
+    <div class="rule"></div>
+    <div class="lanes">
+      <div class="lane a">
+        <div class="tag">Today<span>Hunting</span></div>
+        <div class="track">
+          <div class="pill">A question</div>
+          <div class="arw">&rarr;</div>
+          <div class="docs"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="arw">&rarr;</div>
+          <div class="pill" style="color:var(--muted)">&ldquo;It's in there somewhere&rdquo;</div>
+          <div class="spacer"></div>
+          <div class="cost">Ask a person<small>every time</small></div>
+        </div>
+      </div>
+      <div class="lane b">
+        <div class="tag">With this<span>Answered</span></div>
+        <div class="track">
+          <div class="pill">A question</div>
+          <div class="arw">&rarr;</div>
+          <div class="hub">your documents</div>
+          <div class="arw">&rarr;</div>
+          <div class="out"><div class="t">An answer</div><div class="s">with its sources listed</div></div>
+          <div class="spacer"></div>
+          <div class="cost">Seconds<small>and repeatable</small></div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span>Track B &mdash; Knowledge Base</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 3. WHAT IT IS ============ -->
+  <section class="slide"
+    data-notes="What we actually built is the middle box — not a chatbot. That distinction is worth one sentence, because it is where the value compounds: the same collection can serve Teams, a course page, and a help desk queue without being rebuilt three times. Track C's Teams assistant is already using it. And the left column is the sentence that decides whether a college says yes: your documents stay exactly where they are. No migration, no second copy, no new system for staff to learn.">
+    <div class="eyebrow">What it is</div>
+    <h1 class="title">One collection. <b>Several front doors.</b></h1>
+    <div class="rule"></div>
+    <div class="pipe">
+      <div class="stack">
+        <div class="box src"><div class="t">Your SharePoint site</div><div class="s">Where it already lives</div></div>
+        <div class="box src"><div class="t">Or a shared folder</div><div class="s">Nothing moves, nothing is copied</div></div>
+      </div>
+      <div class="core">
+        <div class="t">Knowledge base</div>
+        <div class="s">Reads your documents.<br>Answers from them only.</div>
+      </div>
+      <div class="stack">
+        <div class="box dst"><div class="t">Microsoft Teams</div><div class="s">Track C is building it now</div></div>
+        <div class="box dst"><div class="t">A course page</div><div class="s">A search box that answers</div></div>
+        <div class="box dst"><div class="t">A help desk</div><div class="s">Repeat questions, handled</div></div>
+      </div>
+    </div>
+    <p class="lede" style="margin-top:36px; text-align:center">
+      Not a chatbot &mdash; <strong>the answering underneath one.</strong> Built once, reused by anyone.
+    </p>
+    <div class="foot"><span>Track B &mdash; Knowledge Base</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 4. PROOF ============ -->
+  <section class="slide"
+    data-notes="These are measured on a real corpus — the ECE 4960 course handouts in the site the course already used — not projected. Left: every document was read, none skipped, none failed. Middle: a real question was answered entirely from the college's own material, five passages out of five, nothing from the open internet. Right is the one to slow down on: every time we publish an update, the system is asked a question we know the documents answer, and if it cannot answer, the update does not go live. So 'it's working' is not an opinion or a quarterly review — it is tested on every single change.">
+    <div class="eyebrow">Proof</div>
+    <h1 class="title">Measured, on real course material</h1>
+    <div class="rule"></div>
+    <div class="proof">
+      <div class="barwrap">
+        <div class="bigfig">25 <em>/ 25</em></div>
+        <div class="caplab">documents read</div>
+        <div class="track2"><span></span></div>
+        <div class="zero">None skipped. <b>Zero failed.</b></div>
+      </div>
+      <div>
+        <svg width="182" height="182" viewBox="0 0 182 182">
+          <defs>
+            <linearGradient id="ringg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#7fbf83"/>
+              <stop offset="100%" stop-color="#a9d9a4"/>
+            </linearGradient>
+          </defs>
+          <circle cx="91" cy="91" r="72" fill="none" stroke="rgba(120,130,150,0.16)" stroke-width="17"/>
+          <circle cx="91" cy="91" r="72" fill="none" stroke="url(#ringg)" stroke-width="17"
+                  stroke-linecap="round" stroke-dasharray="452.4 452.4" stroke-dashoffset="0"
+                  transform="rotate(-90 91 91)"/>
+          <text x="91" y="86" text-anchor="middle" font-size="38" font-weight="300"
+                fill="#2c3444" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">5/5</text>
+          <text x="91" y="112" text-anchor="middle" font-size="12.5" font-weight="700" letter-spacing="1.4"
+                fill="#7d879c" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">PASSAGES</text>
+        </svg>
+        <div class="caplab" style="margin-top:6px">from your documents</div>
+        <div class="zero"><b>None</b> from the open internet.</div>
+      </div>
+      <div>
+        <div class="bigfig" style="font-size:44px">Every</div>
+        <div class="caplab">update re&#8209;tested</div>
+        <div class="ticksrow">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="zero" style="margin-top:14px">Can't answer?<br><b>It doesn't go live.</b></div>
+      </div>
+    </div>
+    <div class="foot"><span>Track B &mdash; Knowledge Base</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 5. WHAT IT IS NOT ============ -->
+  <section class="slide"
+    data-notes="Get the three blocking objections out of the way before anyone has to raise them. One: your documents are read to answer a question, not absorbed into a model other people then use. Two: it answers what is written down — anything needing judgement, discretion or an exception is exactly where it stops, and that work still belongs to staff. Three: if the material does not say it, no answer comes back. It does not guess. That refusal is the feature — it is the difference between something you can put in front of students and something you have to supervise. Then the honest summary: this makes approved material easier to reach. Smaller claim than most AI pitches, and one we can stand behind.">
+    <div class="eyebrow">What it is not</div>
+    <h1 class="title">Three things it <b>doesn't</b> do</h1>
+    <div class="rule"></div>
+    <div class="stmts">
+      <div class="stmt">
+        <div class="x">&times;</div>
+        <div class="txt">It doesn't train anything on your documents.
+          <small>They're read to answer a question. That's all.</small></div>
+      </div>
+      <div class="stmt">
+        <div class="x">&times;</div>
+        <div class="txt">It doesn't replace a person.
+          <small>Judgement, discretion and exceptions are where it stops.</small></div>
+      </div>
+      <div class="stmt">
+        <div class="x">&times;</div>
+        <div class="txt">It doesn't guess.
+          <small>Not in the material? No answer. That's deliberate.</small></div>
+      </div>
+    </div>
+    <div class="foot"><span>Track B &mdash; Knowledge Base</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+  <!-- ============ 6. THE ASK ============ -->
+  <section class="slide"
+    data-notes="Close on a small, concrete ask: a set of documents that already exists, one person who owns it, and a dozen questions you already know the answers to so we measure this on your material rather than ours. Do not promise it is free — you do not know their budget line and it genuinely bills while it runs, by volume stored and questions asked. What you CAN say: they don't open a cloud account, don't hold keys, and don't need a per-department security review, because the platform team runs everything underneath once for everyone. Anything about contracts or chargeback, defer to the platform team rather than answering in the room. And two honest caveats if asked: it only reflects the documents they actually maintain, and everyone who can ask a collection can reach everything in it — mixed public and restricted material means two collections.">
+    <div class="eyebrow">To try it</div>
+    <h1 class="title">What we'd need <b>from you</b></h1>
+    <div class="rule"></div>
+    <div class="ask">
+      <div class="item">
+        <div class="ring">1</div>
+        <div class="t">Documents</div>
+        <div class="s">A site or folder you already maintain</div>
+      </div>
+      <div class="item">
+        <div class="ring">2</div>
+        <div class="t">An owner</div>
+        <div class="s">Who decides what's in it &mdash; and carries what it costs</div>
+      </div>
+      <div class="item">
+        <div class="ring">3</div>
+        <div class="t">A dozen questions</div>
+        <div class="s">Ones you already know the answers to</div>
+      </div>
+    </div>
+    <div class="closing">
+      It bills while it runs. <span class="dim">So it needs an owner, not a pilot nobody switches off.</span>
+    </div>
+    <div class="foot"><span>Track B &mdash; Knowledge Base</span><span class="dots"></span><span class="pg"></span></div>
+  </section>
+
+</div>
+</div>
+
+<div id="notes"><div class="hd">Speaker notes &mdash; press N to hide</div><div id="notes-body"></div></div>
+
+<script>
+(function () {
+  var deck   = document.getElementById('deck');
+  var slides = Array.prototype.slice.call(deck.querySelectorAll('.slide'));
+  var notes  = document.getElementById('notes');
+  var nbody  = document.getElementById('notes-body');
+  var hint   = document.getElementById('hint');
+  var i = 0;
+
+  // build dot indicators + page numbers
+  slides.forEach(function (s) {
+    var dots = s.querySelector('.dots');
+    if (dots) {
+      slides.forEach(function () { dots.appendChild(document.createElement('i')); });
+    }
+  });
+
+  function fit() {
+    var pad = notes.classList.contains('on') ? 0.66 : 0.94;
+    var k = Math.min(window.innerWidth / 1280, (window.innerHeight * pad) / 720);
+    deck.style.transform = 'scale(' + k + ')';
+    if (notes.classList.contains('on')) {
+      deck.style.marginBottom = '0';
+      document.getElementById('stage').style.alignItems = 'flex-start';
+      document.getElementById('stage').style.paddingTop = '14px';
+    } else {
+      document.getElementById('stage').style.alignItems = 'center';
+      document.getElementById('stage').style.paddingTop = '0';
+    }
+  }
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function (s, k) { s.classList.toggle('active', k === i); });
+    var s = slides[i];
+    var pg = s.querySelector('.pg');
+    if (pg) pg.textContent = (i + 1) + ' / ' + slides.length;
+    var dots = s.querySelector('.dots');
+    if (dots) {
+      Array.prototype.forEach.call(dots.children, function (d, k) {
+        d.classList.toggle('on', k === i);
+      });
+    }
+    nbody.innerHTML = s.getAttribute('data-notes') || '<i>No notes for this slide.</i>';
+    location.hash = i + 1;
+  }
+
+  document.addEventListener('keydown', function (e) {
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown' || k === 'Enter') {
+      show(i + 1); e.preventDefault();
+    } else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp' || k === 'Backspace') {
+      show(i - 1); e.preventDefault();
+    } else if (k === 'Home') { show(0); }
+    else if (k === 'End')  { show(slides.length - 1); }
+    else if (k === 'n' || k === 'N') { notes.classList.toggle('on'); fit(); }
+    else if (k === 'f' || k === 'F') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    }
+  });
+
+  deck.addEventListener('click', function (e) {
+    show(e.clientX < window.innerWidth * 0.28 ? i - 1 : i + 1);
+  });
+
+  window.addEventListener('resize', fit);
+  window.addEventListener('hashchange', function () {
+    var n = parseInt(location.hash.slice(1), 10);
+    if (!isNaN(n) && n - 1 !== i) show(n - 1);
+  });
+
+  var start = parseInt(location.hash.slice(1), 10);
+  fit();
+  show(isNaN(start) ? 0 : start - 1);
+  setTimeout(function () { hint.style.opacity = '0'; }, 4200);
+})();
+</script>
+</body>
+</html>
