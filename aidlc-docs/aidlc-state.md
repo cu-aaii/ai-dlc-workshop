@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - Infrastructure Design (applicability to U-01 raised as a question)
+- **Current Stage**: **CONSTRUCTION** - Code Generation for U-01 (Part 1 planning)
 - **NFR Design U-01 Approved**: 2026-08-03 — user response "approve and proceed"
 - **NFR Requirements U-01 Approved**: 2026-08-03 — user response "approve and proceed"
 - **Functional Design U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
@@ -278,9 +278,12 @@ cleanup — deliberately not done.
       components; the plan's own justification for this stage (SECURITY-01, -06, -14 SRI, RESILIENCY-08,
       container build) is entirely U-02's. **First stage where the per-unit split does not fit** — both
       container images contain U-01's code, so the infrastructure is indivisible where the logic was not.
-      - [ ] U-01 — awaiting the skip/thin-pass/combined decision
+      - [x] U-01 — **SKIPPED 2026-08-03** (Q1 = A). Zero infrastructure components; packaging decisions
+            already in TSD-1/2/7; the stage's own justification is entirely U-02's. **2nd skip in the
+            workflow** (first: Reverse Engineering). `u-01-domain-core/infrastructure-design/` will not
+            exist — see `construction/plans/u-01-infrastructure-design-applicability.md`
       - [ ] U-02 — full pass under every option; carries §6.4
-- [ ] Code Generation — EXECUTE (ALWAYS)
+- [ ] Code Generation — **IN PROGRESS: U-01** (Part 1 plan awaiting approval). Depth-first per Q2 = A.
 - [ ] Build and Test — EXECUTE (ALWAYS)
 
 ### 🟡 OPERATIONS PHASE

@@ -370,3 +370,11 @@
 **Context**: CONSTRUCTION — Infrastructure Design Step 1 complete for U-01; two applicability questions outstanding. No artifacts generated pending the answers.
 
 ---
+
+## Infrastructure Design U-01 — SKIPPED; depth-first confirmed
+**Timestamp**: 2026-08-03T00:00:00Z
+**User Input**: "questions answered" — **Q1 = A** (skip U-01's Infrastructure Design with the justification recorded), **Q2 = A** (depth-first holds; U-01 proceeds to Code Generation).
+**Decision**: Infrastructure Design **SKIPPED for U-01 only**. Recorded as a **deviation from the execution plan**, which marked the stage EXECUTE; the plan's stated justification (SECURITY-01, -06, -14 SRI, RESILIENCY-08, container build) is preserved intact for U-02, where all of it lives. Recorded that this is the **second skip in the whole workflow** (the first was Reverse Engineering at Workspace Detection), with the count noted for the same reason the RESILIENCY deferral count is — so a third is visible as a pattern rather than looking like a first. Also recorded that `aidlc-docs/construction/u-01-domain-core/infrastructure-design/` **will not exist**, because a missing directory is ambiguous between "skipped deliberately" and "not done yet".
+**Context**: CONSTRUCTION — proceeding to Code Generation for U-01, which is a **two-part stage**: Part 1 produces a plan requiring explicit approval at its Step 7 before any code is written.
+
+---
