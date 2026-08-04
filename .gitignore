@@ -28,6 +28,11 @@ SCRATCHPAD.md
 PARTICIPANT_BRIEF.md
 aidlc-docs/
 
+# asciinema recordings of demo/demo.sh. A rehearsal artifact by default: committing one means
+# it goes stale silently while still looking authoritative. Commit a specific .cast with
+# `git add -f` when you deliberately want a fixed recording for a session.
+demo/*.cast
+
 .DS_Store
 .idea/
 *.swp
