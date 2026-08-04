@@ -328,3 +328,12 @@
 **Context**: CONSTRUCTION — merged cleanly; NFR Requirements U-01 still awaiting approval. No decision reopened, no artifact invalidated.
 
 ---
+
+## NFR Requirements U-01 — Approval
+**Timestamp**: 2026-08-03T00:00:00Z
+**Approval Prompt**: "# 📊 NFR Requirements Complete - U-01 Domain Core … ✅ **Continue to Next Stage** — approve and proceed to **NFR Design**" — presented with the 26 requirements split honestly into 15 automated and 11 review-only, NFR-T5 singled out as the only requirement whose failure is silent and permanent, U-01's empty runtime-dependency list and its three consequences, amendment A3, **three corrections all of my own** (`tools/check` already runs pytest so Q3 = A was cheaper than I described; Q8's "property test" wording colliding with `max_examples=100`; Q1 = A implying a generic top-level `core` importable), the disclosure that `tools/check` cannot run here so every "automated" verification is intent rather than observed behaviour, and the inbound UI contract recorded as U-02 context with the two-accent ceiling constraint and the frozen-manifest verification.
+**User Input**: "approve and proceed"
+**Decision**: **APPROVED** — NFR Requirements for U-01 closed. Accepted: the 26 requirements with their verification classification, the seven tech-stack decisions, the eight precedent-established choices, amendment A3's `src/dashboard/{core,collector,api}/` layout, and the three recorded corrections.
+**Context**: CONSTRUCTION — proceeding to NFR Design for U-01. RESILIENCY-04/-14/-15 were deferred to "NFR Design" and now come due; their routing is itself a question in the plan rather than a silent second deferral.
+
+---

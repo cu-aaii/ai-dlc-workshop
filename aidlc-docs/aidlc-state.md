@@ -3,7 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - NFR Requirements U-01 complete, awaiting approval
+- **Current Stage**: **CONSTRUCTION** - NFR Design for U-01
+- **NFR Requirements U-01 Approved**: 2026-08-03 — user response "approve and proceed"
 - **Functional Design U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
 - **INCEPTION COMPLETE**: 2026-08-03
 - **Units Approved**: 2026-08-03 — user response "Approve & Continue"
@@ -235,7 +236,7 @@ cleanup — deliberately not done.
       - [x] U-01 Domain Core — 3 artifacts, BR-01..BR-08, **10 PBT properties** (PBT-01 satisfied) — **APPROVED 2026-08-03**
       - [ ] U-02 Dashboard Platform — incl. `frontend-components.md` for C-06
 - [ ] NFR Requirements — **U-01 complete (awaiting approval)**; U-02 pass follows
-      - [x] U-01 — 26 requirements (**15 automated, 11 review-only**), 7 tech-stack decisions
+      - [x] U-01 — 26 requirements (**15 automated, 11 review-only**), 7 tech-stack decisions — **APPROVED 2026-08-03**
       - [ ] U-02
 - [ ] NFR Design — EXECUTE (RESILIENCY-04, -14, -15 user decisions are due here)
 - [ ] Infrastructure Design — EXECUTE (SECURITY-01, -06, -14 SRI, RESILIENCY-08, container build)
