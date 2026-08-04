@@ -695,6 +695,24 @@ Resources:
                   {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
                   ]
 
+            - Name: 'AiseiSiteContainer'
+              Namespace: 'AiseiSiteContainer'
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'ArmContainerBuildProject'
+                EnvironmentVariables: >-
+                  [
+                  {"name": "CONTAINER_TARGET", "value": "aisei-site", "type": "PLAINTEXT"},
+                  {"name": "CONTAINER_CONTEXT", "value": "blueprints/aisei-site", "type": "PLAINTEXT"},
+                  {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
+                  ]
+
         # One action per blueprint stack. Register the template in pipeline/stacks.yml and
         # add an action here; the stack name convention is <application>-<environment>-<name>
         # so it stays inside the BuildPipelineRole's CloudFormation resource scope.
@@ -724,6 +742,34 @@ Resources:
                   "Environment": "${Environment}",
                   "Owner": "${Owner}",
                   "SourceCommitId": "#{GitRepository.CommitId}"
+                  }
+
+            - Name: 'AiseiSiteCloudFormation'
+              Namespace: 'AiseiSiteCloudFormation'
+              RunOrder: 1
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-aisei-site'
+                TemplatePath: 'GitRepositoryArtifact::blueprints/aisei-site/infra/aisei-site.yml'
+                # ContainerImageUri arrives as the digest the Build stage just pushed, so the
+                # function always runs exactly the image this commit produced.
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "BlueprintVersion": "0.1.0",
+                  "DeploymentName": "aisei-site",
+                  "ContainerImageUri": "#{AiseiSiteContainer.CONTAINER_DIGEST}"
                   }
 
             - Name: 'NotifyTopicCloudFormation'
