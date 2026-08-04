@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - U-02 NFR Requirements (plan + 8 questions, awaiting answers)
+- **Current Stage**: **CONSTRUCTION** - U-02 NFR Requirements complete, awaiting approval
 - **Functional Design U-02 Approved**: 2026-08-03 — "Continue to next stage"
 - **Build and Test U-01 Approved**: 2026-08-03 — "Approve". **U-01 COMPLETE END TO END.**
 - **Code Generation U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
@@ -291,6 +291,35 @@ two-accent series with "Other" for charts. Q5 = A goes further: no colour encodi
 all. That is **more conservative than the contract requires, not a violation** — but the file is not ours
 to silently rewrite. Its authors should decide whether the addendum changes or Q5 = A does.
 
+## NFR Requirements U-02 — outputs
+`construction/u-02-dashboard-platform/nfr-requirements/` — `nfr-requirements.md`,
+`tech-stack-decisions.md`. Q1-Q8 all **A**.
+
+Sizing 512 MB (collector 120 s / API 10 s) · cold starts accepted, **no provisioned concurrency** ·
+throttle 20 rps as a parameter · hashed assets immutable + `index.html` 60 s, **no invalidation** ·
+30-day retention everywhere · lifecycle on **both** buckets · **`Condition: HasImage`** on both Lambdas ·
+availability recorded, not engineered.
+
+**A third verification category was needed here that U-01 did not have: `deployed`.** 14 automated,
+19 review-only, **4 verifiable only against a running stack**, 12 N/A. Those four are the honest weak
+point — SEC-7 (the allowlist admits the right people), A-4 (failure degrades to *labelled stale*),
+P-6 (cache behaves), R-8 (metrics arrive). **U-01 finished with 60 executed tests and 9/9 mutation score;
+U-02 cannot reach that without a merge to `main`, which deploys to the shared account.** That asymmetry
+must not be smoothed over at U-02's Build and Test.
+
+### 🔍 Findings — two gaps in my own questions, one unlock
+1. **New requirement P-3.** Two bounds guard the collector — 50 pages and a 120 s timeout — and only one is
+   diagnosable. Past ~2.4 s/page the **timeout wins and the failure loses its name**, defeating Functional
+   Design Q1. The collector now raises `UPSTREAM_TOO_SLOW` on an internal ~100 s deadline, so no failure is
+   ever a bare platform timeout.
+2. **GAP IN MY Q6: the site bucket accumulates too.** Q6 asked about snapshot versions only, but hashed
+   assets pile up on every deploy. Added D-3 (30-day expiry) **and D-4: sync runs *without* `--delete`**,
+   because deleting immediately breaks a browser mid-rollout holding a cached `index.html`.
+3. **Q7 = A unblocks `blueprint.yaml`**, which Code Generation recorded as stuck. The chain was: no images →
+   no working deploy → no `pipeline` registration → no legal manifest target. `HasImage` breaks the first
+   link. Cost: a stack can exist with **no compute**, so "the stack deployed" stops implying "the dashboard
+   works" — covered by UI row 6 plus a new runbook entry.
+
 ### ⚠️ Flagged for the user, not decided
 
 ### Amendment A3 — layout superseded by `src/` conformance (2026-08-03)
@@ -458,6 +487,35 @@ two-accent series with "Other" for charts. Q5 = A goes further: no colour encodi
 all. That is **more conservative than the contract requires, not a violation** — but the file is not ours
 to silently rewrite. Its authors should decide whether the addendum changes or Q5 = A does.
 
+## NFR Requirements U-02 — outputs
+`construction/u-02-dashboard-platform/nfr-requirements/` — `nfr-requirements.md`,
+`tech-stack-decisions.md`. Q1-Q8 all **A**.
+
+Sizing 512 MB (collector 120 s / API 10 s) · cold starts accepted, **no provisioned concurrency** ·
+throttle 20 rps as a parameter · hashed assets immutable + `index.html` 60 s, **no invalidation** ·
+30-day retention everywhere · lifecycle on **both** buckets · **`Condition: HasImage`** on both Lambdas ·
+availability recorded, not engineered.
+
+**A third verification category was needed here that U-01 did not have: `deployed`.** 14 automated,
+19 review-only, **4 verifiable only against a running stack**, 12 N/A. Those four are the honest weak
+point — SEC-7 (the allowlist admits the right people), A-4 (failure degrades to *labelled stale*),
+P-6 (cache behaves), R-8 (metrics arrive). **U-01 finished with 60 executed tests and 9/9 mutation score;
+U-02 cannot reach that without a merge to `main`, which deploys to the shared account.** That asymmetry
+must not be smoothed over at U-02's Build and Test.
+
+### 🔍 Findings — two gaps in my own questions, one unlock
+1. **New requirement P-3.** Two bounds guard the collector — 50 pages and a 120 s timeout — and only one is
+   diagnosable. Past ~2.4 s/page the **timeout wins and the failure loses its name**, defeating Functional
+   Design Q1. The collector now raises `UPSTREAM_TOO_SLOW` on an internal ~100 s deadline, so no failure is
+   ever a bare platform timeout.
+2. **GAP IN MY Q6: the site bucket accumulates too.** Q6 asked about snapshot versions only, but hashed
+   assets pile up on every deploy. Added D-3 (30-day expiry) **and D-4: sync runs *without* `--delete`**,
+   because deleting immediately breaks a browser mid-rollout holding a cached `index.html`.
+3. **Q7 = A unblocks `blueprint.yaml`**, which Code Generation recorded as stuck. The chain was: no images →
+   no working deploy → no `pipeline` registration → no legal manifest target. `HasImage` breaks the first
+   link. Cost: a stack can exist with **no compute**, so "the stack deployed" stops implying "the dashboard
+   works" — covered by UI row 6 plus a new runbook entry.
+
 ### ⚠️ Flagged for the user, not decided
 `CLAUDE.md` now says `docs/aidlc/` is "this repo's own AI-DLC record," and builder-mcp's record was
 relocated to `docs/aidlc/builder-mcp/`. By that convention this blueprint's record belongs at
@@ -485,7 +543,8 @@ cleanup — deliberately not done.
             discharged by a named rule**; RESILIENCY-04 → DR-03, RESILIENCY-15 → DR-04
 - [ ] NFR Requirements — **U-01 complete (awaiting approval)**; U-02 pass follows
       - [x] U-01 — 26 requirements (**15 automated, 11 review-only**), 7 tech-stack decisions — **APPROVED 2026-08-03**
-      - [ ] U-02 — **IN PROGRESS**, 8 questions issued (sizing, cold start, throttles, TTLs, retention, snapshot-version lifecycle, `HasImage`, availability)
+      - [x] U-02 — **complete (awaiting approval)**. **49 requirements: 14 automated, 19 review-only,
+            4 DEPLOYED-only, 12 N/A.** 8 tech-stack decisions (TSD-8..TSD-15)
 - [ ] NFR Design — **U-01 complete (awaiting approval)**; U-02 pass follows
       - [x] U-01 — **APPROVED 2026-08-03** — 9 patterns, zero infrastructure components. **RESILIENCY-14 SATISFIED**;
             **RESILIENCY-04/-15 ASSIGNED to U-02's NFR Design (2nd deferral)**
