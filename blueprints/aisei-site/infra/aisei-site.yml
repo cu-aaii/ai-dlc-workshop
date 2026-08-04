@@ -1,0 +1,203 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'aisei-site: an Angular + Hono web app (container image, arm64) behind a public Function URL, run in Lambda via the AWS Lambda Web Adapter. No auth, no state -- exists as a minimal demo of packaging an existing standalone site as a blueprint. Image built from blueprints/aisei-site/Dockerfile (target aisei-site) once its Build stage action is wired.'
+
+Parameters:
+
+  # Metadata Parameters
+
+  Application:
+    Default: 'aidlc'
+    AllowedPattern: '[a-z0-9-]{1,10}'
+    Description: 'Name used for billing and other tracking/identification purposes'
+    Type: 'String'
+
+  Environment:
+    Default: 'main'
+    AllowedPattern: '[a-z0-9]{1,4}'
+    Description: 'Name of the deployment branch'
+    Type: 'String'
+
+  # Tagging Convention Parameters
+  #
+  # cornell:owner, cornell:blueprint, cornell:blueprint-version and cornell:deployment-id
+  # are required on every resource. Owner and deployment id vary per deployment; blueprint
+  # name and version are properties of this template, so they live here as defaults and are
+  # bumped in the PR that changes the blueprint.
+
+  Owner:
+    Default: 'ai-sei'
+    AllowedPattern: '.{1,128}'
+    Description: 'Who owns this deployment (cornell:owner)'
+    Type: 'String'
+
+  BlueprintVersion:
+    Default: '0.1.0'
+    AllowedPattern: '[0-9]+\.[0-9]+\.[0-9]+'
+    Description: 'Version of the aisei-site blueprint (cornell:blueprint-version)'
+    Type: 'String'
+
+  # Deploy Parameters
+
+  # Mirrors tiny-chatbot's DeploymentName: several sites can coexist per environment. It is
+  # part of the function name and the cornell:deployment-id. The lookahead caps total length
+  # at 2-20 characters; the body forbids leading, trailing and consecutive hyphens.
+
+  DeploymentName:
+    Default: 'aisei-site'
+    AllowedPattern: '(?=[a-z0-9-]{2,20}$)[a-z0-9]+(-[a-z0-9]+)*'
+    Description: 'Instance name for this deployment. Lowercase alphanumerics with single hyphens, 2-20 chars.'
+    Type: 'String'
+
+  # Mirrors builder-mcp's and tiny-chatbot's bootstrap pattern: the pipeline Build stage
+  # supplies a digest URI once its action is wired; empty deploys nothing but proves the
+  # template is valid, which is all a parked blueprint needs.
+
+  ContainerImageUri:
+    Default: ''
+    AllowedPattern: '.{0,512}'
+    Description: 'Image for the function, normally the digest URI the pipeline Build stage exports (#{AiseiSiteContainer.CONTAINER_DIGEST}). Empty deploys nothing, for validation while the blueprint is parked.'
+    Type: 'String'
+
+Conditions:
+
+  HasImage: !Not [!Equals [!Ref 'ContainerImageUri', '']]
+
+Resources:
+
+  # Execution role: basic logging only, scoped to this function's own log group. The site
+  # serves static assets and has no backing datastore, so it touches no other AWS service.
+
+  SiteFunctionRole:
+    Type: 'AWS::IAM::Role'
+    Condition: 'HasImage'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-${DeploymentName}-exec'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'lambda.${AWS::URLSuffix}'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'aisei-site-logging'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  # AWS::Logs::LogGroup's Arn attribute ends in :* so it covers log streams.
+                  - !GetAtt 'SiteLogGroup.Arn'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'iam-role-aisei-site-exec'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'aisei-site'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # Created explicitly (rather than letting Lambda create it on first invoke) so it is
+  # tagged, retained deliberately, and cleaned up with the stack.
+
+  SiteLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Condition: 'HasImage'
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Application}-${Environment}-${DeploymentName}'
+      RetentionInDays: 30
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'log-group-aisei-site'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'aisei-site'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  SiteFunction:
+    Type: 'AWS::Lambda::Function'
+    Condition: 'HasImage'
+    Properties:
+      FunctionName: !Sub '${Application}-${Environment}-${DeploymentName}'
+      Description: 'aisei-site (Angular + Hono) run via the AWS Lambda Web Adapter. Serves the app unmodified from its own container image.'
+      PackageType: 'Image'
+      Code:
+        ImageUri: !Ref 'ContainerImageUri'
+      # Lambda means container images (CLAUDE.md); the ARM CodeBuild project builds arm64.
+      Architectures:
+        - 'arm64'
+      Role: !GetAtt 'SiteFunctionRole.Arn'
+      MemorySize: 512
+      Timeout: 15
+      LoggingConfig:
+        LogGroup: !Ref 'SiteLogGroup'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'lambda-function-aisei-site'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'aisei-site'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # Public on purpose: this is a demo site with data_classification public and no auth.
+  # AuthType NONE still requires an explicit InvokeFunctionUrl grant. AWS::Lambda::Url and
+  # AWS::Lambda::Permission are not taggable resource types.
+
+  SiteFunctionUrl:
+    Type: 'AWS::Lambda::Url'
+    Condition: 'HasImage'
+    Properties:
+      TargetFunctionArn: !GetAtt 'SiteFunction.Arn'
+      AuthType: 'NONE'
+
+  SiteFunctionUrlPublicAccess:
+    Type: 'AWS::Lambda::Permission'
+    Condition: 'HasImage'
+    Properties:
+      FunctionName: !GetAtt 'SiteFunction.Arn'
+      Action: 'lambda:InvokeFunctionUrl'
+      Principal: '*'
+      FunctionUrlAuthType: 'NONE'
+
+Outputs:
+
+  DeploymentId:
+    Description: 'Value of the cornell:deployment-id tag on every resource in this stack'
+    Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  BlueprintVersion:
+    Description: 'Value of the cornell:blueprint-version tag'
+    Value: !Ref 'BlueprintVersion'
+
+  FunctionUrl:
+    Condition: 'HasImage'
+    Description: 'The public site -- open it in a browser'
+    Value: !GetAtt 'SiteFunctionUrl.FunctionUrl'

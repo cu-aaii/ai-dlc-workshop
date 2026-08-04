@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Innovation Hub — Style Guide (WordPress → Angular migration)</title>
+<link rel="stylesheet" href="https://use.typekit.net/nwp2wku.css">
+<style>
+  :root {
+    /* Existing tokens — already correct in client/app/shared/theme/_variables.scss, keep as-is */
+    --color-primary: #2d668e;
+    --color-accent: #b31b1b;
+    --color-accent-dark: #a01114;
+    --color-on-primary: #fff;
+    --color-border: #e0e0e0;
+    --color-warning: #F8981D;
+    --color-on-warning: #222222;
+
+    /* New tokens — to be added for this migration */
+    --color-hero-bg: #1a1a1a;
+    --color-hero-accent-1: #a66dd5; /* purple, italic headline word */
+    --color-hero-accent-2: #c6b20f; /* yellow/olive, italic headline word */
+    --color-footer-bg: #333333;
+    --color-footer-text: #bbbbbb;
+    --color-link: #1176ac;
+
+    --heading-font: "freight-sans-pro", Georgia, serif;
+    --body-font: "freight-sans-pro", Verdana, Geneva, Tahoma, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--body-font); color: #222; line-height: 1.5; }
+  header.page { background: var(--color-accent); color: #fff; padding: 32px 40px; }
+  header.page h1 { margin: 0 0 4px; font-family: var(--heading-font); font-size: 28px; }
+  header.page p { margin: 0; opacity: .9; }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 40px; }
+  section { margin-bottom: 56px; }
+  h2.section-title {
+    font-family: var(--heading-font);
+    font-size: 22px;
+    border-bottom: 3px solid var(--color-accent);
+    padding-bottom: 8px;
+    margin-bottom: 20px;
+  }
+  p.section-note { color: #666; margin-top: -8px; margin-bottom: 20px; font-size: 14px; }
+
+  .swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .swatch { border: 1px solid var(--color-border); border-radius: 4px; overflow: hidden; }
+  .swatch .fill { height: 72px; }
+  .swatch .meta { padding: 10px 12px; background: #fff; }
+  .swatch .meta code { font-size: 13px; display: block; }
+  .swatch .meta .name { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+  .swatch .meta .usage { font-size: 12px; color: #666; margin-top: 4px; }
+  .swatch.on-dark .meta { background: #1a1a1a; color: #fff; }
+  .swatch.on-dark .meta .usage { color: #aaa; }
+
+  .type-row { display: flex; align-items: baseline; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--color-border); }
+  .type-row .label { width: 160px; flex-shrink: 0; font-size: 12px; color: #666; font-family: monospace; }
+  .type-row .sample { flex: 1; }
+  h3.h-display { font-family: var(--heading-font); font-weight: 900; font-style: italic; font-size: 40px; margin: 0; }
+  h3.h1-sample { font-family: var(--heading-font); font-size: 32px; margin: 0; }
+  h3.h2-sample { font-family: var(--heading-font); font-size: 24px; color: var(--color-accent); margin: 0; }
+  p.body-sample { font-family: var(--body-font); font-size: 16px; margin: 0; }
+  p.caption-sample { font-family: var(--body-font); font-size: 13px; color: #666; margin: 0; }
+  a.link-sample { color: var(--color-link); text-decoration: underline; }
+
+  .spacing-scale { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .spacing-scale .bar-wrap { text-align: center; font-size: 12px; color: #666; font-family: monospace; }
+  .spacing-scale .bar { background: var(--color-primary); width: 32px; margin-bottom: 6px; }
+
+  .bp-table, .bp-table td, .bp-table th { border-collapse: collapse; }
+  .bp-table { width: 100%; }
+  .bp-table th, .bp-table td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--color-border); font-size: 14px; }
+  .bp-table th { font-family: var(--heading-font); background: #f7f7f7; }
+  .bp-table code { font-family: monospace; }
+
+  .logo-row { display: flex; align-items: center; gap: 32px; flex-wrap: wrap; }
+  .logo-card { border: 1px solid var(--color-border); border-radius: 4px; padding: 20px; text-align: center; width: 200px; }
+  .logo-card.dark { background: #1a1a1a; }
+  .logo-card img { max-height: 60px; max-width: 100%; }
+  .logo-card .cap { margin-top: 10px; font-size: 12px; color: #666; }
+  .logo-card.dark .cap { color: #aaa; }
+
+  .btn-demo { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 2px; font-family: var(--body-font); font-weight: 700; font-size: 14px; text-decoration: none; border: none; cursor: pointer; }
+  .btn-primary { background: var(--color-accent); color: #fff; }
+  .btn-secondary { background: transparent; color: var(--color-accent); border: 2px solid var(--color-accent); }
+
+  footer.page { background: var(--color-footer-bg); color: var(--color-footer-text); padding: 24px 40px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header class="page">
+  <h1>AI Innovation Hub — Design Tokens &amp; Style Guide</h1>
+  <p>Extracted from innovationhub.ai.cornell.edu (cwd_base_2024 + ai_innovation_lab theme) for the Angular/Hono rebuild. Source of truth for <code>client/app/shared/theme/</code>.</p>
+</header>
+
+<main>
+
+  <section>
+    <h2 class="section-title">Color — existing template tokens (keep as-is)</h2>
+    <p class="section-note">Already defined in <code>client/app/shared/theme/_variables.scss</code> — match the live site's masthead/button red exactly. No change needed.</p>
+    <div class="swatch-grid">
+      <div class="swatch">
+        <div class="fill" style="background:var(--color-primary)"></div>
+        <div class="meta"><div class="name">Cornell Blue</div><code>--color-primary: #2d668e</code><div class="usage">Not visibly used on this site's chrome today, but retained — Material primary palette.</div></div>
+      </div>
+      <div class="swatch on-dark">
+        <div class="fill" style="background:var(--color-accent)"></div>
+        <div class="meta"><div class="name">Cornell Red</div><code>--color-accent: #b31b1b</code><div class="usage">Masthead bg, primary buttons, section-heading underline, card border-bottom.</div></div>
+      </div>
+      <div class="swatch on-dark">
+        <div class="fill" style="background:var(--color-accent-dark)"></div>
+        <div class="meta"><div class="name">Cornell Red — dark</div><code>--color-accent-dark: #a01114</code><div class="usage">Secondary button fill / hover state on red buttons.</div></div>
+      </div>
+      <div class="swatch">
+        <div class="fill" style="background:var(--color-warning)"></div>
+        <div class="meta"><div class="name">Cornell Orange</div><code>--color-warning: #F8981D</code><div class="usage">Warning/alert accents (unchanged).</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Color — new tokens for this migration</h2>
+    <p class="section-note">Not yet in <code>_variables.scss</code> — add these for hero/footer parity with the live site.</p>
+    <div class="swatch-grid">
+      <div class="swatch on-dark">
+        <div class="fill" style="background:var(--color-hero-bg)"></div>
+        <div class="meta"><div class="name">Hero background</div><code>--color-hero-bg: #1a1a1a</code><div class="usage">Homepage hero band gradient base (near-black → subtle gradient).</div></div>
+      </div>
+      <div class="swatch on-dark">
+        <div class="fill" style="background:var(--color-hero-accent-1)"></div>
+        <div class="meta"><div class="name">Hero accent — purple</div><code>--color-hero-accent-1: #a66dd5</code><div class="usage">Italic accent word in hero headline ("Empowering"). Dark-bg only, not a general UI color.</div></div>
+      </div>
+      <div class="swatch on-dark">
+        <div class="fill" style="background:var(--color-hero-accent-2)"></div>
+        <div class="meta"><div class="name">Hero accent — yellow/olive</div><code>--color-hero-accent-2: #c6b20f</code><div class="usage">Italic accent word in hero headline ("Responsible AI"). Dark-bg only.</div></div>
+      </div>
+      <div class="swatch on-dark">
+        <div class="fill" style="background:var(--color-footer-bg)"></div>
+        <div class="meta"><div class="name">Footer background</div><code>--color-footer-bg: #333333</code><div class="usage">Site footer band.</div></div>
+      </div>
+      <div class="swatch">
+        <div class="fill" style="background:#fff;border-bottom:1px solid var(--color-border)"></div>
+        <div class="meta"><div class="name">Footer text (on dark)</div><code>--color-footer-text: #bbbbbb</code><div class="usage">Body text inside footer band.</div></div>
+      </div>
+      <div class="swatch">
+        <div class="fill" style="background:var(--color-link)"></div>
+        <div class="meta"><div class="name">Body link blue</div><code>--color-link: #1176ac</code><div class="usage">Inline text links inside article/page body copy.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Typography</h2>
+    <p class="section-note">Live site loads <code>freight-sans-pro</code> for both headings and body via Cornell's Typekit kit (<code>use.typekit.net/nwp2wku.css</code>) — link this kit in <code>client/index.html</code> rather than copying font files (Adobe/Typekit license). Fallbacks below match the template's current placeholders.</p>
+    <div class="type-row">
+      <div class="label">Hero display<br>900 italic</div>
+      <div class="sample"><h3 class="h-display">Empowering <span style="color:var(--color-hero-accent-2)">Responsible AI</span></h3></div>
+    </div>
+    <div class="type-row">
+      <div class="label">Heading 1<br>--heading-font</div>
+      <div class="sample"><h3 class="h1-sample">Page title heading</h3></div>
+    </div>
+    <div class="type-row">
+      <div class="label">Heading 2<br>accent-colored</div>
+      <div class="sample"><h3 class="h2-sample">Section heading</h3></div>
+    </div>
+    <div class="type-row">
+      <div class="label">Body<br>--body-font 16px</div>
+      <div class="sample"><p class="body-sample">Body copy uses freight-sans-pro with a Verdana/Tahoma fallback stack, 16px base to avoid mobile auto-zoom on inputs (see <code>_accessability.scss</code>).</p></div>
+    </div>
+    <div class="type-row">
+      <div class="label">Caption / meta<br>13px, #666</div>
+      <div class="sample"><p class="caption-sample">June 15, 2026 · Articles</p></div>
+    </div>
+    <div class="type-row">
+      <div class="label">Inline link</div>
+      <div class="sample"><p class="body-sample">Read more in <a class="link-sample" href="#">the full article</a>.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Spacing scale</h2>
+    <p class="section-note">From <code>_spacing.scss</code> / <code>_flex.scss</code> — unchanged, reused directly.</p>
+    <div class="spacing-scale">
+      <div class="bar-wrap"><div class="bar" style="height:4px"></div>gap-0 · 0px</div>
+      <div class="bar-wrap"><div class="bar" style="height:8px"></div>gap-1 · 8px</div>
+      <div class="bar-wrap"><div class="bar" style="height:16px"></div>gap-2 · 16px</div>
+      <div class="bar-wrap"><div class="bar" style="height:24px"></div>gap-3 · 24px</div>
+      <div class="bar-wrap"><div class="bar" style="height:32px"></div>gap-4 · 32px</div>
+      <div class="bar-wrap"><div class="bar" style="height:40px"></div>gap-5 · 40px</div>
+      <div class="bar-wrap"><div class="bar" style="height:48px"></div>gap-6 · 48px</div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Breakpoints</h2>
+    <p class="section-note">From <code>_variables.scss</code> — the mobile nav/menu collapse threshold used across the live site is <code>$screen-sm-min</code> (768px).</p>
+    <table class="bp-table">
+      <tr><th>Variable</th><th>Value</th><th>Usage</th></tr>
+      <tr><td><code>$screen-xs-min</code></td><td>480px</td><td>Smallest phone breakpoint</td></tr>
+      <tr><td><code>$screen-ks-min</code></td><td>624px</td><td>Small tablet</td></tr>
+      <tr><td><code>$screen-sm-min</code></td><td>768px</td><td><strong>Nav/menu collapse</strong> — hamburger below this width</td></tr>
+      <tr><td><code>$screen-mobile-min</code></td><td>868px</td><td>Mobile-max helper</td></tr>
+      <tr><td><code>$screen-md-min</code></td><td>992px</td><td>Container-fluid gutters kick in</td></tr>
+      <tr><td><code>$screen-ml-min</code></td><td>1080px</td><td>Medium-large</td></tr>
+      <tr><td><code>$screen-lg-min</code></td><td>1200px</td><td>Large desktop</td></tr>
+      <tr><td><code>$screen-xl-min</code></td><td>1480px</td><td>Wide desktop</td></tr>
+      <tr><td><code>$cwd-container-fluid-max-width</code></td><td>1280px</td><td>Max content width, matches live site's centered column</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2 class="section-title">Cornell branding &amp; logo usage</h2>
+    <p class="section-note">SVGs already live in <code>client/assets/</code> (seal) — the wordmark + reduced-white variant + chevron icon need to be copied in alongside it (see migration plan, "Static asset migration").</p>
+    <div class="logo-row">
+      <div class="logo-card dark">
+        <img src="assets/cornell_logo_simple_b31b1b.svg" alt="Cornell University seal, white-on-transparent">
+        <div class="cap">Seal icon (white fill — needs a dark/red bg)<br>cornell_logo_simple_b31b1b.svg</div>
+      </div>
+      <div class="logo-card dark">
+        <img src="assets/cornell-reduced-white.svg" alt="Cornell University wordmark, white">
+        <div class="cap">Wordmark — dark/red backgrounds<br>cornell-reduced-white.svg</div>
+      </div>
+      <div class="logo-card dark">
+        <img src="assets/cornell_seal.svg" alt="Cornell University seal, white-on-transparent">
+        <div class="cap">Seal — masthead, top-right (white fill)<br>cornell_seal.svg</div>
+      </div>
+      <div class="logo-card" style="background:var(--color-accent)">
+        <img src="assets/icon_chevron_right_white.svg" alt="chevron icon" style="max-height:28px">
+        <div class="cap" style="color:#fff">Chevron — link/CTA affordance<br>icon_chevron_right_white.svg</div>
+      </div>
+    </div>
+    <p class="section-note" style="margin-top:12px;">Both "logo" SVGs shipped by the theme are actually the white-fill circular seal at different weights — the textual "Cornell University / AI Innovation Hub" wordmark seen in the live masthead is rendered as HTML text, not an image/SVG.</p>
+  </section>
+
+  <section>
+    <h2 class="section-title">Buttons</h2>
+    <div style="display:flex; gap:16px; align-items:center;">
+      <a class="btn-demo btn-primary" href="#">See All →</a>
+      <a class="btn-demo btn-secondary" href="#">Join meeting</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="page">
+  Cornell University AI Innovation Hub — Style Guide · Generated during WordPress → Angular migration planning · docs/wp-migration/style-guide.html
+</footer>
+
+</body>
+</html>
