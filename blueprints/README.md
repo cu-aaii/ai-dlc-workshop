@@ -69,3 +69,29 @@ same PR as the template. Until then, no manifest: an absent blueprint is better 
 **Every parameter passed explicitly by the pipeline.** A blueprint should deploy identically
 by hand and through the pipeline. Parameter defaults exist to make a manual deploy possible,
 not to be the real values.
+
+## Required of every blueprint that renders a UI
+
+**If a blueprint renders anything a human reads** — a page, a chat surface, a dashboard, an emailed
+report — it conforms to [`contracts/ui-design-language.md`](../contracts/ui-design-language.md). The
+design language itself is [`aisei-site/`](aisei-site/): take tokens from
+`app/client/app/shared/theme/_variables.scss` and patterns from `app/docs/wp-migration/`, and never
+hardcode a hex in a component.
+
+**Two parts of that contract cannot be waived — not by a builder, not by a reviewer, not by an agent:**
+
+- **Accessibility — WCAG 2.2 AA.** This is law, not preference: Cornell Policy 5.12, ADA Title II (the
+  DOJ 2024 rule names WCAG 2.1 AA), and Section 504/508. 2.2 AA is a superset of all three, so
+  conforming to it conforms to each.
+- **Cornell logo and wordmark usage.** Governed by [brand.cornell.edu](https://brand.cornell.edu/logos)
+  — exact size bands (simple 73–120px, seal never over 120px, reduced logo exactly 45px), clear space
+  of 1/4 the seal's diameter, fills restricted to carnelian/black/white, one mark per page, and no
+  redrawing the art in any form including CSS or hand-written SVG.
+
+Everything below those two — tokens, components, spacing, layout — permits a **documented** deviation
+in `blueprints/<name>/docs/`.
+
+[`.claude/skills/cornell-ui-compliance/`](../.claude/skills/cornell-ui-compliance/SKILL.md) enforces
+this: it triggers on UI work, stops on a violation, names the measured value and the threshold it
+misses, prompts for an adjustment, and **re-measures the adjustment before accepting it.** There is no
+ship-anyway path for the two non-waivable sets.
