@@ -74,6 +74,9 @@ cannot be deployed by the pipeline. Same for the CodeBuild project name prefix.
 3. Add a `BlueprintDeploy` action in `pipeline.yml` modelled on `HelloWorldCloudFormation`.
    Pass every parameter the template needs explicitly; do not rely on template defaults, so
    the stack deploys identically by hand and by pipeline.
+4. Write `blueprints/<name>/blueprint.yaml` — the manifest that puts the blueprint in the
+   Cornell Builder MCP's catalog. Steps 1–3 make it deploy; this is what makes a builder able
+   to find it. See "Required of every blueprint" in `blueprints/README.md`.
 
 Stages are static CloudFormation, so `stacks.yml` and the pipeline actions are mirrored by
 hand. That is on purpose — generating stages from the registry would be the framework the
@@ -85,6 +88,11 @@ had been asked to deploy one. `validate_stacks.py` now fails a `deployed_by: pip
 that no action deploys, and an action whose template is unregistered. If a template genuinely
 should not be pipeline-deployed, register it `deployed_by: manual` and say why in its
 `description`.
+
+Skipping step 4 has the same shape one layer up: the stack deploys, and the blueprint is absent
+from `blueprint_search` with no error anywhere. `validate_stacks.py` fails a blueprint directory
+with no manifest too; a blueprint that genuinely should not be in the builder catalog goes in
+`MANIFEST_EXEMPT` with the reason.
 
 ## Adding a Terraform module
 

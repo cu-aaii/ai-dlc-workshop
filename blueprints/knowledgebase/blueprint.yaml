@@ -1,0 +1,92 @@
+# Blueprint manifest -- the contract the Cornell Builder MCP reads (builder-mcp/SPEC.md, C1).
+# Not a CloudFormation template: it declares no template format version, so
+# validate_stacks.py and cfn-lint ignore it by design (that check is a text scan, so even
+# naming the marker key here would trip it). The CFN template it points at is registered
+# in pipeline/stacks.yml as usual.
+#
+# Without this file the blueprint is invisible to blueprint_search -- the catalog loader
+# globs blueprints/*/blueprint.yaml, and a directory with no manifest is skipped with no
+# error. A builder asking for a knowledge base got tiny-chatbot as the top hit.
+apiVersion: builder.cornell.edu/v1
+kind: Blueprint
+metadata:
+  name: knowledgebase
+  version: 0.1.0        # keep in lockstep with BlueprintVersion default in the template
+  maintainer: ai-sei@cornell.edu
+  maturity: supported
+summary: >-
+  Turns documents already sitting in an S3 bucket into a query-ready Amazon Bedrock managed
+  knowledge base, and publishes the knowledge base id and a scoped retrieval policy to SSM for
+  a chatbot or agent to consume. AWS owns the storage, index and embedding model, so there is
+  no vector store to provision. The deploy ingests and then verifies itself -- it fails unless
+  the documents indexed with zero failures and the knowledge base answered a smoke query -- so
+  a green deploy is the acceptance test rather than a hint.
+matches:
+  - "knowledge base"
+  - "a knowledge base I can ask questions about my documents"
+  - "search my course documents"
+  - "answer questions from my PDFs"
+  - "RAG over documents"
+  - "retrieval augmented generation"
+  - "index a bucket of documents"
+  - "give my chatbot something to answer from"
+inputs:
+  owner_netid:
+    type: string
+    required: true
+    description: NetID of the person who owns the deployment (cornell:owner)
+  # IngestionBucketName and SmokeQuery are deliberately NOT declared as inputs, even though the
+  # template takes both. deployment_create builds its parameter overrides from Application,
+  # Environment, Owner and pipeline_parameters only -- a declared input other than owner_netid
+  # is recorded in the deployment shell and never reaches the generated pipeline action. So
+  # declaring them would let a builder set a bucket and silently get the template default.
+  # validate_inputs rejects an undeclared input by name, which is the safe failure. The values
+  # below travel through pipeline_parameters instead, which does reach the action.
+  # Making these builder-settable needs a change in builder-mcp, not here -- see the PR.
+template: blueprints/knowledgebase/infra/knowledgebase.yml
+# CodePipeline-level parameters, resolved by the pipeline at deploy time (not by the MCP).
+#
+# Everything the template needs is here, not just the pipeline-resolved values, because the
+# repo requires every parameter to be passed explicitly by the pipeline -- a stack should
+# deploy identically by hand and by pipeline. BlueprintVersion duplicates the template default
+# on purpose: bump both in the same PR or the cornell:blueprint-version tag will lie.
+#
+# SmokeQuery couples the deploy to the corpus. If the bucket's contents stop answering it,
+# EVERY merge goes red for every track, not just this blueprint's. Change it in the same PR
+# that changes the corpus. See docs/warnings.md.
+pipeline_parameters:
+  BlueprintVersion: "0.1.0"
+  IngestionBucketName: "aidlc-kb-ingestion-890349359349"
+  SmokeQuery: "What is the late homework policy?"
+  SourceCommitId: "#{GitRepository.CommitId}"
+# The template derives every name from ${Application}-${Environment}-knowledgebase and takes no
+# DeploymentName parameter, so a second deployment in one environment would collide. Making it
+# multi-instance is a template change (thread DeploymentName through the names), not a manifest
+# change.
+singleton: true
+cost:
+  # No baseline figure: this is the first thing in the repo that bills while idle -- managed
+  # knowledge base pricing is per-GB-stored plus per-retrieve, continuously, and nobody has
+  # measured it for this corpus. Omitted rather than guessed, because the number is shown to
+  # builders before they deploy. spec_export renders a missing value as "$?/month". Measuring
+  # it is a follow-up. See docs/warnings.md, "Managed knowledge base billing does not stop".
+  scales_with: [documents_stored, retrieve_requests]
+# The corpus this is deployed against is one public course syllabus. This is a property of the
+# bucket's contents, not of the blueprint -- the same template over a bucket of student records
+# would be a different classification, and the gate reads this field to block anything above
+# policy. Revisit it in any PR that repoints IngestionBucketName.
+data_classification: [public]
+# Backup/recovery contract (see builder-mcp/aidlc-docs/inception/requirements/
+# versioning-releases-and-recovery-options.md). The knowledge base index is `derived`: it is a
+# cache, never the system of record, and it rebuilds by re-running ingestion -- which a merge
+# does on every deploy. Per the "derived data may not be the only copy" rule it names its
+# authoritative source, and that source is deliberately outside this blueprint: the template
+# references IngestionBucketName and never creates it, so backing up the documents is the
+# bucket owner's responsibility and not covered by deleting or redeploying this stack.
+state:
+  - resource: KnowledgeBase
+    class: derived
+    rebuild: reingest
+    authoritative_source: >-
+      the S3 bucket named by IngestionBucketName, which this blueprint references and does
+      not create or back up

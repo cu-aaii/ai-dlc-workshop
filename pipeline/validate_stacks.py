@@ -29,6 +29,16 @@ terraform modules <-> pipeline.yml
     with no Terraform action applying nothing while every stage still reported Succeeded.
     Checked in both directions against the TF_WORKING_DIR values in the pipeline's Terraform
     actions.
+
+blueprints <-> blueprint manifests
+    The third shape of the same failure, in the layer above the pipeline. The Cornell Builder
+    MCP builds its catalog by globbing `blueprints/*/blueprint.yaml`, and a blueprint directory
+    with no manifest is skipped with no error -- so the blueprint deploys perfectly and no
+    builder can find it. `knowledgebase` was invisible this way, and an intent search for a
+    knowledge base returned `tiny-chatbot` as its top hit: a confident wrong answer rather than
+    an empty one. Checked in both directions against MANIFEST_EXEMPT, plus the two ways a
+    manifest can be present but wrong -- naming a template nobody registered, or drifting out
+    of version lockstep with the template it names.
 """
 
 from __future__ import annotations
@@ -57,6 +67,43 @@ TF_WORKING_DIR_PATTERN = re.compile(r'"name"\s*:\s*"TF_WORKING_DIR"\s*,\s*"value
 
 # Terraform modules live alongside a blueprint's CloudFormation, per blueprints/README.md.
 TF_MODULE_GLOB = 'blueprints/*/infra/azure'
+
+# One blueprint per directory; the Cornell Builder MCP's catalog loader globs exactly this
+# (builder-mcp/src/builder_mcp/catalog.py, _load_local).
+#
+# Credit where due: the manifest-names-an-unregistered-template check below was written first by
+# ef436 on the trust-me-bruh branch (adfd31b), together with a knowledgebase manifest. That
+# branch was deleted from the remote without ever being merged, so this reconstructs the check
+# and adds the direction it did not cover: it globbed the manifests that exist, which makes a
+# blueprint directory with no manifest at all invisible to it -- the failure that hid
+# knowledgebase from blueprint_search in the first place.
+BLUEPRINT_DIR_GLOB = 'blueprints/*'
+MANIFEST_NAME = 'blueprint.yaml'
+
+# Blueprint directories that deliberately have no manifest, and why. A blueprint belongs here
+# only when it should not appear in the builder-facing catalog at all -- not merely because
+# writing the manifest is outstanding work.
+#
+# The manifest's `template` field is a repo-relative CloudFormation path, and deployment_create
+# renders a CloudFormation deploy action from it, so a Terraform-only blueprint cannot be
+# expressed as a catalog entry today. Supporting one is a builder-mcp change (a manifest kind
+# that renders a Terraform action instead), not something to fake with an empty template path.
+MANIFEST_EXEMPT = {
+    'entra-probe': (
+        'Terraform-only and self-declared "a probe, not a building block. Nothing should '
+        'depend on it." It creates one Entra application that grants nothing, and it has no '
+        'CloudFormation template for a manifest to point at. Listing it in the catalog would '
+        'offer builders a deployment that deployment_create cannot render an action for.'
+    ),
+}
+
+# The template's BlueprintVersion default, which the manifest's metadata.version must match
+# (builder-mcp/SPEC.md C1). Text scan, like everything else here, because a CloudFormation
+# template full of !Sub and !GetAtt is not yaml.safe_load-able.
+BLUEPRINT_VERSION_PATTERN = re.compile(
+    r'^  BlueprintVersion:\s*$.*?^\s*Default:\s*[\'"]?([0-9]+\.[0-9]+\.[0-9]+)[\'"]?\s*$',
+    re.MULTILINE | re.DOTALL,
+)
 
 # A YAML file is a CloudFormation template if it declares a template format version. Cheap
 # text scan rather than a YAML parse, because CloudFormation short tags (!Sub, !GetAtt)
@@ -142,6 +189,124 @@ def check_tf_modules() -> list[str]:
     return errors
 
 
+def discover_blueprint_dirs() -> set[str]:
+    """Every blueprint directory, by name. `blueprints/README.md` is a file, not a blueprint."""
+    return {
+        path.name
+        for path in REPO_ROOT.glob(BLUEPRINT_DIR_GLOB)
+        if path.is_dir() and path.name not in SKIP_DIRS
+    }
+
+
+def template_blueprint_version(template: str) -> str | None:
+    """The BlueprintVersion default declared by a template, or None if it declares none."""
+    path = REPO_ROOT / template
+    if not path.is_file():
+        return None
+    match = BLUEPRINT_VERSION_PATTERN.search(path.read_text(encoding='utf-8'))
+    return match.group(1) if match else None
+
+
+def check_blueprint_manifests(registered: set[str]) -> list[str]:
+    """Cross-check blueprint directories against their builder-catalog manifests.
+
+    The silent failure here is one layer above the pipeline: no manifest means the blueprint is
+    absent from blueprint_search, which fails by returning a *wrong* top hit rather than an
+    empty result. Checked in both directions, plus the ways a manifest can be present but lie.
+    """
+    errors: list[str] = []
+    on_disk = discover_blueprint_dirs()
+
+    for stale in sorted(set(MANIFEST_EXEMPT) - on_disk):
+        errors.append(
+            f'MANIFEST_EXEMPT in {Path(__file__).name} lists {stale!r}, but '
+            f'blueprints/{stale}/ does not exist -- drop the exemption.'
+        )
+
+    for name in sorted(on_disk):
+        manifest_path = REPO_ROOT / 'blueprints' / name / MANIFEST_NAME
+        exempt_reason = MANIFEST_EXEMPT.get(name)
+
+        if not manifest_path.is_file():
+            if exempt_reason is None:
+                errors.append(
+                    f'blueprint {name} has no blueprints/{name}/{MANIFEST_NAME} -- it would be '
+                    'invisible to the Cornell Builder MCP\'s blueprint_search, silently, while '
+                    'deploying perfectly. Add the manifest (builder-mcp/SPEC.md, C1), or add '
+                    f'{name!r} to MANIFEST_EXEMPT with the reason it should not be in the '
+                    'catalog.'
+                )
+            continue
+
+        if exempt_reason is not None:
+            errors.append(
+                f'blueprint {name} is in MANIFEST_EXEMPT but has a {MANIFEST_NAME} -- the '
+                'exemption says it should not be in the builder catalog while the manifest '
+                'puts it there. Remove one of the two.'
+            )
+
+        if TEMPLATE_MARKER in manifest_path.read_text(encoding='utf-8'):
+            errors.append(
+                f'blueprints/{name}/{MANIFEST_NAME} contains the string {TEMPLATE_MARKER}, so '
+                'discover_templates() reads it as a CloudFormation template and cfn-lint will '
+                'be handed a manifest. Do not name that key in a manifest, even in a comment '
+                '(builder-mcp/SPEC.md, C1).'
+            )
+            continue
+
+        try:
+            manifest = yaml.safe_load(manifest_path.read_text(encoding='utf-8')) or {}
+        except yaml.YAMLError as error:
+            errors.append(f'blueprints/{name}/{MANIFEST_NAME} is not valid YAML: {error}')
+            continue
+        if not isinstance(manifest, dict):
+            errors.append(f'blueprints/{name}/{MANIFEST_NAME}: expected a mapping at the top level')
+            continue
+
+        metadata = manifest.get('metadata') or {}
+        declared_name = metadata.get('name') if isinstance(metadata, dict) else None
+        if declared_name != name:
+            errors.append(
+                f'blueprints/{name}/{MANIFEST_NAME}: metadata.name is {declared_name!r} but the '
+                f'directory is {name!r} -- the catalog keys deployments off metadata.name, so '
+                'the two must agree.'
+            )
+
+        template = manifest.get('template')
+        if not template:
+            errors.append(
+                f'blueprints/{name}/{MANIFEST_NAME}: missing "template" -- deployment_create '
+                'renders its CloudFormation action from this path and would emit a broken one.'
+            )
+            continue
+        if not (REPO_ROOT / template).is_file():
+            errors.append(
+                f'blueprints/{name}/{MANIFEST_NAME}: template does not exist: {template}'
+            )
+            continue
+        if template not in registered:
+            errors.append(
+                f'blueprints/{name}/{MANIFEST_NAME}: names {template}, which is not registered '
+                'in pipeline/stacks.yml -- the catalog would offer a blueprint whose template '
+                'PR checks do not lint.'
+            )
+
+        # SPEC C1: manifest metadata.version stays in lockstep with the template's
+        # BlueprintVersion default. Out of lockstep, the version a builder sees in the catalog
+        # is not the version the cornell:blueprint-version tag records on the deployed stack.
+        manifest_version = str(metadata.get('version')) if isinstance(metadata, dict) else None
+        template_version = template_blueprint_version(template)
+        if template_version is not None and manifest_version != template_version:
+            errors.append(
+                f'blueprints/{name}/{MANIFEST_NAME}: metadata.version is {manifest_version!r} '
+                f'but {template} declares BlueprintVersion default {template_version!r} -- bump '
+                'both in the same PR, or the catalog and the cornell:blueprint-version tag '
+                'disagree about what is deployed.'
+            )
+
+    return errors
+
+
 def load_registry() -> list[dict]:
     if not REGISTRY_PATH.exists():
         sys.exit(f'missing registry: {REGISTRY_PATH.relative_to(REPO_ROOT)}')
@@ -207,6 +372,7 @@ def validate(entries: list[dict]) -> list[str]:
 
     errors.extend(check_pipeline_actions(declared))
     errors.extend(check_tf_modules())
+    errors.extend(check_blueprint_manifests(seen_paths))
 
     return errors
 
@@ -293,6 +459,17 @@ def main() -> int:
     for module in sorted(modules):
         wired = ' <- applied by a pipeline action' if module in applied else ''
         print(f'  {"terraform":<9} {module}{wired}')
+
+    # Which blueprints the builder can actually find, printed for the same reason the pipeline
+    # wiring is: a missing manifest is otherwise only visible as an absence.
+    blueprints = discover_blueprint_dirs()
+    print(f'blueprints: {len(blueprints)} directory(ies) present')
+    for name in sorted(blueprints):
+        if name in MANIFEST_EXEMPT:
+            state = 'not in the builder catalog (exempt)'
+        else:
+            state = 'in the builder catalog'
+        print(f'  {"blueprint":<9} blueprints/{name} <- {state}')
     return 0
 
 
