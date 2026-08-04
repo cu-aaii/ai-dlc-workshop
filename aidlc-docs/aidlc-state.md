@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **CONSTRUCTION** - Functional Design for U-01 Domain Core
+- **Current Stage**: **CONSTRUCTION** - Functional Design for U-01 Domain Core (awaiting answers)
 - **INCEPTION COMPLETE**: 2026-08-03
 - **Units Approved**: 2026-08-03 — user response "Approve & Continue"
 - **Application Design Approved**: 2026-08-03 — user response "approved"
@@ -136,7 +136,7 @@ cleanup — deliberately not done.
 **🔵 INCEPTION PHASE COMPLETE — 2026-08-03**
 
 ### 🟢 CONSTRUCTION PHASE
-- [ ] Functional Design — EXECUTE (PBT-01 identifies properties here)
+- [ ] Functional Design — **IN PROGRESS: U-01** (plan + 9 questions issued). PBT-01 identifies properties here. U-02 pass follows.
 - [ ] NFR Requirements — EXECUTE
 - [ ] NFR Design — EXECUTE (RESILIENCY-04, -14, -15 user decisions are due here)
 - [ ] Infrastructure Design — EXECUTE (SECURITY-01, -06, -14 SRI, RESILIENCY-08, container build)
