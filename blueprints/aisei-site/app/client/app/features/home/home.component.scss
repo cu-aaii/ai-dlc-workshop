@@ -7,6 +7,11 @@
     min-height: 80vh;
     box-sizing: border-box;
     padding: 120px 24px 64px;
+    position: relative;
+    left: 50%;
+    width: 100vw;
+    margin-left: -50vw;
+    margin-right: -50vw;
 
     .hero-inner {
       max-width: 1280px;
@@ -49,8 +54,9 @@
     grid-template-columns: repeat(3, 1fr);
     gap: 0;
     max-width: 1280px;
-    margin: -40px auto 0;
+    margin: -80px auto 0;
     position: relative;
+    z-index: 1;
   }
 
   .decorative-card {

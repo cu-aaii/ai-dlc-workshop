@@ -2,14 +2,17 @@
   display: block;
 
   .cu-masthead {
-    position: relative;
     background: var(--color-accent);
     color: var(--color-on-primary);
-    padding: 40px 24px;
+  }
+
+  .masthead-inner {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 24px;
+    padding-top: 40px;
+    padding-bottom: 40px;
 
     .brand {
       display: flex;
@@ -36,31 +39,12 @@
       width: 120px;
       flex-shrink: 0;
     }
-
-    .search-toggle {
-      position: absolute;
-      top: 0;
-      right: 24px;
-      width: 44px;
-      height: 42px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--color-accent-dark);
-      color: var(--color-on-primary);
-      border: none;
-      font-size: 18px;
-      cursor: pointer;
-
-      &:hover {
-        background: var(--color-hero-bg);
-      }
-    }
   }
 
   @media (max-width: 767px) {
-    .cu-masthead {
-      padding: 24px 16px;
+    .masthead-inner {
+      padding-top: 24px;
+      padding-bottom: 24px;
 
       .brand strong {
         font-size: 28px;
