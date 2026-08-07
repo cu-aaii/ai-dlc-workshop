@@ -867,3 +867,41 @@ dashboard stacks** — the branch has never been merged, so SEC-7/A-4/P-6/R-8 re
 
 **Still governing, unchanged**: T1–T8, FR-10.9, NFR-T1…T7. **Still open**: per-model rates (FR-10.8
 item 3 — pricing-page data, no web access this session).
+
+---
+
+## Application Design — FR-9/FR-10 pass (2026-08-07)
+
+**Plan**: `inception/plans/application-design-plan-fr9-fr10.md`. Extends the approved v1 design
+(C-01…C-09) without revisiting it.
+
+| # | Decision | Answer |
+|---|---|---|
+| Q1 | Snapshot layout | **A — three objects, one per section**, one owner each. A2's FR-9.5.3 could not be built: cost is daily vs hourly inventory/telemetry, so one object forces a **read-modify-write** that C-01 forbids and that loses updates. → **A4.1** |
+| Q2 | How the declaration reaches the reader | **A — build-time baked catalog (C-14) + fixed code-level AWS allowlist.** FR-9.4/9.5.2 had no middle: `blueprint.yaml` is in git, the reader is a Lambda. → **A4.2** |
+| Q3 | Cost collector packaging | **B — reuse the collector image**, new target + handler, own role (`ce:GetCostAndUsage`) + own daily schedule |
+| Q4 | Unit boundary | **A — extend both** on the purity line: pure into U-01, AWS-facing into U-02. Money arithmetic must be property-testable |
+| Q5–Q8 | Rate table in SSM; distinct route per view; two new UI tabs reusing `StateBoundary`; dashboard shows its own cost | defaults, unopposed |
+
+**Added**: C-10 Cost Collector (U-02), C-11 Telemetry Collector (U-02), C-12 Cost Model + Estimator
+(**U-01, pure**), C-13 Telemetry Model (**U-01, pure**), C-14 Declared-Counter Catalog.
+**Extended**: C-02 (3 keys/3 owners), C-03 (4 routes + composition + read-time estimation), C-06
+(Financial + Adoption tabs), C-09 (2 collectors' alarms; short retention — CloudWatch is already ~18%
+of account spend).
+
+**Design properties recorded once**: `collected_at` is **per section** (no single snapshot age — cost
+really is 24–48h stale, inventory an hour); **money is `Decimal`, never `float`** (CE returns decimal
+strings; `float` puts binary rounding into figures people act on); **estimation is read-time** so
+correcting a rate corrects history.
+
+**Two deliberately different failure policies**: cost **fails whole** (a partial cost object reads as
+zero spend), telemetry **degrades per counter** (failing the run would erase real AWS data because an
+uninstrumented namespace was empty).
+
+**Artifacts**: `components.md`, `component-methods.md`, `services.md`, `component-dependency.md`,
+`application-design.md` all extended with an FR-9/FR-10 section + a coverage table;
+`amendments/telemetry-a4-design-2026-08-07.md` new. **Awaiting approval.**
+
+**Not decided here, deliberately**: CE query shapes and call count, metric window/period, one
+EventBridge rule vs two, which template the new Lambdas live in, and the per-model rate values
+(FR-10.8 item 3 — pricing data, not design).

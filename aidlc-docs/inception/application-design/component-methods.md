@@ -201,3 +201,92 @@ break a requirement.
 - **No cross-account or cross-region assumption.** Single account, `us-east-1` (§5).
 - **No cost computation.** FR-8 / US-D1 / US-D2 are deferred with the data source undecided.
 - **No user, session, or identity handling.** No Cognito, no tokens (FR-5.5).
+
+---
+---
+
+# FR-9 / FR-10 extension (2026-08-07)
+
+Signatures only. Business rules are Functional Design's job (CONSTRUCTION, per-unit). Types are
+indicative Python; `Decimal` for money throughout (C-12), `Mapping`/frozen dataclasses to match U-01's
+PAT-1/PAT-2 immutability rules.
+
+## C-12 — Cost Model + Estimator (pure, U-01)
+
+| Method | Purpose | In → Out |
+|---|---|---|
+| `parse_rate_table(raw)` | Rate table from JSON; reject malformed rather than defaulting | `str \| bytes` → `RateTable` |
+| `estimate_model_cost(usage, rates)` | FR-10.6 estimate, per model | `ModelUsage, RateTable` → `CostEstimate` |
+| `missing_rates(usage, rates)` | Models with usage but no rate — surfaced, never zero (FR-10.6.6) | `ModelUsage, RateTable` → `frozenset[str]` |
+| `is_unattributed(group_key)` | The FR-10.3.6 predicate: `"cornell:blueprint$"` → True | `str` → `bool` |
+| `split_attribution(groups)` | Partition CE tag groups into attributed / unattributed | `Sequence[CostGroup]` → `AttributionSplit` |
+| `cost_per_task(cost, completed)` | FR-10.7; `completed == 0` returns an explicit no-tasks result, never a division | `Decimal, int` → `PerTaskResult` |
+| `parse_amount(raw)` | CE's decimal **string** → `Decimal`. Never `float` | `str` → `Decimal` |
+
+Types: `RateTable`, `ModelUsage`, `CostEstimate`, `CostGroup`, `AttributionSplit`, `PerTaskResult` —
+all frozen, all hashable, no clock, no env.
+
+## C-13 — Telemetry Model (pure, U-01)
+
+| Method | Purpose | In → Out |
+|---|---|---|
+| `counter_key(deployment_id, agent_id, model)` | Canonical key; **`agent_id` defaults to `deployment_id`** (T8) | `str, str \| None, str \| None` → `CounterKey` |
+| `derive_rate(numerator, denominator)` | Rate from two counters; re-aggregatable (FR-9.6) | `Counter, Counter` → `RateResult` |
+| `classify(declared, datapoints, read_ok)` | The NFR-T7 three-state enum | `bool, int, bool` → `TelemetryState` |
+| `aggregate_by_agent(series)` | Per-agent totals; agents within a deployment sum to it (US-23) | `Sequence[CounterSeries]` → `Mapping[CounterKey, Counter]` |
+| `total_tokens(series)` | Input/output token totals per model, for C-12's estimate | `Sequence[CounterSeries]` → `ModelUsage` |
+
+`TelemetryState` is a closed `StrEnum`: `NOT_INSTRUMENTED`, `NO_DATA_YET`, `CANNOT_READ`, `OK` —
+matching U-01's `SkipReason` precedent rather than free-text status strings.
+
+## C-14 — Declared-Counter Catalog
+
+| Method | Purpose | In → Out |
+|---|---|---|
+| `parse_catalog(raw)` | Baked catalog → declared counters (pure, U-01) | `str \| bytes` → `Catalog` |
+| `declared_counters(catalog, blueprint)` | The closed allowlist for one blueprint (FR-9.5.2) | `Catalog, str` → `tuple[DeclaredCounter, ...]` |
+| `emits(catalog, blueprint)` | `False` when absent or `emits: false` (FR-9.4.2) | `Catalog, str` → `bool` |
+| *build step* `collect_declarations(repo_root)` | Walk `blueprints/*/blueprint.yaml`; fail on malformed | path → catalog JSON |
+
+`DeclaredCounter` carries `name`, `unit`, `description` — the three fields FR-9.4.3 needs for generic
+rendering.
+
+## C-10 — Cost Collector (U-02)
+
+| Method | Purpose | In → Out |
+|---|---|---|
+| `run(*, config, ce_client, s3_client, clock)` | Orchestrate; clock injected, read exactly twice (C-01's pattern) | — → `None` (raises on failure) |
+| `fetch_windows(ce_client, today)` | The three US-16 windows, bounded call count | client, date → `CostWindows` |
+| `fetch_groupings(ce_client, window)` | `SERVICE`, `USAGE_TYPE`, and the two TAG groupings | client, window → `Groupings` |
+| `handler(event, context)` | Lambda entrypoint; bootstraps clients | AWS event → `None` |
+
+`CostCollectorConfig.from_env()` requires `SNAPSHOT_BUCKET`, `COST_KEY`; carries the CE call budget and
+a `botocore.Config` with explicit timeouts and standard retries (RESILIENCY-10), matching C-01.
+
+## C-11 — Telemetry Collector (U-02)
+
+| Method | Purpose | In → Out |
+|---|---|---|
+| `run(*, config, cw_client, s3_client, catalog, clock)` | Orchestrate both halves | — → `None` |
+| `discover_models(cw_client)` | `ListMetrics` for `ModelId` **values only** — never which metrics | client → `frozenset[str]` |
+| `fetch_aws_metrics(cw_client, models, window)` | The fixed AWS allowlist (A3.1, A3.2) | … → `Sequence[CounterSeries]` |
+| `fetch_declared(cw_client, catalog, window)` | Only catalog-declared counters (NFR-T5) | … → `Sequence[CounterSeries]` |
+| `handler(event, context)` | Lambda entrypoint | AWS event → `None` |
+
+The AWS metric allowlist is a **module-level constant**, not configuration — closing it in code is
+what makes NFR-T5 true for the pull path.
+
+## C-03 — Read API, new methods
+
+| Method | Purpose |
+|---|---|
+| `load_section(s3, bucket, key)` | Per-section load returning the existing `LoadOutcome` shape; total, never raises |
+| `views.cost_summary(cost, now)` | US-16 — three windows, each with its own age |
+| `views.cost_breakdown(cost)` | US-17 — attributed groups plus the explicit unattributed bucket |
+| `views.usage_models(telemetry, rates)` | US-20 + US-18 — per-model counts, tokens, and the labelled estimate |
+| `views.usage_quality(telemetry)` | US-21/US-22 — rates with their counts and declared definitions |
+| `shaping.section_state(outcome, declared)` | Maps a section to its NFR-T7 state independently of its siblings |
+
+**Composition rule**: a failed or missing section degrades **only** that section. The response always
+carries every section's own `collected_at` and state — there is no combined snapshot timestamp
+(Q1 = A).

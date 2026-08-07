@@ -268,3 +268,208 @@ Neither is a component of this blueprint, but both must change for it to exist a
 `CLAUDE.md` permits changing the pipeline's *shape* for a blueprint that needs it, while forbidding
 "improvements" to the source stage, artifact handling, role assumptions, and the digest export. Only
 the additions above are in scope.
+
+---
+---
+
+# FR-9 / FR-10 extension (2026-08-07)
+
+**Source**: `amendments/telemetry-fr9-2026-08-07.md` (A2) as corrected by
+`amendments/telemetry-a3-measured-2026-08-07.md` (A3). **Decisions**:
+`plans/application-design-plan-fr9-fr10.md` Part A2 (Q1 = A one object per section, Q2 = A baked
+catalog + fixed AWS allowlist, Q3 = B reuse the collector image, Q4 = A extend both units).
+
+Nothing in C-01…C-09 above is revisited. Five components are added and four are extended.
+
+## New component inventory
+
+| ID | Component | Kind | Unit |
+|---|---|---|---|
+| C-10 | Cost Collector | Lambda (container image, 3rd target) | U-02 |
+| C-11 | Telemetry Collector | Lambda (container image, 4th target) | U-02 |
+| C-12 | Cost Model + Estimator | Pure Python (no AWS) | **U-01** |
+| C-13 | Telemetry Model | Pure Python (no AWS) | **U-01** |
+| C-14 | Declared-Counter Catalog | Build-time JSON artifact + pure parser | U-01 parser, pipeline build step |
+
+## C-10 — Cost Collector
+
+**Purpose**: read platform cost from Cost Explorer once a day and write it as its own object.
+
+**Responsibilities**
+- Call `ce:GetCostAndUsage` for the three windows US-16 needs (day, month-to-date, year-to-date)
+- Group by `SERVICE`, by `USAGE_TYPE` (per-model cost — A3.4), and attempt the `cornell:blueprint` /
+  `cornell:deployment-id` **TAG** groupings
+- **Classify the empty-value tag group as unattributed** (FR-10.3.6) — the A3.3 trap. A successful
+  response containing one group keyed `cornell:blueprint$` is 100% unattributed spend, *not* a
+  blueprint named `cornell:blueprint`. This classification is the component's most important job.
+- Stamp `collected_at` and the CE window actually covered, which is **not** "today" (24–48h lag)
+- Write `cost/current.json` in **one** `PutObject`, complete-or-fail
+
+**Explicitly not responsible for**
+- Estimating model cost — that is C-12, and it needs token counts C-11 collects
+- Any tag activation. It **cannot** activate cost allocation tags; this is a linked account and only
+  the Organization payer can (A3.3). It detects and reports the consequence.
+
+**Interfaces**
+- *In*: EventBridge, **daily**, cadence a stack parameter (FR-10.4.3)
+- *Out*: one `PutObject` to `cost/current.json`; JSON logs; EMF metrics
+- *Depends on*: Cost Explorer (upstream), C-02, C-12
+
+**Constraints carried**
+- Same image as C-01, new Dockerfile target + `CMD` (Q3 = B)
+- IAM: `ce:GetCostAndUsage` only, plus write to the one cost key. `ce:*` has no resource-level
+  scoping — a **documented exception** in the same shape as `tag:GetResources` (NFR-T6)
+- Reserved concurrency 1; a daily collector needs no more
+- **Call budget is a design constraint, not a detail**: every request is $0.01 against a ~$9/month
+  account (A3.6). The number of CE calls per run MUST be bounded and counted, and the count emitted
+  as a metric so the dashboard's own cost is observable (NFR-T8, Q8)
+
+**The failure mode this component exists to avoid**: rendering `cornell:blueprint$` as a real
+attribution. That produces a confident, wrong money figure from a 200 response — undetectable by
+error-checking, which is why the classification lives here rather than in the UI.
+
+## C-11 — Telemetry Collector
+
+**Purpose**: read usage metrics from CloudWatch — both AWS-emitted and blueprint-emitted — and write
+them as their own object.
+
+**Responsibilities**
+- Read the **fixed** AWS allowlist (Q2 = A): `AWS/Bedrock` (`Invocations`, `InputTokenCount`,
+  `OutputTokenCount`, `InvocationClientErrors`, `InvocationLatency`) and `AWS/Bedrock-AgentCore`
+  (`Sessions`, `ActiveSessionCount`, `Invocations`, `Errors`, `Throttles`, `Latency`)
+- Read **only** the counters C-14's catalog declares, in `Cornell/Blueprints/*` (FR-9.5.2, NFR-T5)
+- Discover **dimension values only** — which `ModelId`s exist — never which metrics to read
+- Distinguish the three states of NFR-T7 per counter: *not instrumented* (not in the catalog),
+  *no data yet* (declared, no datapoints in window), *cannot read* (the call failed)
+- Write `telemetry/current.json` in one `PutObject`, complete-or-fail
+
+**Explicitly not responsible for**
+- Deriving rates. It collects numerator and denominator counters separately; C-13 derives
+  (FR-9.6 — a pre-computed ratio cannot be re-aggregated across agents or windows)
+- Pricing anything. That is C-12.
+
+**Interfaces**
+- *In*: EventBridge, **hourly** — same cadence as inventory, deliberately a separate writer so a
+  CloudWatch failure cannot fail the inventory snapshot
+- *Out*: one `PutObject` to `telemetry/current.json`; JSON logs; EMF metrics
+- *Depends on*: CloudWatch (upstream), C-02, C-13, C-14
+
+**Constraints carried**
+- Same image as C-01, 4th target + `CMD`
+- IAM: `cloudwatch:GetMetricData` and `cloudwatch:ListMetrics`, read-only, plus write to the one
+  telemetry key
+- `GetMetricData` is ~$0.01 per 1,000 metrics requested — negligible, unlike CE (A3.6). The metric
+  count per run MUST still be bounded, because the allowlist × discovered models is a product
+
+**Honest status on delivery** (A3.1): the AWS-emitted half returns real but tiny numbers — 2
+invocations and 14 input tokens over 14 days, because the application's real traffic goes through the
+LiteLLM gateway off-account. The `Cornell/Blueprints/*` half returns *not instrumented* for every
+blueprint, because T6 instrumented none. Both are correct behaviour, and both must be visibly
+distinguishable from zero.
+
+## C-12 — Cost Model + Estimator (pure)
+
+**Purpose**: the cost record types, and the token × rate arithmetic. No AWS, no clock, no env.
+
+**Responsibilities**
+- The cost record and rate-table types, and parsing a rate table from JSON
+- `estimate_model_cost(tokens, rates)` — the FR-10.6 estimate
+- Deriving cost-per-completed-task (FR-10.7), including the no-tasks case
+- Classifying a tag group as attributed or unattributed (the FR-10.3.6 predicate, so the rule is
+  property-testable without AWS)
+
+**Money is `Decimal`, never `float`.** Cost Explorer returns strings (`"9.0231738003"`); parsing
+those to `float` introduces binary rounding into figures a human will act on. `decimal` is stdlib, so
+this stays inside U-01's dependency-free boundary. Recorded here because it is the kind of decision
+that is invisible until a total fails to reconcile.
+
+**Why it is a component, and in U-01**: it is the one piece of new logic where a silent error produces
+a *wrong number a person spends money on*. Being pure makes it property-testable without mocks —
+Q4 = A exists for this. Candidate properties: estimate is monotonic in tokens; zero tokens ⇒ zero
+cost; summing per-model estimates equals the estimate over summed tokens; a missing rate is surfaced,
+never treated as zero (FR-10.6.6).
+
+**Interfaces**: called by C-10 (types, tag classification) and C-03 (estimate at read time). Depends
+on nothing in this blueprint. Must satisfy `tools/check`'s core boundary grep.
+
+## C-13 — Telemetry Model (pure)
+
+**Purpose**: the counter record types and every derivation over them. Clock injected, never read.
+
+**Responsibilities**
+- Counter and counter-series types, keyed by `deployment_id` / `agent_id` / `model` (FR-9.3)
+- **`agent_id` defaults to `deployment_id`** (T8) — implemented here so every reader inherits it
+- Rate derivation from numerator + denominator counters, re-aggregatable across agents and windows
+- The three-state classification of NFR-T7 as a closed enum, not free text
+
+**Interfaces**: called by C-11 and C-03. Depends on nothing. Boundary-grep clean.
+
+## C-14 — Declared-Counter Catalog
+
+**Purpose**: carry each blueprint's `telemetry:` declaration to a Lambda that cannot read git.
+
+**Design** (Q2 = A): a pipeline build step walks `blueprints/*/blueprint.yaml`, extracts each
+`telemetry:` block, and writes one catalog JSON baked into the container image. A pure parser in U-01
+reads it.
+
+**Why this component exists at all**: FR-9.4 requires the declaration to live in `blueprint.yaml` and
+FR-9.5.2 requires the reader to honour it as a closed allowlist — but **`blueprint.yaml` is in git and
+the reader is in Lambda**, and this repo has no runtime config distribution. A2 specified both ends
+and no middle. C-14 is the middle.
+
+**Responsibilities**
+- Build step: collect declarations; treat a missing `telemetry:` block as `emits: false`
+  (FR-9.4.2); fail the build on a malformed one
+- Parser: expose the catalog as declared counters with units and descriptions, so the UI renders
+  **generically** and a new emitting blueprint needs no dashboard code change (FR-9.4.3)
+
+**The tradeoff, stated**: a blueprint that starts emitting is invisible until the dashboard is next
+deployed. Acceptable because a merge to `main` redeploys everything, so the lag is one pipeline run —
+and the alternative (SSM at deploy time) requires editing every other blueprint's template, which is
+the cross-track work T6 declined.
+
+## Extensions to existing components
+
+### C-02 Snapshot Store → three keys, three writers, no RMW (Q1 = A)
+
+The store becomes **three objects, one per section**, each with a single owner:
+
+| Key | Writer | Cadence |
+|---|---|---|
+| `inventory/current.json` | C-01 | hourly |
+| `telemetry/current.json` | C-11 | hourly |
+| `cost/current.json` | C-10 | daily |
+
+**This supersedes FR-9.5.3's "additive sibling section" wording** and the "room for a sibling
+top-level key" note in C-02 above. The reason is concrete: with two cadences, one object forces a
+**read-modify-write**, which C-01's design forbids in terms (*"single `put_object`, complete-or-fail,
+CR-05, no read-modify-write"*) and which loses updates when writers overlap. Per-key ownership keeps
+every write complete-or-fail and means no writer ever reads another's data.
+
+**Consequence the UI must carry**: `collected_at` is now **per section**. There is no single "snapshot
+age". This is more honest than the alternative — cost is genuinely ~24–48h stale while inventory is an
+hour stale, and one timestamp over all three would have misrepresented two of them.
+
+### C-03 Read API → new routes, composition, read-time estimation
+- New routes (plan Q6): `/api/cost/summary`, `/api/cost/breakdown`, `/api/usage/models`,
+  `/api/usage/quality`
+- Reads 1–3 objects and composes; a missing or unreadable section degrades **that section only**,
+  never the whole response
+- Applies C-12's estimate at read time, consistent with Q2 = A of the v1 design (derive on read)
+- Every section carries its own `collected_at` and its own NFR-T7 state
+- IAM widens from one key to the three keys — still key-scoped, not bucket-wide
+
+### C-06 Web UI → two new tabs
+- **Financial** (US-16…US-19) and **Adoption** (US-20…US-23), alongside the existing four views
+- Reuses `StateBoundary` unchanged — NFR-T7's three states map onto the component already tested for
+  six, so the honest-empty-state behaviour is inherited rather than reimplemented
+- Estimated figures visually distinct from billed ones (NFR-T1); unattributed spend never rendered as
+  a named group (FR-10.3.6)
+- Shows the dashboard's **own** cost line (plan Q8), because A3.6 makes it material
+
+### C-09 Observability Set → the new collectors
+- Alarms for C-10 and C-11 failure and staleness, mirroring C-01's
+- **Two new log groups**, and CloudWatch is already ~18% of this account's spend (A3.6) — so
+  retention on the new groups is a cost decision, not a default. Short retention, set explicitly.
+- A metric for **CE calls per run** (C-10), so the dashboard's own cost is measurable rather than
+  assumed (NFR-T8)

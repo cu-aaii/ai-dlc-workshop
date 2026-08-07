@@ -26,6 +26,16 @@
 > **Confirmed rather than changed**: FR-10.6's estimate is necessary (in-account Bedrock spend is
 > `$0.0000371` MTD — A3.5); T7 is validated (A3.2); NFR-T4 is now quantified and promoted to
 > **NFR-T8** (A3.6). Every T1–T8 decision still governs.
+>
+> **⚠️ ALSO AMENDED BY DESIGN — see `telemetry-a4-design-2026-08-07.md` (A4).** Two clauses below
+> **cannot be built as written** and were corrected at Application Design:
+> - **FR-9.5.3's "additive sibling section"** — cost is daily while inventory/telemetry are hourly, so
+>   one object forces a **read-modify-write**, which C-01 forbids (*"complete-or-fail, CR-05, no
+>   read-modify-write"*) and which loses updates when writers overlap. Now **three per-section objects**,
+>   one owner each. `collected_at` becomes per-section.
+> - **FR-9.4 / FR-9.5.2** had **no path from the declaration to the reader**: `blueprint.yaml` is in git,
+>   the reader is a Lambda, and this repo has no runtime config distribution. Now **C-14**, a build-time
+>   baked catalog, plus a fixed code-level allowlist for the AWS-emitted namespaces.
 
 ## Why this document rather than edits to `requirements.md`
 

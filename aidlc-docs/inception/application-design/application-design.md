@@ -244,3 +244,159 @@ Approving this design accepts:
 It does **not** decide §6.3 (whether `requirements.md` §4.6 and US-09 are amended to match Q11 = B).
 That is asked separately in `application-design-plan-clarification-2.md` and can be answered after
 this gate.
+
+---
+---
+
+# FR-9 / FR-10 extension — consolidated (2026-08-07)
+
+**Second Application Design pass**, covering FR-9 (usage telemetry) and FR-10 (cost) only. The v1
+design above is unchanged. Decisions: `plans/application-design-plan-fr9-fr10.md` Part A2.
+
+## The four decisions, and what each one turned on
+
+| # | Decision | Turned on |
+|---|---|---|
+| **Q1 = A** | **Three objects, one per section**, each with a single owner — not one object with sibling sections | A2's FR-9.5.3 could not be built as written. Cost is daily, inventory/telemetry hourly, so one object forces a **read-modify-write** — which C-01 forbids in terms (*"complete-or-fail, CR-05, no read-modify-write"*) and which loses updates when writers overlap. |
+| **Q2 = A** | **Baked catalog + fixed AWS allowlist** | FR-9.4 puts declarations in `blueprint.yaml`; FR-9.5.2 makes them a closed allowlist. But `blueprint.yaml` is in **git** and the reader is in **Lambda**, and this repo has no runtime config distribution. A2 specified both ends and no middle; C-14 is the middle. |
+| **Q3 = B** | **Reuse the collector image**, new target + handler, own role + schedule | Least-privilege stays tight (`ce:GetCostAndUsage` alone) and the failure domain stays independent, at the cost of a little template. Follows the existing `collector`/`api` two-target precedent. |
+| **Q4 = A** | **Extend both units** on the existing purity line | Money arithmetic is the one new thing where a silent bug produces a wrong number someone spends against, so it must be pure and property-testable — which means U-01. |
+
+## What is added
+
+**Five new components**: C-10 Cost Collector (U-02), C-11 Telemetry Collector (U-02), C-12 Cost Model
++ Estimator (**U-01, pure**), C-13 Telemetry Model (**U-01, pure**), C-14 Declared-Counter Catalog
+(pure parser + pipeline build step).
+
+**Four extended**: C-02 (three keys, three owners), C-03 (four new routes, composition, read-time
+estimation), C-06 (Financial + Adoption tabs), C-09 (alarms and log groups for two new collectors).
+
+**Three new flows**: daily cost collection, hourly telemetry collection, read-time composition — see
+`services.md`.
+
+## Three design properties worth stating once, plainly
+
+1. **`collected_at` is per-section; there is no single snapshot age.** A direct consequence of Q1 = A,
+   and more honest than the alternative: cost is genuinely 24–48h stale while inventory is an hour
+   stale, so one timestamp over all three would have misrepresented two of them.
+2. **Money is `Decimal`, never `float`.** Cost Explorer returns decimal *strings*; parsing them to
+   `float` puts binary rounding into figures a person acts on. `decimal` is stdlib, so this stays inside
+   U-01's dependency-free boundary.
+3. **Estimation happens at read time, not collection time.** Mirrors v1's Q2 = A. Storing an estimate
+   would freeze it against the rate table in force when it was collected, so fixing a wrong rate would
+   not fix history. Rates change; token counts do not.
+
+## Two failure policies, deliberately different
+
+Same-shaped components, opposite upstream economics:
+
+- **Cost (Flow 4) fails whole.** Any CE call failing writes **nothing**; the previous cost object
+  survives and tomorrow retries. A partially-populated cost object is worse than a stale one, because
+  its missing groups read as *zero spend*.
+- **Telemetry (Flow 5) degrades per counter.** The AWS half and the declared half are independent, and
+  each counter carries its own state. Failing the run would erase real AWS data because an
+  uninstrumented namespace returned nothing.
+
+## Honest delivery status, carried forward from A3
+
+- **Real data**: platform cost totals and by-service breakdown; per-model cost via `USAGE_TYPE`; AWS
+  Bedrock/AgentCore request, token, error and session counts — *tiny* (2 invocations, 14 input tokens
+  over 14 days), because real generation is off-account behind the LiteLLM gateway.
+- **`unattributed`**: cost by blueprint/deployment, until the **Organization payer** activates
+  `cornell:*` cost allocation tags. This account cannot, at any privilege level.
+- **`not instrumented`**: human approval rate, prompt success rate, completed tasks, and therefore
+  cost per completed task — T6 instrumented no blueprint.
+
+All three are distinguishable states in the UI by requirement (NFR-T7), not incidental empty views.
+
+## The namespace inconsistency FR-9.2.3 deferred here — decided
+
+FR-9.2.3 flagged that U-02's own operational metrics use the CloudWatch namespace `Dashboard`, while
+the contract requires `Cornell/Blueprints/<name>`, and left the resolution to this stage.
+
+**Decision: keep both, unchanged, because they are not the same kind of metric.**
+
+| Namespace | Carries | Required by |
+|---|---|---|
+| `Dashboard` | the dashboard's **operational** health — collector duration, outcomes, resources collected | US-14, RESILIENCY-05 |
+| `Cornell/Blueprints/<name>` | a blueprint's **business usage** counters | FR-9.2.3 |
+
+They answer different questions ("is the dashboard healthy" vs "how much is this application used"),
+so one namespace holding both would conflate them. Renaming `Dashboard` was rejected on a concrete
+ground: the shipped alarms name it literally, and `emf.py` records that it is *"kept short and fixed so
+alarms name it literally"* — a rename is a breaking change to deployed alarms for a cosmetic gain.
+
+**The rule this sets**: if the dashboard ever emits *usage* counters about itself — API hits, views
+rendered — those go to `Cornell/Blueprints/dashboard` and are read by C-11 like any other blueprint's,
+while `Dashboard` stays operational-only. The dashboard is then an emitter and a consumer at once,
+which the contract already permits (`composable-dashboards.md` §3).
+
+## Requirements amended by this stage
+
+- **FR-9.5.3** — "additive sibling section" → three per-section objects. Recorded in
+  `amendments/telemetry-a4-design-2026-08-07.md`.
+- **FR-9.4 / FR-9.5.2** — gain the missing middle: the declaration reaches the reader via C-14's
+  build-time catalog; the AWS-emitted half uses a fixed code-level allowlist. Same amendment.
+
+## What this stage did NOT decide
+
+Left to Functional Design / NFR Design / Infrastructure Design, deliberately:
+
+- Exact CE query shapes, granularities, and the resulting call count per run (NFR-T8's budget)
+- The metric window and period for `GetMetricData`, and how partial windows are presented
+- Whether the two new schedules are one EventBridge rule with two targets or two rules
+- Template layout: which stack the new Lambdas and schedules live in (`dashboard.yml` vs a new one)
+- The per-model rate values themselves — still open per FR-10.8 item 3 (pricing-page data)
+
+## Coverage validation (plan step B7)
+
+Every FR-9/FR-10 clause and every US-16…US-25 story has a component home. Gaps are named, not implied.
+
+| Requirement | Home |
+|---|---|
+| FR-9.1 contract + graceful non-participation | C-14 (declaration), C-11 (state), C-06 (render) |
+| FR-9.2 EMF emission mechanism | **Not this blueprint's code** — the emitting side is each blueprint's. C-11 reads the result. Correct per T6. |
+| FR-9.3 dimensions, `agent_id` defaults to `deployment_id` | C-13 `counter_key()` |
+| FR-9.4 manifest declaration, `emits: false` first-class | C-14 (amended by A4.2) |
+| FR-9.5 reader, closed allowlist, additive storage | C-11 + C-14; storage per A4.1 |
+| FR-9.6 required counters, rates from two counters | C-11 (collect), C-13 (`derive_rate`) |
+| FR-9.7 no emitter; three distinct states | C-13 `classify()`, C-03 `section_state()`, C-06 |
+| FR-10.1 Cost Explorer | C-10 |
+| FR-10.2 day / MTD / YTD, no budget | C-10 `fetch_windows()`, C-03 `cost_summary()` |
+| FR-10.3 breakdown; asymmetric agent split | C-10 `fetch_groupings()`, C-03 `cost_breakdown()` |
+| **FR-10.3.6 unattributed-group trap** | C-12 `is_unattributed()` / `split_attribution()` — pure, so property-testable |
+| FR-10.4 separate daily schedule, bounded calls | C-10 + its EventBridge rule; call count emitted |
+| FR-10.5 activation, non-retroactivity, lag, denial | C-10 classification + C-06 states |
+| FR-10.6 estimate, labelled, configurable rates | C-12 `estimate_model_cost()`, rates from SSM, C-06 labelling |
+| FR-10.7 cost per completed task | C-12 `cost_per_task()` |
+| FR-10.8 verify-before-build | **Items 1–2 answered by A3.4.** Item 3 (per-model rates) is still open and is *data*, not design — NFR-T2's configurable table is the mitigation. |
+| FR-10.9 no per-user attribution | **Prohibition** — verified by absence, as FR-5.4 is |
+| NFR-T1 estimates distinguishable | C-06 |
+| NFR-T2 rate table configurable | SSM + C-12 `parse_rate_table()` |
+| NFR-T3 low-cardinality, no PII dimensions | C-13 key construction; no user dimension exists to leak |
+| NFR-T4 / **NFR-T8** bounded own cost | C-10 call budget + `ce_calls` metric; C-09 short retention on new log groups |
+| NFR-T5 closed allowlist | C-14 catalog (declared) + C-11 module constant (AWS) |
+| NFR-T6 least-privilege IAM | Per-collector roles, each scoped to one CE/CW action set and one S3 key |
+| NFR-T7 three states per panel | C-13 enum → C-03 → C-06 |
+
+| Story | Home |
+|---|---|
+| US-16 cost totals, per-section age | C-10, C-03 `cost_summary()`, C-06 Financial |
+| US-17 breakdown + **unattributed criteria** | C-10, C-12 `split_attribution()`, C-06 |
+| US-18 estimated model cost, labelled | C-12, C-06 |
+| US-19 cost per completed task | C-12 `cost_per_task()` |
+| US-20 usage by model | C-11 (AWS half — real data), C-03 `usage_models()` |
+| US-21 error / timeout rate | C-11 (`InvocationClientErrors` real; timeout push-only), C-13 `derive_rate()` |
+| US-22 approval / success rate | C-14 + C-11 declared half — *not instrumented* on delivery, by design |
+| US-23 per-agent attribution | C-13 `counter_key()` / `aggregate_by_agent()` |
+| US-24 [Enabler] the contract | C-14, C-13, C-11's allowlist |
+| US-25 [Enabler] cheap cost collection | C-10 budget + metric, C-09 retention, per-collector roles |
+
+**Two coverage gaps, named rather than papered over:**
+1. **FR-9.2's emission mechanism has no component here**, and should not — T6 put the emitting side in
+   other blueprints. This blueprint specifies and reads it. A reviewer expecting an emitter should read
+   FR-9.7.1.
+2. **FR-10.8 item 3 (per-model rates) has no design answer** because it is pricing data, not a design
+   question. NFR-T2 is the mitigation: the table is configuration, so a wrong rate is corrected without
+   a deploy. Until it is populated, C-12 returns its missing-rate result and the UI shows *not
+   instrumented* rather than a zero price.

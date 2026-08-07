@@ -169,3 +169,68 @@ is an obligation nobody implements.
 
 The last row is the only obligation in this table that is narrower than the rule it cites. It is
 recorded as such in `application-design.md` rather than presented as full compliance.
+
+---
+---
+
+# FR-9 / FR-10 extension (2026-08-07)
+
+## Dependency matrix (new components)
+
+| Component | Depends on | Depended on by | Unit |
+|---|---|---|---|
+| C-10 Cost Collector | Cost Explorer (upstream), C-02, C-12 | — (nothing depends on a collector) | U-02 |
+| C-11 Telemetry Collector | CloudWatch (upstream), C-02, C-13, C-14 | — | U-02 |
+| C-12 Cost Model + Estimator | **nothing** | C-10, C-03 | U-01 |
+| C-13 Telemetry Model | **nothing** | C-11, C-03 | U-01 |
+| C-14 Catalog | **nothing** (parser); pipeline build step produces it | C-11, C-03 | U-01 + pipeline |
+| C-02 Snapshot Store *(extended)* | — | C-01, C-10, C-11 write; C-03 reads | U-02 |
+| C-03 Read API *(extended)* | C-02, C-04, C-05, C-12, C-13, C-14, SSM | C-06 | U-02 |
+
+C-12, C-13 and C-14's parser depend on **nothing** — the same property that makes C-04/C-05
+property-testable without AWS, and what keeps `tools/check`'s core-boundary grep passing.
+
+## Data flow
+
+```
+                    ┌─────────────── C-02 Snapshot Store (3 keys, 3 owners) ──────────────┐
+                    │                                                                     │
+ EventBridge hourly │   inventory/current.json  <── C-01  (tag:GetResources)               │
+ EventBridge hourly │   telemetry/current.json  <── C-11  (cloudwatch:GetMetricData)       │
+ EventBridge daily  │   cost/current.json       <── C-10  (ce:GetCostAndUsage)             │
+                    └───────────────────────────────┬─────────────────────────────────────┘
+                                                    │  GetObject x3 (independent)
+                                                    ▼
+   SSM /<app>/<env>/dashboard/model-rates ──────> C-03 Read API ──> C-12 estimate
+   C-14 baked catalog (in image) ───────────────>              └──> C-13 derive
+                                                    │
+                                                    ▼  per-section data + collected_at + state
+                                          C-07 edge ──> C-06 UI (Financial / Adoption tabs)
+```
+
+## Communication patterns
+
+| Edge | Pattern | Note |
+|---|---|---|
+| EventBridge → C-10 / C-11 | async, scheduled | Two schedules, two rules; cadences are stack parameters |
+| C-10 / C-11 → C-02 | single `PutObject` per run | Complete-or-fail. **No RMW anywhere** (Q1 = A) |
+| C-03 → C-02 | three independent `GetObject` | One failure degrades one section only |
+| C-03 → SSM | read at invocation, cached | Rate table; missing ⇒ explicit state, never zero |
+| C-14 → C-11 / C-03 | baked into the image | Build-time, not runtime — the Lambda cannot read git |
+| C-11 → CloudWatch | read, fixed metric allowlist | Only `ModelId` **values** are discovered |
+
+## Coupling concerns, recorded
+
+1. **Three writers, one bucket.** Isolation is by key prefix plus per-role IAM: each collector's role
+   can write **only** its own key. That is what makes "no writer reads another's data" enforced rather
+   than merely intended.
+2. **C-03 now depends on six components and two external config sources.** It is the composition
+   point, so this is expected — but it makes C-03 the place where a partial-failure bug would be most
+   costly, which is why per-section independence is stated as a rule in `services.md` rather than left
+   to implementation.
+3. **C-14 couples the dashboard's deploy to other blueprints' declarations.** A new emitter is invisible
+   until the next pipeline run. Accepted (Q2 = A); the alternative required editing every other
+   blueprint's template.
+4. **The upstreams have opposite failure economics.** Cost Explorer is expensive per call and slow to
+   change, so Flow 4 fails whole and retries tomorrow. CloudWatch is cheap and continuous, so Flow 5
+   degrades per-counter. Same-shaped components, deliberately different failure policies.

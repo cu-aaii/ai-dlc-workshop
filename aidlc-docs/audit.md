@@ -713,3 +713,52 @@ Confirmed no dashboard stacks are deployed, so SEC-7/A-4/P-6/R-8 remain unverifi
 open: per-model rates for the estimator table — pricing-page data, and web access was unavailable."
 **Context**: INCEPTION — A3 amends the approved A2. Next stage remains **Application Design for
 FR-9/FR-10**, now with measured inputs instead of quarantined unknowns.
+
+---
+
+## Application Design — FR-9/FR-10 pass
+**Timestamp**: 2026-08-07T00:00:00Z
+**User Input**: "yes" (start Application Design), then Q1–Q4 answered as recommended.
+**Files Generated**: `plans/application-design-plan-fr9-fr10.md`;
+`amendments/telemetry-a4-design-2026-08-07.md`; FR-9/FR-10 sections appended to `components.md`,
+`component-methods.md`, `services.md`, `component-dependency.md`, `application-design.md`.
+**AI Response**: "Designing against A2/A3 surfaced **two clauses in the approved requirements that
+cannot be built as written**, which is what this stage is for.
+
+**FR-9.5.3** said telemetry lands as an 'additive sibling section' in the existing snapshot object. But
+FR-10.4 puts cost on a daily schedule while inventory and telemetry are hourly — three sections in one
+object means the daily writer must read, splice and rewrite, i.e. a **read-modify-write**. C-01 forbids
+exactly that in terms ('single put_object, complete-or-fail, CR-05, no read-modify-write'), and two
+writers on one object lose updates with no compare-and-swap available. Resolved as **three objects, one
+owner each**, IAM-scoped per key. Consequence is an improvement: `collected_at` becomes per-section,
+which is honest — cost is 24–48h stale, inventory an hour, and one timestamp would have misstated two
+of three.
+
+**FR-9.4/FR-9.5.2** required declarations in `blueprint.yaml` and a closed allowlist over them — but
+`blueprint.yaml` is in **git** and the reader is a **Lambda**, and this repo has no runtime config
+distribution. A2 specified both ends and no middle, which made FR-9.5.2 unimplementable. Resolved with
+**C-14**: a pipeline build step bakes the declarations into the image, plus a **fixed module-level
+allowlist** for the AWS-emitted namespaces (which no manifest declares, so a catalog cannot cover them).
+Only `ModelId` dimension *values* are discovered — never which metrics to read, so NFR-T5 holds for
+both sources. Both corrections are recorded as **A4**.
+
+Five components added — C-10 Cost Collector, C-11 Telemetry Collector, C-12 Cost Model + Estimator,
+C-13 Telemetry Model, C-14 Catalog — with C-12/C-13 in **U-01** because money arithmetic is the one new
+place a silent bug yields a wrong number someone spends against, and purity is what makes it
+property-testable. Specified **`Decimal`, never `float`** for money: Cost Explorer returns decimal
+strings and `float` would put binary rounding into figures a person acts on; `decimal` is stdlib so
+U-01 stays dependency-free.
+
+Gave the two collectors **deliberately opposite failure policies**, which is the non-obvious call here:
+cost **fails whole** and retries tomorrow, because a partially-populated cost object reads as *zero
+spend*; telemetry **degrades per counter**, because failing the run would erase real AWS data merely
+because an uninstrumented namespace returned nothing. Same component shape, opposite upstream
+economics.
+
+Coverage table maps every FR-9/FR-10 clause and every US-16…US-25 story to a component, and names the
+two real gaps rather than implying coverage: FR-9.2's emission mechanism has no component here **and
+should not** (T6 put the emitting side in other blueprints), and FR-10.8 item 3 (per-model rates) has no
+design answer because it is pricing data — NFR-T2's configurable table is the mitigation. `tools/check`
+green throughout; no code was written."
+**Context**: INCEPTION — Application Design for FR-9/FR-10 complete; **awaiting approval**. Next would
+be Units Generation / per-unit CONSTRUCTION for the new components.

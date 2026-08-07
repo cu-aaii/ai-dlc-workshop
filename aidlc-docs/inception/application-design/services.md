@@ -116,3 +116,79 @@ bucket to exist, but the bucket is created by the stack the Build stage precedes
 moves to a separately-deployed stack, or the sync moves after BlueprintDeploy, or the bucket name is
 resolved at sync time from a known convention. This is genuinely an infrastructure-topology decision
 and is recorded rather than guessed here.
+
+---
+---
+
+# FR-9 / FR-10 extension (2026-08-07)
+
+Three flows are added. The v1 inventory flow is unchanged.
+
+## Flow 4 — Daily cost collection (C-10)
+
+```
+EventBridge (daily, stack parameter)
+  └─> C-10 Cost Collector
+        ├─> ce:GetCostAndUsage  x N   (N bounded and counted -- $0.01 each)
+        │     ├─ windows: day / month-to-date / year-to-date        (US-16)
+        │     ├─ GROUP BY SERVICE                                    (US-16)
+        │     ├─ GROUP BY USAGE_TYPE   -> per-model cost             (A3.4)
+        │     └─ GROUP BY TAG cornell:blueprint / :deployment-id     (US-17)
+        ├─> C-12.split_attribution()  -- "cornell:blueprint$" => UNATTRIBUTED, not a group name
+        ├─> EMF: ce_calls, outcome, unattributed_fraction
+        └─> ONE PutObject -> cost/current.json          (complete-or-fail, no RMW)
+```
+
+**Orchestration rule**: any CE call failing fails the whole run and writes **nothing** — the previous
+`cost/current.json` survives and the next day retries, exactly as C-01 treats inventory (A-4,
+SECURITY-15). A partially-populated cost object would be worse than a stale one, because the missing
+groups would read as zero spend.
+
+## Flow 5 — Hourly telemetry collection (C-11)
+
+```
+EventBridge (hourly)
+  └─> C-11 Telemetry Collector
+        ├─> cloudwatch:ListMetrics    -> ModelId VALUES only (never which metrics)
+        ├─> cloudwatch:GetMetricData
+        │     ├─ FIXED allowlist: AWS/Bedrock, AWS/Bedrock-AgentCore      (A3.1, A3.2)
+        │     └─ catalog-declared only: Cornell/Blueprints/*              (NFR-T5)
+        ├─> C-13.classify() per counter -> NOT_INSTRUMENTED / NO_DATA_YET / CANNOT_READ / OK
+        └─> ONE PutObject -> telemetry/current.json
+```
+
+**Orchestration rule, and it differs from Flow 4 deliberately**: the two halves are **independent**.
+If `Cornell/Blueprints/*` cannot be read, the AWS half still writes, and vice versa — each counter
+carries its own state. Failing the whole run would erase real AWS data because an uninstrumented
+namespace returned nothing, which is the opposite of the honesty NFR-T7 requires.
+
+## Flow 6 — Read-time composition (C-03)
+
+```
+Browser -> C-07 edge -> API Gateway -> C-03
+  ├─> load inventory/current.json    (may be ABSENT/UNREADABLE -- independent)
+  ├─> load telemetry/current.json    (independent)
+  ├─> load cost/current.json         (independent)
+  ├─> C-12.estimate_model_cost(tokens from telemetry, rates from SSM)   <- FR-10.6, at read time
+  ├─> C-13 derivations (rates, per-agent aggregation)
+  └─> response: per-section data + per-section collected_at + per-section state
+```
+
+**The rate table** is read from SSM (`/<app>/<env>/dashboard/model-rates`) and cached per invocation.
+A missing or malformed table yields C-12's missing-rate result and the *not instrumented* state for
+estimated cost — **never** a zero price (FR-10.6.6, NFR-T2).
+
+**Why estimation is read-time, not collection-time**: it mirrors the v1 decision (Q2 = A, "aggregation
+at read time; the snapshot holds raw data"). Storing an estimate would freeze it against the rate table
+in force at collection, so correcting a wrong rate would not correct history. Rates change; tokens do
+not.
+
+## Service boundaries — what must not happen
+
+| Rule | Why |
+|---|---|
+| No writer reads another writer's object | Keeps every write complete-or-fail; removes the lost-update race that made Q1 = A necessary |
+| A read never triggers a collection | v1's invariant (FR-2.1, US-07), unchanged and now covering three sections |
+| No section's failure degrades another | US-16/US-17 must be able to show cost while usage is uninstrumented, and vice versa |
+| Rates are never baked into stored data | NFR-T2 — configuration must be correctable without a redeploy or a rewrite |
+| The CE call count is bounded and emitted | NFR-T8 — a cost dashboard must be able to prove it is not itself a material cost |
