@@ -58,11 +58,9 @@ body {
   inline-size: auto;
   padding-inline-end: 12px; /* >= 1/4 seal diameter clear space, as fixed padding */
 }
-.masthead-divider {
-  inline-size: 1px;
-  block-size: 28px;
-  background: rgba(255, 255, 255, 0.6);
-}
+/* No .masthead-divider rule, deliberately. A hairline between the mark and the title would
+   construct the academic lockup that contracts/ui-design-language.md §3.1 restricts to colleges and
+   schools. Do not add one back. */
 .masthead-title {
   font-family: var(--heading-font);
   font-size: 20px;
