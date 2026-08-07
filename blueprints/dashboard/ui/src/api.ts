@@ -21,3 +21,22 @@ export async function fetchEnvelope<T>(path: string): Promise<ViewState<T>> {
     return { kind: "failed", httpStatus: 0 };
   }
 }
+
+// Sections use a different envelope (see types.ts): state travels in the body and the status is
+// always 200, so a missing cost object must NOT be treated as a failed request.
+export async function fetchSection<T>(
+  path: string,
+): Promise<import("./types").SectionViewState<T>> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) {
+      return { kind: "failed", httpStatus: res.status };
+    }
+    const envelope = (await res.json()) as import("./types").SectionEnvelope<T>;
+    return { kind: "ready", envelope };
+  } catch {
+    return { kind: "failed", httpStatus: 0 };
+  }
+}

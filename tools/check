@@ -104,6 +104,15 @@ echo '==> dashboard tests'
 )
 
 echo
+echo '==> dashboard telemetry catalog'
+# The catalog is generated from every blueprint's `telemetry:` block, committed, and baked into the
+# container image -- because blueprint.yaml lives in git and the reader is a Lambda, and this repo has
+# no runtime config distribution. Same bargain as uv.lock: generated, committed, verified. Without
+# this check the committed catalog could silently disagree with the manifests it came from, and the
+# dashboard would show a blueprint as "not instrumented" after it started emitting.
+uv run --quiet blueprints/dashboard/tools/gen_telemetry_catalog.py --check
+
+echo
 echo '==> dashboard core boundary'
 # U-01 Domain Core is pure by contract, not by convention: no AWS SDK, no environment read, no
 # clock, no logging, no serialization format other than JSON. Ten property-based tests depend on

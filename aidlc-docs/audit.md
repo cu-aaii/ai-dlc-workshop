@@ -814,3 +814,46 @@ committed as a generated file validated by `tools/check`. Deciding it needs the 
 me, which is Code Generation's first task."
 **Context**: CONSTRUCTION — design stages complete; **awaiting approval before Code Generation**, the
 first stage in this pass that writes code and templates.
+
+## CONSTRUCTION — FR-9/FR-10 Code Generation + Build and Test
+**Timestamp**: 2026-08-07T00:00:00Z
+**User Input**: "just run it if there are no open questions that need answering"
+**Build Status**: Success — wheel builds and **contains the baked catalog**; UI bundle builds with 0
+inline script bodies. `docker build` NOT re-run (daemon down); image shape unchanged.
+**Test Status**: `tools/check` exit 0, stable over three runs — 198 dashboard / 77 builder-mcp / 49
+teams-bot, mypy clean (52 files), boundary clean, cfn-lint clean, catalog drift green, 15 vitest.
+**Mutation spot-check**: 6/6 caught on the money and telemetry invariants.
+**AI Response**: "Resolved the one open question first — C-14's catalog is a **generated, committed
+file** validated by a new `tools/check` gate, not generated in the container build. The deciding fact
+was that `ArmContainerBuildProject` is **shared by every blueprint**, so a dashboard-specific step
+there would pollute a common project; committing it also means zero pipeline bytes for the catalog.
+
+Three real defects surfaced by building it, which is the argument for building it:
+1. `parse_catalog` dropped non-emitting blueprints, so `not_instrumented` was **always empty** — the UI
+   would have rendered a blank panel instead of naming the seven blueprints that report nothing, which
+   is precisely what FR-9.7.3 exists to prevent. Added `Catalog.known` plus a regression test.
+2. My new CSS referenced `var(--muted)` and `.muted`, **neither of which existed**. Defining it
+   properly mattered more than it sounds: the obvious reuse, `--border` (`#767676`), measures **4.24:1
+   on `#f7f7f7`** — fine for a boundary, short of AA for text. Measured candidates and took `#6b6b6b`
+   (5.33:1 white, 4.97:1 gray), the lightest that clears 4.5 on both surfaces.
+3. The existing `test_api_routing.py` closed-allowlist **property failed** once the four routes landed:
+   Hypothesis generated one of them and found it resolving while `_KNOWN` still listed five. That is
+   the property doing its job — widening an allowlist should force someone to declare it — so I updated
+   `_KNOWN`, recorded why in the module docstring, and added dispatch tests.
+
+Also caught myself mid-run: a mutation-testing script used `cp` to restore and hit an interactive
+overwrite prompt, so it timed out **leaving a mutation in the working tree**. Rewrote it to restore in
+a `finally` block, verified restoration with the full suite, and re-ran clean at 6/6. Worth recording
+because a mutation harness that can leave the tree mutated is worse than none.
+
+Kept the two collectors' opposite failure policies visible in code and tests: cost fails whole and
+writes nothing, telemetry degrades per half. Shipped `ModelRatesParameter` empty, so every model reports
+*rate missing* rather than a zero price. Gave `ACCESS_DENIED` its own alarm whose description says to
+escalate rather than retry, because only the Organization payer can clear it.
+
+Reclaimed 636 bytes in `pipeline.yml` by condensing comment prose to docs that already hold the detail —
+811 bytes free now, up from 234. No merge to `main`; CONSTRUCTION ends here as it did for U-01/U-02."
+**Residual**: `docker build` not re-run this pass; per-model rates still unset (FR-10.8 item 3); cost
+attribution still blocked on the payer account (A3.3); the four v1 `deployed`-only requirements
+unchanged.
+**Context**: CONSTRUCTION complete for the FR-9/FR-10 increment. **Awaiting approval.**

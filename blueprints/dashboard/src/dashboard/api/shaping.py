@@ -87,3 +87,19 @@ def shape(outcome: LoadOutcome, view: View, now: datetime, stale_after: timedelt
             "data": view(snapshot),
         },
     )
+
+
+def section_response(body: dict[str, Any]) -> dict[str, Any]:
+    """Shape an FR-9/FR-10 section response (A4.1).
+
+    Unlike `shape`, the HTTP status is **always 200**: a section's absence or unreadability is carried
+    in its own `state` field, not in the status code. That differs from the inventory path on purpose.
+    The inventory snapshot is the whole response, so a failure there is a failure of the request; a
+    section is one of three independent parts, and returning 503 because *cost* is absent would hide a
+    perfectly good *usage* payload. `state` is what the UI reads, and it is never absent.
+    """
+    return {
+        "statusCode": 200,
+        "headers": {"content-type": "application/json"},
+        "body": json.dumps({"status": "ok", **body}, separators=(",", ":")),
+    }

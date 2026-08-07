@@ -21,9 +21,10 @@ from typing import Any
 
 import boto3
 
-from dashboard.api import routing, shaping
+from dashboard.api import routing, section_views, shaping
 from dashboard.api.config import ApiConfig
 from dashboard.api.loading import load_current_snapshot
+from dashboard.api.sections import SectionRoute, load_section
 from dashboard.shared.logging_json import get_logger
 
 LOG = get_logger("dashboard.api")
@@ -49,6 +50,8 @@ def run(
         view = routing.route(method, path)
         if view is None:
             return shaping.error_response(404)
+        if isinstance(view, SectionRoute):
+            return _serve_section(view, config=config, s3_client=s3_client)
         if isinstance(view, str):  # the HEALTH sentinel; narrows `view` to a View below
             return shaping.health()
         outcome = load_current_snapshot(s3_client, config.snapshot_bucket, config.snapshot_key)
@@ -57,6 +60,38 @@ def run(
         # Generic 503, no internals. One place, so a new route cannot undo AR-06 by forgetting it.
         LOG.exception("unhandled error in api handler")
         return shaping.error_response(503)
+
+
+def _serve_section(
+    route: SectionRoute, *, config: ApiConfig, s3_client: object
+) -> dict[str, Any]:
+    """Serve one FR-9/FR-10 route.
+
+    Loads **only** the sections that route needs, and each load is total -- so an absent cost object
+    does not affect a usage response, and vice versa. That per-section independence is a requirement
+    (FR-9.5.5, US-16/US-20), not an optimisation: a viewer must be able to see cost while usage is
+    uninstrumented.
+
+    Still inside `run`'s outer boundary, so a fault here becomes the same generic 503 (AR-06).
+    """
+    if route in (SectionRoute.COST_SUMMARY, SectionRoute.COST_BREAKDOWN):
+        cost = load_section(s3_client, config.snapshot_bucket, config.cost_key)
+        if route is SectionRoute.COST_SUMMARY:
+            body = section_views.cost_summary(cost)
+            # US-19 rides on the summary: it needs both sections, so it reports the worse state.
+            telemetry = load_section(
+                s3_client, config.snapshot_bucket, config.telemetry_key
+            )
+            body["per_task"] = section_views.cost_per_completed_task(cost, telemetry)
+            return shaping.section_response(body)
+        return shaping.section_response(section_views.cost_breakdown(cost))
+
+    telemetry = load_section(s3_client, config.snapshot_bucket, config.telemetry_key)
+    if route is SectionRoute.USAGE_MODELS:
+        return shaping.section_response(
+            section_views.usage_models(telemetry, config.model_rates)
+        )
+    return shaping.section_response(section_views.usage_quality(telemetry))
 
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:

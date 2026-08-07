@@ -6,6 +6,8 @@ import { InventoryView } from "./components/InventoryView";
 import { GroupingView } from "./components/GroupingView";
 import { TagGapView } from "./components/TagGapView";
 import { StatusView } from "./components/StatusView";
+import { FinancialView } from "./components/FinancialView";
+import { AdoptionView } from "./components/AdoptionView";
 import type { ViewName } from "./types";
 
 // One URL for the whole app (Q4 = A): view is local state, no router. Switching a tab remounts the
@@ -24,6 +26,8 @@ export function App() {
         {view === "grouping" && <GroupingView />}
         {view === "tag-gaps" && <TagGapView />}
         {view === "status" && <StatusView />}
+        {view === "financial" && <FinancialView />}
+        {view === "adoption" && <AdoptionView />}
       </main>
     </>
   );

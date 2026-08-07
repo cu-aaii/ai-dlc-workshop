@@ -14,6 +14,7 @@ from typing import Any
 
 from dashboard.core import REQUIRED_TAGS, Snapshot
 from dashboard.api import views
+from dashboard.api.sections import SectionRoute
 
 # A view maps a Snapshot to the response's `data`. The health sentinel is handled specially by the
 # handler (it does no S3 read), so it needs no snapshot.
@@ -21,6 +22,16 @@ View = Callable[[Snapshot], Any]
 
 HEALTH = "health"
 """Sentinel returned for /api/health so the handler can skip the S3 read (AR-08)."""
+
+_SECTIONS: dict[str, SectionRoute] = {
+    "/api/cost/summary": SectionRoute.COST_SUMMARY,
+    "/api/cost/breakdown": SectionRoute.COST_BREAKDOWN,
+    "/api/usage/models": SectionRoute.USAGE_MODELS,
+    "/api/usage/quality": SectionRoute.USAGE_QUALITY,
+}
+"""The FR-9/FR-10 routes. Still a closed table, so SEC-5 input validation stays structural: these
+read the cost/telemetry sections rather than the inventory snapshot, so the handler dispatches on the
+returned `SectionRoute` instead of calling a Snapshot view."""
 
 _GROUPS_PREFIX = "/api/groups/"
 
@@ -31,7 +42,7 @@ _STATIC: dict[str, View] = {
 }
 
 
-def route(method: str | None, path: str | None) -> View | str | None:
+def route(method: str | None, path: str | None) -> View | SectionRoute | str | None:
     """Resolve `(method, path)` to a view, the `HEALTH` sentinel, or `None` (→ 404).
 
     Returns before any S3 access, so an unknown route never touches storage (AR-01).
@@ -40,6 +51,9 @@ def route(method: str | None, path: str | None) -> View | str | None:
         return None
     if path == "/api/health":
         return HEALTH
+    section = _SECTIONS.get(path)
+    if section is not None:
+        return section
     static = _STATIC.get(path)
     if static is not None:
         return static

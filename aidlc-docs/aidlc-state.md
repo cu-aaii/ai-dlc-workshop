@@ -967,3 +967,44 @@ Needs the buildspec in front of me.
 leave ~70; comment condensation is part of the work, not a contingency.
 
 **Awaiting approval before Code Generation** — the first stage in this pass that writes code.
+
+### Code Generation + Build and Test — FR-9/FR-10 — COMPLETE 2026-08-07
+**`tools/check` exit 0**, stable across three consecutive runs: **198 dashboard tests** (was 101),
+77 builder-mcp, 49 teams-bot; mypy clean on **52 source files**; core boundary clean; cfn-lint clean;
+catalog drift check green. **UI**: 15 vitest (was 8), `tsc` clean, `npm run build` clean, **0 inline
+script bodies** in the built HTML (verified after stripping comments — an earlier grep of mine matched
+the comment that documents the rule, so the check now parses instead).
+
+**Written** — U-01 pure: `core/money.py` (C-12), `core/telemetry.py` (C-13), `core/catalog.py` (C-14
+parser). U-02: `cost/` (config/errors/explorer/handler), `telemetry/`
+(config/metrics/catalog_loader/handler), `api/sections.py` + `api/section_views.py`, four new routes.
+UI: `SectionBoundary`, `FinancialView`, `AdoptionView`, `useSection`, two new tabs. Infra: 2 functions,
+2 roles, 2 schedules, 4 alarms, `ModelRatesParameter`. Tooling: `tools/gen_telemetry_catalog.py` +
+a `tools/check` drift gate.
+
+**Mutation spot-check: 6/6 caught** — `is_unattributed` always False (the A3.3 trap), missing rate
+priced as zero, no-tasks guard removed, `agent_id` default dropped, zero-denominator guard removed, CE
+call budget not enforced.
+
+**Three real defects found by building it**, each fixed and regression-tested:
+1. `parse_catalog` dropped non-emitting blueprints, so `not_instrumented` was always empty — the UI
+   would have shown an unexplained blank panel instead of naming the seven blueprints that report
+   nothing (FR-9.7.3). Added `Catalog.known`.
+2. The new CSS used `var(--muted)` and `.muted`, **neither of which existed**. Defined `--muted:
+   #6b6b6b` — measured 5.33:1 on white, 4.97:1 on `#f7f7f7`. Reusing `--border` (`#767676`) would have
+   been a quiet 1.4.3 failure at **4.24:1** on the gray surface.
+3. `test_api_routing.py`'s closed-allowlist property **failed**, because Hypothesis generated one of
+   the new paths and found it resolving while `_KNOWN` listed only the original five. The property
+   working exactly as intended; `_KNOWN` updated and two dispatch tests added.
+
+**Packaging verified without Docker** (daemon down again): built the wheel and confirmed
+`dashboard/telemetry_catalog.json` is inside it, so the Lambda can load the baked catalog. `docker
+build` itself was **not** re-run this pass — the images are unchanged in shape (same two targets), but
+that is the one residual gap, closable when the daemon is up.
+
+**`pipeline.yml`**: one parameter added, then **636 bytes reclaimed** by condensing teams-bot and
+knowledgebase comment prose (pointing at docs that already carry the detail, never deleting rationale).
+50,389 / 51,200 bytes — **811 free**, up from 234.
+
+**Still open, unchanged**: per-model rates (FR-10.8 item 3 — pricing data; the table ships empty on
+purpose), and cost attribution blocked on the Organization payer activating `cornell:*` (A3.3).

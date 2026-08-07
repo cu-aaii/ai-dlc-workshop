@@ -37,12 +37,48 @@ from dashboard.core.aggregation import (
     group_by_tag,
     has_required_tag,
 )
+from dashboard.core.catalog import (
+    Catalog,
+    DeclaredCounter,
+    MalformedCatalog,
+    declared_counters,
+    emits,
+    parse_catalog,
+)
 from dashboard.core.errors import (
     CoreError,
     IncompatibleSchema,
     InvalidSnapshot,
     MalformedResource,
     SkipReason,
+)
+from dashboard.core.money import (
+    AttributionSplit,
+    CostEstimate,
+    CostGroup,
+    MalformedRateTable,
+    ModelRate,
+    ModelUsage,
+    PerTaskOutcome,
+    PerTaskResult,
+    RateTable,
+    cost_per_task,
+    estimate_model_cost,
+    is_unattributed,
+    parse_amount,
+    parse_rate_table,
+    split_attribution,
+)
+from dashboard.core.telemetry import (
+    Counter,
+    CounterKey,
+    CounterSeries,
+    RateResult,
+    TelemetryState,
+    aggregate_by_agent,
+    counter_key,
+    derive_rate,
+    total_tokens_by_model,
 )
 from dashboard.core.model import (
     REQUIRED_TAGS,
@@ -61,6 +97,40 @@ __all__ = [
     # Constants
     "REQUIRED_TAGS",
     "SCHEMA_VERSION",
+    # --- FR-9 / FR-10 additions (C-12 money, C-13 telemetry, C-14 catalog) ---
+    # Money (C-12). Every monetary value is Decimal, never float (COST-01).
+    "AttributionSplit",
+    "CostEstimate",
+    "CostGroup",
+    "MalformedRateTable",
+    "ModelRate",
+    "ModelUsage",
+    "PerTaskOutcome",
+    "PerTaskResult",
+    "RateTable",
+    "cost_per_task",
+    "estimate_model_cost",
+    "is_unattributed",
+    "parse_amount",
+    "parse_rate_table",
+    "split_attribution",
+    # Telemetry (C-13). agent_id defaults to deployment_id in counter_key (TEL-01).
+    "Counter",
+    "CounterKey",
+    "CounterSeries",
+    "RateResult",
+    "TelemetryState",
+    "aggregate_by_agent",
+    "counter_key",
+    "derive_rate",
+    "total_tokens_by_model",
+    # Catalog (C-14). Parser only -- loading the file is U-02's job (CAT-04).
+    "Catalog",
+    "DeclaredCounter",
+    "MalformedCatalog",
+    "declared_counters",
+    "emits",
+    "parse_catalog",
     # Entities
     "Freshness",
     "Group",

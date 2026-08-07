@@ -17,6 +17,13 @@ class ApiConfig:
     snapshot_bucket: str
     snapshot_key: str
     stale_after: timedelta
+    # A4.1: three per-section keys, not one snapshot object. Each has a single writer, so no
+    # read-modify-write is ever needed and each section carries its own age.
+    cost_key: str = "cost/current.json"
+    telemetry_key: str = "telemetry/current.json"
+    # The rate table's JSON, resolved from SSM at deploy time into the environment. Empty means no
+    # rates are configured, which surfaces as "rate missing" rather than as a zero price (COST-14).
+    model_rates: str | None = None
 
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "ApiConfig":
@@ -28,4 +35,7 @@ class ApiConfig:
             snapshot_bucket=bucket,
             snapshot_key=e.get("SNAPSHOT_KEY", "snapshots/current.json"),
             stale_after=timedelta(seconds=int(e.get("STALE_THRESHOLD_S", str(3 * 3600)))),
+            cost_key=e.get("COST_KEY", "cost/current.json"),
+            telemetry_key=e.get("TELEMETRY_KEY", "telemetry/current.json"),
+            model_rates=e.get("MODEL_RATES") or None,
         )

@@ -993,12 +993,9 @@ Resources:
                 RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
                 StackName: !Sub '${Application}-${Environment}-knowledgebase'
                 TemplatePath: 'GitRepositoryArtifact::blueprints/knowledgebase/infra/knowledgebase.yml'
-                # Params passed explicitly; BlueprintVersion kept in lockstep with the template.
-                # EnableSharePointSource "true" indexes sites/kb alongside S3 -- so every track's
-                # merge now depends on the Entra app's consent/grant/cert (platform-team managed);
-                # roll back by setting it "false" (all SharePoint resources hang off one Condition).
-                # None of the SharePoint values is a secret. EnableScheduledSync "false".
-                # Full detail + warnings: blueprints/knowledgebase/docs/warnings.md.
+                # Params explicit; BlueprintVersion in lockstep with the template. SharePoint on =>
+                # merges depend on the Entra app's consent/cert; roll back with "false" (one
+                # Condition). No value here is a secret. See blueprints/knowledgebase/docs/warnings.md.
                 ParameterOverrides: !Sub >-
                   {
                   "Application": "${Application}",
@@ -1020,13 +1017,9 @@ Resources:
                   "SourceCommitId": "#{GitRepository.CommitId}"
                   }
 
-            # Track C's Microsoft Teams chatbot. Generic: behaviour is set by SystemPrompt.
-            # KnowledgeBaseId empty here -> answers from the prompt, no retrieval (optional by
-            # design; ground it with the /aidlc/main/knowledgebase/knowledge-base-id SSM value).
-            # The two Bot* values are not credentials (app id ships in every Teams manifest, tenant
-            # id in every serviceUrl); the client secret + gateway api key are injected by CLI into
-            # <app>/<env>/teams-bot/{bot-client-secret,gateway-api-key} (created here as placeholders),
-            # and the bot answers nothing until both are put in place.
+            # Track C's Teams chatbot. Behaviour from SystemPrompt; KnowledgeBaseId empty => no
+            # retrieval. Bot* values are not secrets; the client secret + gateway key are injected by
+            # CLI and the bot answers nothing until they are. See blueprints/teams-bot/README.md.
             - Name: 'TeamsBotCloudFormation'
               Namespace: 'TeamsBotCloudFormation'
               RunOrder: 1
@@ -1147,6 +1140,7 @@ Resources:
                   "ApiImageUri": "#{DashboardApiContainer.CONTAINER_DIGEST}",
                   "AllowedIpv4Cidrs": "192.0.2.0/24",
                   "LogLevel": "INFO",
+                  "CostScheduleExpression": "rate(1 day)",
                   "SourceCommitId": "#{GitRepository.CommitId}"
                   }
 

@@ -12,6 +12,8 @@ const TABS: { name: ViewName; label: string; testid: string }[] = [
   { name: "grouping", label: "Grouping", testid: "view-tabs-grouping" },
   { name: "tag-gaps", label: "Tag gaps", testid: "view-tabs-tag-gaps" },
   { name: "status", label: "Status", testid: "view-tabs-status" },
+  { name: "financial", label: "Financial", testid: "view-tabs-financial" },
+  { name: "adoption", label: "Adoption", testid: "view-tabs-adoption" },
 ];
 
 export function ViewTabs({ active, onSelect }: Props) {

@@ -103,6 +103,10 @@ module = [
     "test_api_routing",
     "test_api_boundary",
     "test_template_invariants",
+    "test_money",
+    "test_telemetry_core",
+    "test_sections_api",
+    "test_cost_collector",
 ]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
