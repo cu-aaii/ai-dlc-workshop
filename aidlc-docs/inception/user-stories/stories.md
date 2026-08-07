@@ -287,6 +287,14 @@ that dependency is stated here in prose rather than as a marker on each story.*
 
 # Deferred / Stretch — cost data
 
+> **⚠️ SUPERSEDED 2026-08-07 — see the Round-2 section below (US-16 … US-25).** The decision these two
+> placeholders were blocked on has been made: **Cost Explorer**, per decision T1 in
+> `requirements/requirement-amendment-questions-telemetry-round-2.md`. US-D1 and US-D2 are therefore
+> replaced by real stories with real criteria — US-16/US-17 carry US-D1's and US-D2's intent, and the
+> open questions listed under US-D1 are answered in `amendments/telemetry-fr9-2026-08-07.md` FR-10.5
+> and FR-10.8. **The two stories below are kept as the record of what was approved on 2026-08-03, not
+> as work to pick up**, and their exemption from INVEST no longer applies to anything live.
+
 **These are placeholders, not ready-to-build stories.** The requirements deliberately leave the cost
 data source undecided (Cost Explorer API vs. Cost and Usage Report), and that decision has real
 consequences — cost allocation tag activation, latency, and whether this account can configure an
@@ -394,3 +402,261 @@ is carried by a later stage that can verify it.
 
 `P-01` Dashboard viewer appears in every story in Journeys 1–4 (US-01..US-08) and in both deferred
 stories. US-09..US-15 name no persona by design, being labelled `[Enabler]`.
+
+---
+---
+
+# Round 2 (2026-08-07) — usage telemetry and cost
+
+**Source**: `amendments/telemetry-fr9-2026-08-07.md` (FR-9, FR-10), from decisions T1–T8 in
+`requirements/requirement-amendment-questions-telemetry-round-2.md`. This is the second
+Requirements → Stories pass that the 2026-08-03 telemetry amendment queued (Q3 = B).
+
+**Same conventions as above**: classic format, Given/When/Then, thin vertical slices, no priority or
+dependency markers, requirement IDs kept out of story text. Persona is still `P-01` — the pass adds
+goals, not an audience (see the amendment note in `personas.md`).
+
+**One thing to hold in mind while reading these.** Decision T6 means **no blueprint is instrumented
+in this pass**, so US-19 … US-22 have no live emitter and will render their empty state on delivery.
+That does **not** make them TBD placeholders the way US-D1/US-D2 were: their criteria are fully
+writable and testable today, because each specifies behaviour for *data present* (against fixtures)
+**and** for *data absent* (the state a real deployment will actually show). The absent case is not a
+consolation criterion — with T6 it is the one a viewer sees first, which is why it is written first
+in each story.
+
+---
+
+# Journey 5 — Knowing what the platform costs
+
+## US-16 — See what the platform is costing right now
+
+**As a** Dashboard viewer,
+**I want** to see total platform cost for today, this month, and the year so far,
+**so that** I can answer "what is this costing us" without a Billing console login I do not have.
+
+**Acceptance criteria**
+- **Given** cost data has been collected, **when** I open the financial view, **then** I see a
+  today, a month-to-date, and a year-to-date total, each with the currency stated.
+- **Given** the upstream cost data lags behind real time, **when** I read the "today" figure,
+  **then** it is labelled as of the last finalized day rather than presented as up-to-the-minute, and
+  the date it covers is shown.
+- **Given** cost data has never been collected, **when** I open the financial view, **then** I see an
+  explicit "no cost data collected yet" state, distinguishable from a genuine zero spend.
+- **Given** the cost data source cannot be read at all, **when** I open the financial view, **then** I
+  see an explicit unavailable state, and **no** figure that could be mistaken for real spend.
+- **Given** a cost figure is displayed, **when** I look for its age, **then** its collection timestamp
+  is shown, exactly as the inventory views show theirs.
+
+## US-17 — See cost attributed to an application and a deployment
+
+**As a** Dashboard viewer,
+**I want** platform cost broken down by blueprint and by deployment,
+**so that** I can tell which application is responsible for the spend rather than only the total.
+
+**Acceptance criteria**
+- **Given** cost data grouped by tag is available, **when** I view the breakdown, **then** cost is
+  totalled per blueprint and per deployment, and the parts sum to the stated total.
+- **Given** spend exists that carries no attribution tag, **when** I view the breakdown, **then** it
+  appears in an explicit unattributed group rather than being dropped or silently folded into
+  another group.
+- **Given** the required tags have not been activated for cost attribution upstream, **when** I view
+  the breakdown, **then** I am told attribution is unavailable and why — and I am **not** shown zeros
+  that would read as "this blueprint costs nothing".
+- **Given** attribution was activated part-way through the period I am viewing, **when** I read a
+  year-to-date breakdown, **then** the period before attribution began is identified as
+  unattributable rather than shown as zero spend.
+- **Given** several agents run inside one deployment, **when** I view infrastructure cost, **then** it
+  is **not** split per agent, because the underlying billing cannot support that split.
+
+## US-18 — See estimated model cost, clearly marked as an estimate
+
+**As a** Dashboard viewer,
+**I want** to see what the language-model usage is costing, and to know it is an estimate,
+**so that** I can reason about model spend without mistaking a derived figure for a bill.
+
+**Acceptance criteria**
+- **Given** no application is reporting token usage, **when** I open the model-cost panel, **then** I
+  see the not-instrumented state naming which blueprints are not reporting, and **not** a figure of
+  zero.
+- **Given** token counts and a configured rate table are available, **when** model cost is shown,
+  **then** it is labelled an estimate everywhere it appears, including in any total it contributes to.
+- **Given** both estimated model cost and billed platform cost are on screen, **when** I read them,
+  **then** the two are visually distinguishable and are not silently summed into one unqualified
+  figure.
+- **Given** the rates used to produce the estimate, **when** they need correcting, **then** they can
+  be changed without a code change or a redeploy of the application logic.
+- **Given** a model has no rate configured, **when** its usage is priced, **then** that is surfaced as
+  a known gap rather than counted as zero cost.
+
+## US-19 — See what a deployment costs per completed task
+
+**As a** Dashboard viewer,
+**I want** cost expressed per completed task,
+**so that** I can judge whether a deployed application earns what it costs.
+
+**Acceptance criteria**
+- **Given** no application reports completed tasks, **when** I open this panel, **then** I see the
+  not-instrumented state, and **no** figure, zero, blank, or division error.
+- **Given** completed-task counts and cost are both available, **when** the per-task figure is shown,
+  **then** it states which cost it divides — estimated model cost, billed platform cost, or both.
+- **Given** a period in which cost exists but no task was completed, **when** the figure is computed,
+  **then** I am shown that no tasks completed rather than an infinite or blank result.
+
+---
+
+# Journey 6 — Knowing whether it is used, and whether it works
+
+## US-20 — See how much each model is used
+
+**As a** Dashboard viewer,
+**I want** request counts and token usage broken down by model,
+**so that** I can see which models are actually being used and how heavily.
+
+**Acceptance criteria**
+- **Given** no application reports usage, **when** I open the adoption view, **then** I see the
+  not-instrumented state naming the blueprints found and not reporting.
+- **Given** an application reports usage, **when** I view the breakdown, **then** request counts,
+  input tokens, and output tokens are each shown per model.
+- **Given** an application declares a counter but has sent no datapoints in the window I am viewing,
+  **when** I read that counter, **then** I see a no-data-yet state distinct from both
+  not-instrumented and from a failed read.
+- **Given** the counters cannot be read at all, **when** I open the view, **then** I see an explicit
+  read-failure state and no fabricated figures.
+- **Given** an application not previously reporting begins to report, **when** its data arrives,
+  **then** it appears without any change to this dashboard.
+
+## US-21 — See how often requests fail or time out
+
+**As a** Dashboard viewer,
+**I want** error rate and timeout rate for model calls,
+**so that** I can tell whether a deployed application is actually working for its users.
+
+**Acceptance criteria**
+- **Given** no application reports these counters, **when** I open the panel, **then** I see the
+  not-instrumented state rather than a reassuring zero-percent rate.
+- **Given** an application reports failures and total requests, **when** a rate is shown, **then** it
+  is derived from both counts, and the counts behind it are available to me — not only the ratio.
+- **Given** I change the time window, **when** the rate is recomputed, **then** it reflects that
+  window rather than a pre-computed ratio that cannot be re-aggregated.
+- **Given** these rates concern the model call, **when** I read them, **then** they are
+  distinguishable from the dashboard's own operational error metrics, so a failing model call is not
+  read as a failing dashboard.
+
+## US-22 — See whether the application's answers are any good
+
+**As a** Dashboard viewer,
+**I want** human approval rate and prompt success rate,
+**so that** I have a signal about usefulness and not merely about volume.
+
+**Acceptance criteria**
+- **Given** no application reports these counters, **when** I open the panel, **then** I see the
+  not-instrumented state, because no platform metric can substitute for them.
+- **Given** an application reports them, **when** I read a rate, **then** the definition of success
+  or approval that the application declared is shown alongside it — these are application-defined
+  and are not comparable across applications without it.
+- **Given** two applications define success differently, **when** both are displayed, **then** their
+  rates are not aggregated into a single cross-application figure.
+
+## US-23 — See usage attributed to the right agent
+
+**As a** Dashboard viewer,
+**I want** usage and estimated model cost attributed per agent within a deployment,
+**so that** attribution still holds when one blueprint runs several agents.
+
+**Acceptance criteria**
+- **Given** a deployment runs exactly one agent, **when** I view its usage, **then** it is attributed
+  correctly with no extra configuration on the emitting side.
+- **Given** a deployment runs several agents, **when** I view its usage, **then** each agent's
+  counters are attributed separately rather than collapsed into one deployment total.
+- **Given** usage is attributed per agent, **when** I total the agents within a deployment, **then**
+  the total equals the deployment's figure.
+- **Given** estimated model cost is attributed per agent, **when** I look for infrastructure cost per
+  agent, **then** it is absent by design rather than estimated or implied.
+
+---
+
+# Round-2 enabler stories
+
+## US-24 [Enabler] — The telemetry emission contract
+*Satisfies FR-9.1 through FR-9.4, and NFR-T3, NFR-T5.*
+
+- **Given** a blueprint that wants to be visible to usage telemetry, **when** it consults the
+  contract, **then** it finds a declaration format for what it emits and a runtime convention for how
+  to emit it, without needing to read this dashboard's code.
+- **Given** a blueprint that declares no telemetry, **when** the contract is applied to it, **then**
+  it is treated as reporting nothing, and remains fully inventoried and cost-attributed.
+- **Given** an emitted measurement, **when** its dimensions are inspected, **then** they identify the
+  deployment and the agent, and contain no tag value, ARN, personal identifier, or other
+  high-cardinality value.
+- **Given** a deployment that runs one agent, **when** it emits without configuring an agent
+  identifier, **then** the agent identifier defaults to the deployment identifier.
+- **Given** the reader, **when** it collects telemetry, **then** it reads only counters a manifest
+  declares plus a fixed list of platform namespaces, and never discovers and renders arbitrary
+  metrics.
+- **Given** a new emitting blueprint, **when** its counters arrive, **then** the dashboard renders
+  them generically with no blueprint-specific code — which is the test of whether this contract is
+  correct.
+
+## US-25 [Enabler] — Cost collection that does not itself cost much
+*Satisfies FR-10.4 and NFR-T4, NFR-T6.*
+
+- **Given** the upstream cost API is billed per request and its data advances only daily, **when**
+  cost collection is scheduled, **then** it runs on its own daily cadence and not on the inventory
+  schedule.
+- **Given** the cost cadence needs changing, **when** a new value is supplied to the stack, **then**
+  the schedule changes without editing the blueprint's template.
+- **Given** the new permissions this pass requires, **when** they are inspected, **then** they are
+  read-only and least-privilege, and any unavoidable account-wide breadth is documented as an
+  accepted exception.
+- **Given** the operating cost of collection, **when** the blueprint's documentation is read, **then**
+  the per-request charge, the upstream lag, and the manual attribution-activation step are all stated.
+
+---
+
+# Round-2 INVEST verification
+
+Applied to US-16 … US-25. Nothing in this section is exempt — unlike US-D1/US-D2, which were exempt
+because their criteria were TBD.
+
+| Criterion | How it holds |
+|---|---|
+| **Independent** | Each story is demonstrable alone. US-24 is a shared precondition for US-20…US-23 in the same way US-15 is for everything — a delivery fact, not story coupling. |
+| **Negotiable** | Criteria name observable behaviour, not services. "The upstream cost API", not "Cost Explorer"; "declares a counter", not a YAML schema. The mechanisms are in the amendment, where design can revisit them. |
+| **Valuable** | US-16…US-23 each name P-01's gain. US-24/US-25 are `[Enabler]` and name the requirement they discharge. |
+| **Estimable** | Each is bounded by its criteria. The riskiest unknowns — usage-type strings, per-model rates — are quarantined in FR-10.8 as verify-before-build rather than hidden inside a story. |
+| **Small** | Each covers one panel or one contract concern. Cost and usage are deliberately not one story. |
+| **Testable** | Every criterion can pass or fail. **The T6 case is what makes this hold**: because each story specifies the data-absent behaviour, every story is testable against the system as it will actually be delivered, not only against fixtures. |
+
+---
+
+# Round-2 coverage
+
+| Requirement | Covered by |
+|---|---|
+| FR-9.1 contract-not-feature, graceful non-participation | US-24, US-20 |
+| FR-9.2 EMF emission mechanism | US-24 (as observable behaviour; the mechanism itself is verified at design/build) |
+| FR-9.3 dimensions incl. `agent_id` default | US-23, US-24 |
+| FR-9.4 manifest declaration, `emits: false` first-class | US-24 |
+| FR-9.5 reader, closed allowlist, additive snapshot section | US-24, US-20 |
+| FR-9.6 the required counters | US-20 (requests/tokens), US-21 (error/timeout), US-22 (approval/success), US-19 (completed tasks) |
+| FR-9.7 no emitter this pass; three distinct empty states | US-20 (all three states named), and the absent-data criterion opening US-18…US-22 |
+| FR-10.1 Cost Explorer chosen | US-16 (behaviourally); the decision itself is recorded in the amendment, not story-shaped |
+| FR-10.2 today / month / YTD, no budget | US-16 |
+| FR-10.3 breakdown by blueprint + deployment; no department; asymmetric agent split | US-17, US-23 |
+| FR-10.4 separate daily schedule | US-25 |
+| FR-10.5 activation, non-retroactivity, lag, denied access | US-16, US-17, US-25 |
+| FR-10.6 estimated model cost, labelled, configurable rates | US-18 |
+| FR-10.7 cost per completed task | US-19 |
+| FR-10.8 verify-before-build items | **Not story-covered, deliberately** — these are open verification tasks, not behaviours. Named here so the gap is visible. |
+| FR-10.9 no per-user attribution | **Not story-covered** — a prohibition, verified by the absence of the feature, as FR-5.4 was |
+| NFR-T1 estimates distinguishable | US-18 |
+| NFR-T2 rate table configurable | US-18 |
+| NFR-T3 low-cardinality, no PII dimensions | US-24 |
+| NFR-T4 bounded cost-API calls | US-25 |
+| NFR-T5 closed allowlist | US-24 |
+| NFR-T6 least-privilege IAM | US-25 |
+| NFR-T7 three distinct empty states | US-20, and every data panel's absent-data criterion |
+
+**Superseded**: US-D1 → US-16/US-17; US-D2 → US-17. US-D1's five open questions are answered in
+FR-10.5 (attribution activation, lag, granularity, late-tagged resources) and FR-10.1 (source
+choice); the CUR access question is answered by rejecting CUR.

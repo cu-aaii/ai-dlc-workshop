@@ -85,3 +85,30 @@ practice: one undifferentiated viewer, admitted by IP.
 If Entra federation is built later, this persona is expected to split along the lines v1 collapsed
 — platform operator, workshop organizer, campus builder — and the enabler stories' operator-facing
 concerns (logging, alarms, monitoring) would gain a persona to attach to, which in v1 they lack.
+
+---
+
+## Amendment (2026-08-07) — the telemetry/cost pass adds goals, not a persona
+
+`inception/amendments/telemetry-fr9-2026-08-07.md` adds FR-9 (usage telemetry) and FR-10 (cost).
+The natural reading is that this introduces a new audience — someone justifying spend, or judging
+whether a deployed application is worth keeping. **It does not add a persona**, and the reason is
+structural rather than a simplification: admission is still by network position with no identity
+(FR-4.5, the SECURITY-13 exception), so the dashboard still cannot tell a budget owner from a
+builder. One undifferentiated viewer remains correct.
+
+What it does add is **two goals** to P-01, from the Round-1 Q4 answer *"usage metrics to justify
+cost; feedback for business processes; metrics to determine value / how useful the system is"*:
+
+- Know what the platform is costing, broken down by application and deployment, without a Billing
+  console login — which nobody in this population has, exactly as they have no AWS console login
+- Judge whether a deployed application is actually used, and at what cost per unit of use
+
+Both are read-only and both are satisfied by the same undifferentiated view, so the persona's
+technical access level, admission path, and excluded audiences are all unchanged.
+
+**One caution this sharpens.** "Wrong data is worse than absent data" was already recorded above as
+a characteristic. It matters more now: this viewer will act on a *money* figure, and FR-10.6's model
+cost is an **estimate** derived from token counters, not billed spend. That is why NFR-T1 requires
+estimates to remain visually distinguishable from billed figures — the persona's disposition to act
+on what they see is the reason the labelling is a requirement rather than a courtesy.

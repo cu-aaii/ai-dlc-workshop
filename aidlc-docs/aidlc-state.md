@@ -3,7 +3,15 @@
 ## Project Information
 - **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
 - **Start Date**: 2026-08-03
-- **Current Stage**: **OPERATIONS** (entering — U-02 Build and Test approved)
+- **Current Stage**: **INCEPTION → Requirements Analysis + User Stories, SECOND PASS** (telemetry/cost
+  amendment, 2026-08-07 — the pass Q3=B queued). v1 remains complete and unaffected; this is a
+  re-entry into a closed stage for an additive amendment, not a restart of it.
+- **Telemetry/cost amendment (Round 2)**: 2026-08-07 — decisions **T1–T8** recorded in
+  `inception/requirements/requirement-amendment-questions-telemetry-round-2.md`; requirement text in
+  `inception/amendments/telemetry-fr9-2026-08-07.md` (**FR-9** usage telemetry, **FR-10** cost —
+  FR-10 supersedes FR-8's deferral); stories US-16…US-25 appended to `stories.md` (US-D1/US-D2
+  superseded). **APPROVED 2026-08-07** — user response "approve, then commit and pull in any new code
+  before continuing". Next stage: **Application Design for FR-9/FR-10** (not yet run — nothing built).
 - **Build and Test U-02 Approved**: 2026-08-04 — "approve and proceed". **U-02 COMPLETE END TO END (pre-deploy).**
 - **Code Generation U-02 Approved**: 2026-08-04 — "approved" (docker build verified after daemon came up)
 - **Infrastructure Design U-02 Approved**: 2026-08-04 — "approve and continue" (Q1–Q7 all A)
@@ -681,7 +689,10 @@ Both units through every applicable CONSTRUCTION stage; OPERATIONS is a methodol
 - **U-02 Dashboard Platform** — complete pre-deploy: collector/api/UI/edge/marker/observability built,
   `tools/check` green, both images build, UI builds CSP-clean; 4 `deployed`-only reqs pending a merge.
 - **Still open, non-blocking (tracked, not part of this workflow's completion):**
-  - Task #7 — telemetry amendment (2nd Requirements→Stories pass), needs team-d + `docs/aidlc/dashboard/design/`.
+  - ~~Task #7 — telemetry amendment~~ → **IN PROGRESS 2026-08-07**, see the Round-2 section at the end
+    of this file. Did **not** in the end need team-d: `origin/team-d` still has no composition-id
+    decision recorded (checked at `e7edca0`), so there was nothing to coordinate with and the
+    `agent_id`-defaults-to-`deployment_id` design (T8) avoids depending on one.
   - Q12/Q13 — whether `requirements.md` §4.6 gains a 5th exception, and whether US-09's 4th acceptance
     criterion narrows to match Q11 = B (51 Dependabot findings context).
 
@@ -753,3 +764,70 @@ Requirements, NFR Design, Infrastructure Design, Code Generation, and Build and 
 The one boundary that changes *how work is verified* rather than how it is organised: C-04 and C-05
 have empty dependency rows and no AWS SDK, so they can be property-tested on a laptop with no
 account and no pipeline. Everything else needs the never-yet-run container build.
+
+---
+
+## Round 2 (2026-08-07) — Telemetry + Cost amendment (FR-9 / FR-10)
+
+**Trigger**: user picked up the queued Task #7 and supplied a concrete metric list for two dashboards
+(Financial: platform costs, cost by model/application/department/agent/user, cost per completed task;
+Adoption: requests by model, token usage, error/timeout rate, human approval + prompt success rate),
+plus a question about reading metrics directly from AgentCore.
+
+**Stage re-entry, not restart.** `requirements.md`, `stories.md` and `personas.md` are **approved**
+artifacts, so per `common/workflow-changes.md` and the precedent in
+`amendments/repo-baseline-2026-08-03.md` none was rewritten in place. Each affected passage keeps its
+original text and gains a pointer. v1 (U-01 + U-02) is untouched and still complete.
+
+### The finding that reframed the request
+`blueprints/teams-bot` — the repo's only real LLM application — routes **all** generation through
+Cornell's **LiteLLM gateway, not Bedrock** (read from `src/handler.py` + `src/requirements.txt`, not
+assumed). So chat traffic emits **no `AWS/Bedrock` metrics in this account** and incurs **no Bedrock
+cost here**: a pull-based CloudWatch metrics source — which both `docs/aidlc/dashboard/design/`
+drafts proposed — would render **zeros** for exactly the requested metrics. The app *does* hold the
+numbers (`usage.input_tokens` / `output_tokens` on every response), so they are reachable by the
+**push** path only. Platform *infrastructure* cost is unaffected and works via Cost Explorer.
+**Consequence: platform cost and model cost are two domains with two sources.**
+
+### Decisions T1–T8
+| # | Decision | Answer |
+|---|---|---|
+| T1 | Cost source; un-defer FR-8? | **Yes — Cost Explorer** (`GetCostAndUsage`), **separate daily** schedule. CUR rejected: needs a payer/org-level export this account may not control. |
+| T2 | Cost by department | **Punt** — no `cornell:department` tag; a 5th required tag is a platform-wide change |
+| T3 | Cost by agent | Collapses to deployment today; per-agent dimension designed anyway (T8) |
+| T4 | Budget remaining | **Removed from scope** — no AWS Budgets dependency |
+| T5 | Cost by model (off-account) | **Both** — `tokens × configurable rate table` estimate now, labelled an estimate; LiteLLM API recorded as authoritative, still `BLOCKED` on the builder-credential problem |
+| T6 | Who emits | **Reader + spec only; no emitter.** `teams-bot` is Track C's and is not edited |
+| T7 | AgentCore direct vs CloudWatch | **CloudWatch only** — AgentCore publishes into CloudWatch; one `GetMetricData` read path. *Not re-verified against live docs (no web access this session) — treat exact namespaces as verify-before-build* |
+| T8 | deployment-id under composition | **Design the per-agent dimension now**: `agent_id`, **defaulting to `deployment_id`** — multi-agent becomes a change of values, not a schema migration |
+
+### Artifacts
+| File | Action |
+|---|---|
+| `inception/requirements/requirement-amendment-questions-telemetry-round-2.md` | **new** — decision record, the LiteLLM finding, CE caveats, cardinality/PII traps |
+| `inception/amendments/telemetry-fr9-2026-08-07.md` | **new** — FR-9 (9.1–9.7), FR-10 (10.1–10.9), NFR-T1–T7, 2 new documented exceptions |
+| `inception/requirements/requirements.md` | **pointers only** — FR-8 `⚠️ SUPERSEDED`, §6 `⚠️ AMENDED` |
+| `inception/user-stories/stories.md` | **appended** Round-2 section: US-16…US-23 + enablers US-24/US-25, own INVEST + coverage tables; US-D1/US-D2 marked superseded |
+| `inception/user-stories/personas.md` | **appended** amendment note — 2 goals added to P-01, **no new persona** (no identity layer, so nothing to differentiate) |
+| `docs/aidlc/dashboard/design/observability-contract.md` | **pointer only** — 4 of its open decisions now answered (teammate's doc, not rewritten) |
+| `docs/aidlc/dashboard/design/integration-note-fork-telemetry.md` | **pointer only** — its "port at U-02 Code Gen" recommendation overtaken; Bedrock-first framing holed by the LiteLLM finding |
+
+### What this pass will actually deliver when built (T6 consequence, stated not discovered)
+- **Real data day one**: platform cost today / month-to-date / YTD, and cost by blueprint + deployment
+  — *subject to* the manual Billing-console cost-allocation-tag activation (FR-10.5.1), which nothing
+  in this repo can perform, is not retroactive, and lags 24–48h.
+- **Empty state day one**: the entire Adoption dashboard, estimated model cost, and cost per completed
+  task — all push-only, and no blueprint is instrumented. So the empty state **is** the visible
+  deliverable, and FR-9.7.3/NFR-T7 make it a requirement to distinguish *not instrumented* /
+  *no data yet* / *cannot read* rather than showing a blank or a reassuring zero.
+
+### Not done, deliberately
+No code, no template, no manifest change, no UI. This pass is Requirements + Stories only — the
+stages after it (Application Design → NFR/Infrastructure Design → Code Generation → Build and Test)
+have **not** been run for FR-9/FR-10, so nothing is built and `tools/check` is unaffected.
+
+### Verify-before-build carried forward (FR-10.8)
+Bedrock per-model **usage-type strings**; whether `GetCostAndUsage` grouped by `USAGE_TYPE` splits per
+model in this account; current per-model **rates** for the estimator's table. None was verifiable this
+session — no live doc access, no account to query. Building against a guess here produces silently
+wrong money.

@@ -136,6 +136,16 @@ silently dropped, and the supersession chain is logged in `aidlc-docs/audit.md`.
 5. `tools/check` MUST pass before push.
 
 ### FR-8 — Cost data (stretch goal, explicitly out of v1 scope)
+
+> **⚠️ SUPERSEDED 2026-08-07 — see `inception/amendments/telemetry-fr9-2026-08-07.md` (FR-10).**
+> FR-8.3 required that the cost-source decision "be revisited as its own clarification" when cost was
+> taken up. That happened: decision **T1** picks the **Cost Explorer API** and rejects CUR, because a
+> CUR export is configured at an Organization's management account and this account's payer-level
+> standing is not controlled by this project. Cost is **no longer a stretch goal**. The text below
+> stands as the record of what was approved on 2026-08-03; **FR-10 now governs.** The same amendment
+> adds **FR-9** (usage telemetry), the second pass queued by
+> `requirements/requirement-amendment-questions-telemetry.md` Q3 = B.
+
 1. Cost figures are a **stretch goal**. The cost data source (Cost Explorer API vs. Cost and
    Usage Report) is deliberately **not decided** in this stage (R1-Q2 = C).
 2. v1 MUST NOT block on cost data, but MUST leave the snapshot schema and API shape extensible
@@ -276,6 +286,12 @@ These bind regardless of the vendored AI-DLC rules, per `CLAUDE.md`:
 ---
 
 ## 6. Out of Scope for v1
+
+> **⚠️ AMENDED 2026-08-07 — see `inception/amendments/telemetry-fr9-2026-08-07.md`.** The first bullet
+> below no longer holds: cost figures are in scope and the source is decided (Cost Explorer). Usage
+> telemetry (FR-9) is also now in scope. That amendment carries its own out-of-scope list, which
+> **adds** budget tracking, department-level attribution, per-user attribution, instrumenting any
+> blueprint, a direct AgentCore integration, and every `auth: secret` source.
 
 - Cost dollar figures and the choice of cost data source (stretch goal — FR-8).
 - Cognito, any login flow, per-user identity, and Entra/SSO federation.

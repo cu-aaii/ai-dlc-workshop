@@ -557,3 +557,99 @@
 **Decision**: **APPROVED** — U-02 Build and Test closed. **U-02 COMPLETE END TO END (pre-deploy); the whole `dashboard` blueprint is built and verified as far as a non-deployed environment allows.**
 **AI Response**: "Proceeded to OPERATIONS and found it is an explicit methodology **placeholder** — `operations/operations.md`: 'The AI-DLC workflow currently ends after the Build and Test phase in CONSTRUCTION.' There are no defined OPERATIONS stages to execute, and `CLAUDE.md` forbids pre-building `observability/` or deployment scaffolding unasked. So I marked the AI-DLC workflow COMPLETE at the OPERATIONS boundary rather than inventing scope. The one real remaining action is not an AI-DLC stage and is the user's call: open a PR and merge to `main` (with real `AllowedIpv4Cidrs`), which deploys the three dashboard stacks to the shared account and finally verifies the four `deployed`-only requirements (SEC-7, A-4, P-6, R-8). Left open and tracked, non-blocking: Task #7 (telemetry amendment) and Q12/Q13."
 **Context**: 🏁 **AI-DLC workflow COMPLETE.** OPERATIONS is a placeholder; no further stages defined.
+
+---
+
+## Change Request — Requirements Analysis + User Stories, SECOND PASS (telemetry/cost)
+**Timestamp**: 2026-08-07T00:00:00Z
+**Request**: user picked up the queued Task #7 ("let's pick up #2 the deferred telemetry amendment"), then
+supplied a concrete metric list for two dashboards — **Financial**: cost today / this month / YTD,
+budget remaining, cost by model / application / department / agent / user, cost per completed task;
+**Adoption**: requests by model, token usage (input/output), error rate, timeout rate, human approval
+rate, prompt success rate — plus: *"Using Cloudwatch makes sense but I'd also like to explore getting
+metrics directly from AgentCore. I'm not sure if that is advisable or if it's more robust to have agents
+send everything to Cloudwatch?"*
+**Current State**: AI-DLC workflow was marked COMPLETE at the OPERATIONS boundary (2026-08-04). v1
+(U-01 + U-02) built, `tools/check` green, not deployed.
+**Impact Assessment**: re-entry into two **closed, approved** stages for an additive amendment. Per
+`common/workflow-changes.md` and the precedent set by `amendments/repo-baseline-2026-08-03.md`, no
+approved artifact is rewritten in place — each affected passage keeps its text and gains a pointer.
+v1 artifacts, code, and `tools/check` are unaffected. No downstream stage is invalidated because none
+has been run for FR-9/FR-10.
+**User Confirmation**: eight explicit decisions (T1–T8) given across the exchange, including three
+mid-course corrections: "punt on department", "ignore budget remaining. Let's just remove that
+requirement", and confirmation of Cost Explorer after asking "What is CUR?".
+**Action Taken**: recorded T1–T8; wrote FR-9 + FR-10 + NFR-T1..T7 as an amendment; appended stories
+US-16…US-25 with their own INVEST and coverage tables; annotated FR-8, §6, US-D1/US-D2, and personas.
+**Artifacts Affected**: `requirement-amendment-questions-telemetry-round-2.md` (new),
+`amendments/telemetry-fr9-2026-08-07.md` (new), `requirements.md` (2 pointers),
+`stories.md` (appended + 1 supersession), `personas.md` (appended note),
+`docs/aidlc/dashboard/design/observability-contract.md` + `integration-note-fork-telemetry.md`
+(pointers only — a teammate's docs, deliberately not rewritten), `aidlc-state.md`, `audit.md`.
+
+**AI Response**: "Checked the ground before writing requirements, and the check changed the answer.
+**`blueprints/teams-bot` — the repo's only real LLM application — routes all generation through
+Cornell's LiteLLM gateway, not Bedrock** (read from `src/handler.py`'s `Anthropic(base_url=...)` and
+`src/requirements.txt`'s note that the `[bedrock]` extra is *deliberately absent*). So chat traffic
+emits **no `AWS/Bedrock` metrics in this account** and incurs **no Bedrock cost here**: the pull-based
+CloudWatch metrics source that both `docs/aidlc/dashboard/design/` drafts recommend — and that the
+fork's captured `telemetry.py` spec was written for — would have rendered **zeros** for exactly the
+metrics requested. The application does hold the numbers (`usage.input_tokens`/`output_tokens` on every
+response, `model_id` from SSM), so they are reachable **only by the push path**. The in-account Bedrock
+spend that does exist is `knowledgebase`'s MANAGED embedding model, which is not what 'cost by model'
+means here. `course-chatbot` calls Bedrock directly but is a deliberately unbuilt scaffold. **The
+consequence, and the most important thing in this pass: platform (infrastructure) cost and model (LLM)
+cost are two domains with two sources, and the requested Financial list mixes them.**
+
+Decisions: **T1** un-defer FR-8 → **Cost Explorer**, rejecting CUR because a CUR export is configured
+at an Organization's management account and this account's payer standing isn't ours; cost collection on
+its **own daily schedule**, because `GetCostAndUsage` bills **$0.01 per paginated request** and its data
+advances once a day — an hourly tick would make a cost-control dashboard a silent cost. **T2** punt
+department (no tag; a 5th required tag is platform-wide). **T3/T8** cost-by-agent collapses to
+deployment today, but the contract carries an **`agent_id` that defaults to `deployment_id`** — so
+multi-agent attribution is a change of values, not a schema migration, and C-02's `schema_version`
+headroom stays unspent. team-d had nothing to coordinate with: checked `origin/team-d` at `e7edca0`,
+reverse-engineering artifacts only, no composition-id decision. **T4** budget-remaining removed.
+**T5** model cost estimated as `tokens × a configurable rate table`, labelled an estimate everywhere,
+with LiteLLM's API named as authoritative and still `BLOCKED` on the unsolved builder-credential
+problem. **T6** reader + spec only — **no blueprint instrumented**, `teams-bot` is Track C's and was not
+touched. **T7** CloudWatch only: AgentCore Observability publishes into CloudWatch metrics plus
+OTel/X-Ray and its console view reads the same data, so there is no separate backend to integrate and
+one `GetMetricData` path covers AgentCore agents, direct-Bedrock callers and Lambda alike.
+
+Two traps found in the metric list and recorded rather than built: **cost by user must not be a metric
+dimension** — CloudWatch bills per metric per month and a dimension is part of a metric's identity, so
+a per-user dimension is one metric per user per counter (hundreds of dollars a month to observe a
+workshop chatbot); it belongs in structured logs. And it **must not carry a NetID** — SECURITY-04 and
+NFR-S1 both forbid it; any future identifier must be a stable non-identifying pseudonym. U-02's existing
+`shared/emf.py` already documents this exact rule, so this is precedent, not invention.
+
+Stated plainly rather than left to be discovered: **T6 means the entire Adoption dashboard, estimated
+model cost, and cost-per-completed-task render an EMPTY STATE on delivery.** Only platform cost has real
+data — and only after a **manual Billing-console cost-allocation-tag activation** that nothing in this
+repo can perform or verify, that is **not retroactive**, and that lags 24–48h. So the empty state *is*
+the visible deliverable, which is why FR-9.7.3/NFR-T7 make it a requirement to distinguish *not
+instrumented* / *no data yet* / *cannot read* — the same reasoning that made US-06 require 'no data
+collected yet' to be distinguishable from 'no resources found'.
+
+Three things I could not verify and did not pretend to: exact Bedrock **usage-type strings**, whether
+`GetCostAndUsage` grouped by `USAGE_TYPE` splits per model in this account, and current per-model
+**rates**. No live doc access this session (WebSearch/WebFetch both unavailable) and no account to
+query. Carried as FR-10.8 verify-before-build, because guessing here produces silently wrong money —
+and the same caveat is recorded against T7's AgentCore namespace names.
+
+No code, template, manifest or UI was written. This is Requirements + Stories only; the stages that
+would build FR-9/FR-10 have not been run, and `tools/check` is untouched."
+**Context**: INCEPTION second pass — Requirements amendment + Stories extension complete; **awaiting
+approval**. v1 remains complete and deployable-pending-PR, independent of this pass.
+
+---
+
+## Requirements + Stories, Round 2 (APPROVED)
+**Timestamp**: 2026-08-07T00:00:00Z
+**User Input**: "approve, then commit and pull in any new code before continuing"
+**Decision**: **APPROVED** — FR-9 (usage telemetry) and FR-10 (cost, superseding FR-8's deferral) are
+approved requirements; stories US-16…US-25 are approved. US-D1/US-D2 are formally superseded.
+**Context**: INCEPTION second pass closed. Next stage is **Application Design for FR-9/FR-10** —
+nothing is built yet. The four `deployed`-only v1 requirements (SEC-7, A-4, P-6, R-8) are unaffected
+and still pending a merge to `main`.

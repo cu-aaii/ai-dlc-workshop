@@ -189,6 +189,25 @@ active cost-of-delay (dashboard is in Units Generation; team-d is early enough t
 
 ## 7. Open decisions (delta from `composable-dashboards.md` §8)
 
+> **📌 Pointer added 2026-08-07 by the AI-DLC telemetry pass — content below unchanged.**
+> The queued FR-9 pass has now run and **answers four of the items below**, so they should not be
+> re-litigated: **#2 emission mechanism** → CloudWatch EMF to the blueprint's own log group,
+> *ratified as recommended*. **#3 deployment-id under composition** → resolved as an `agent_id`
+> dimension that defaults to `deployment_id`, so the multi-agent case is a change of values rather
+> than a migration; `origin/team-d` had no composition-id decision recorded to coordinate with
+> (checked at `e7edca0`, reverse-engineering artifacts only). **§4's "second emitter" trigger** →
+> still not fired, and the pass deliberately declines to instrument one (decision T6). **§2 Part B
+> manifest shape** → adopted essentially as drafted.
+> See `aidlc-docs/inception/amendments/telemetry-fr9-2026-08-07.md` and the decision record at
+> `aidlc-docs/inception/requirements/requirement-amendment-questions-telemetry-round-2.md`.
+>
+> **One finding in that pass materially affects §2 of this document** and is worth reading before
+> building anything here: `blueprints/teams-bot` routes all generation through Cornell's LiteLLM
+> gateway rather than Bedrock, so the `AWS/Bedrock` namespace in this account is **empty** for chat
+> traffic and Cost Explorer shows **no model spend**. The pull-based CloudWatch source this document
+> and `dashboard-sources.md` §4.1 both propose therefore reads zeros for model usage today; those
+> metrics are reachable only by the push path. #7 and #8 remain genuinely open.
+
 Resolved or narrowed by this grounding:
 - **#1 contract shape** → proposed concretely in §2 (three parts) — ratify.
 - **#2 emission mechanism** → recommended CloudWatch EMF in §3 — ratify or overrule.

@@ -99,6 +99,30 @@ branch's hardening rules. Porting = rewriting it to the current contracts, not m
 
 ## 5. Recommendation
 
+> **📌 Pointer added 2026-08-07 by the AI-DLC telemetry pass — content below unchanged.**
+> §2's captured metric set survives as useful domain knowledge, and §4's five porting contracts were
+> the right list. **But two of this section's recommendations are now overtaken:**
+>
+> 1. **"Port at U-02 Code Generation" did not happen** — U-02 completed on 2026-08-04 without a
+>    telemetry module, and the FR-9 pass (2026-08-07) deliberately builds the *reading* side only,
+>    instrumenting no blueprint (decision T6). So there is still no `telemetry.py` anywhere.
+> 2. **The Bedrock-first framing in §5's scope check has a hole this note could not have known.**
+>    `blueprints/teams-bot` — the repo's only real LLM application — sends all generation through
+>    Cornell's LiteLLM gateway, **not Bedrock** (`src/handler.py` builds
+>    `Anthropic(base_url=...)`; `src/requirements.txt` says the `[bedrock]` extra is *"deliberately
+>    absent"*). Its traffic therefore emits **no `AWS/Bedrock` metrics in this account** and incurs
+>    **no Bedrock cost here**. A Bedrock-metrics reader built as recommended would return zeros for
+>    the workshop's actual agent traffic. The in-account Bedrock activity that *does* exist is
+>    `knowledgebase`'s managed **embedding** model, which is not what "agent health" meant here.
+>    `course-chatbot` does call Bedrock directly, but is a deliberately unbuilt scaffold.
+>
+> Consequence for anyone picking this up: the metric list in §2 is still the right thing to collect
+> **for an agent that actually calls Bedrock in this account**, and the status thresholds in §2 are
+> still worth reusing — but token/request/error metrics for gateway-routed agents must come from the
+> **push** path (the app emits what its response object already carries), not from `GetMetricData`.
+> See `aidlc-docs/inception/amendments/telemetry-fr9-2026-08-07.md` FR-9.6 and the decision record at
+> `aidlc-docs/inception/requirements/requirement-amendment-questions-telemetry-round-2.md` §0.
+
 - **Do not regress** the integrated `core/` toward the fork. The integrated version is the mature one.
 - **Treat the fork's `telemetry.py` as a captured spec** (§2) — the metric set, thresholds, and record
   shape are the reusable parts.
