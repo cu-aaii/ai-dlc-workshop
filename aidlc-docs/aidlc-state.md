@@ -997,10 +997,18 @@ call budget not enforced.
    the new paths and found it resolving while `_KNOWN` listed only the original five. The property
    working exactly as intended; `_KNOWN` updated and two dispatch tests added.
 
-**Packaging verified without Docker** (daemon down again): built the wheel and confirmed
-`dashboard/telemetry_catalog.json` is inside it, so the Lambda can load the baked catalog. `docker
-build` itself was **not** re-run this pass — the images are unchanged in shape (same two targets), but
-that is the one residual gap, closable when the daemon is up.
+**Images verified — the residual gap is CLOSED (2026-08-07, daemon came up).** Both arm64 targets
+build. What mattered most was confirming the `ImageConfig.Command` premise rather than just that the
+build succeeds: **all four entrypoints import from the *collector* image**
+(`collector`/`api`/`cost`/`telemetry` handlers), which is what makes one digest across four functions
+correct. Also confirmed inside the image: the baked catalog loads and names all 7 blueprints,
+`boto3 1.43.66` is present from the `[aws]` extra, `arch: arm64`, and each image's baked `CMD` is its
+own handler. Then **ran both new collectors end to end inside the image** with fake clients: cost wrote
+`cost/current.json` with `covered_through` 2026-08-06 distinct from `collected_at` 2026-08-07, the
+unattributed bucket at 9.0231738003 with **zero attributed groups**, and `ce_calls: 7`; telemetry wrote
+`telemetry/current.json` with `aws_state: ok` (10 counters) beside `declared_state: not_instrumented`
+naming 7 blueprints — the two-different-states-side-by-side case NFR-T7 exists for. JSON logs and EMF
+envelopes emitted correctly. Check images removed afterwards.
 
 **`pipeline.yml`**: one parameter added, then **636 bytes reclaimed** by condensing teams-bot and
 knowledgebase comment prose (pointing at docs that already carry the detail, never deleting rationale).

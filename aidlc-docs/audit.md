@@ -857,3 +857,25 @@ Reclaimed 636 bytes in `pipeline.yml` by condensing comment prose to docs that a
 attribution still blocked on the payer account (A3.3); the four v1 `deployed`-only requirements
 unchanged.
 **Context**: CONSTRUCTION complete for the FR-9/FR-10 increment. **Awaiting approval.**
+
+## FR-9/FR-10 — container images verified (residual gap closed)
+**Timestamp**: 2026-08-07T00:00:00Z
+**User Input**: "the docker build should run now. Try again"
+**AI Response**: "Both arm64 targets build. The check worth more than the build itself was the
+**`ImageConfig.Command` premise**: all four entrypoints — collector, api, cost, telemetry — import from
+the *collector* image, which is what makes deploying one digest to four functions correct rather than
+merely smaller. Also verified inside the image: the baked catalog loads and names all 7 blueprints,
+`boto3 1.43.66` from the `[aws]` extra, `arch: arm64`, and each image's baked `CMD` is its own handler.
+
+Then ran both new collectors **end to end inside the image** with fake AWS clients rather than stopping
+at imports. Cost wrote `cost/current.json` with `covered_through` 2026-08-06 held separate from
+`collected_at` 2026-08-07 (COST-04), the unattributed bucket carrying 9.0231738003 with **zero
+attributed groups** (the A3.3 trap handled), and `ce_calls: 7` inside the budget. Telemetry wrote
+`telemetry/current.json` showing `aws_state: ok` with 10 counters **beside** `declared_state:
+not_instrumented` naming 7 blueprints — the one-populated-panel-next-to-an-unpopulated-one case that
+NFR-T7 exists for, observed rather than assumed. Structured JSON logs and the EMF envelope both emitted
+correctly. Removed the check images afterwards."
+**Residual now**: per-model rates unset by design (FR-10.8 item 3); cost attribution blocked on the
+Organization payer (A3.3); the four v1 `deployed`-only requirements (SEC-7, A-4, P-6, R-8) still need a
+merge to `main`. **No image gap remains.**
+**Context**: CONSTRUCTION for FR-9/FR-10 fully verified pre-deploy.
