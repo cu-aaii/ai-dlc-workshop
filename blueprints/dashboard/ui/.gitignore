@@ -1,0 +1,6 @@
+# UI build + dependency artifacts. The bundle is produced by the pipeline's SiteBuildProject
+# (npm ci && npm run build) and synced to S3; it is never committed. package-lock.json IS committed
+# (US-09 pinning) -- it is not ignored here.
+node_modules/
+dist/
+*.tsbuildinfo

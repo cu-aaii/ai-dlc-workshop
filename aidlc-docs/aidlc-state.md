@@ -1,0 +1,1018 @@
+# AI-DLC State Tracking
+
+## Project Information
+- **Project Type**: Brownfield (repo), but the unit of work is a new, self-contained blueprint
+- **Start Date**: 2026-08-03
+- **Current Stage**: **INCEPTION → Requirements Analysis + User Stories, SECOND PASS** (telemetry/cost
+  amendment, 2026-08-07 — the pass Q3=B queued). v1 remains complete and unaffected; this is a
+  re-entry into a closed stage for an additive amendment, not a restart of it.
+- **Telemetry/cost amendment (Round 2)**: 2026-08-07 — decisions **T1–T8** recorded in
+  `inception/requirements/requirement-amendment-questions-telemetry-round-2.md`; requirement text in
+  `inception/amendments/telemetry-fr9-2026-08-07.md` (**FR-9** usage telemetry, **FR-10** cost —
+  FR-10 supersedes FR-8's deferral); stories US-16…US-25 appended to `stories.md` (US-D1/US-D2
+  superseded). **APPROVED 2026-08-07** — user response "approve, then commit and pull in any new code
+  before continuing". Next stage: **Application Design for FR-9/FR-10** (not yet run — nothing built).
+- **Build and Test U-02 Approved**: 2026-08-04 — "approve and proceed". **U-02 COMPLETE END TO END (pre-deploy).**
+- **Code Generation U-02 Approved**: 2026-08-04 — "approved" (docker build verified after daemon came up)
+- **Infrastructure Design U-02 Approved**: 2026-08-04 — "approve and continue" (Q1–Q7 all A)
+- **NFR Design U-02 Approved**: 2026-08-04 — "approve and continue" (Q1–Q6 all A)
+- **NFR Requirements U-02 Approved**: 2026-08-03 — "Continue to next stage"
+- **Functional Design U-02 Approved**: 2026-08-03 — "Continue to next stage"
+- **Build and Test U-01 Approved**: 2026-08-03 — "Approve". **U-01 COMPLETE END TO END.**
+- **Code Generation U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
+- **NFR Design U-01 Approved**: 2026-08-03 — user response "approve and proceed"
+- **NFR Requirements U-01 Approved**: 2026-08-03 — user response "approve and proceed"
+- **Functional Design U-01 Approved**: 2026-08-03 — user response "Continue to next stage"
+- **INCEPTION COMPLETE**: 2026-08-03
+- **Units Approved**: 2026-08-03 — user response "Approve & Continue"
+- **Application Design Approved**: 2026-08-03 — user response "approved"
+- **Execution Plan Approved**: 2026-08-03 — user response "Approve and Continue"
+- **User Stories Approved**: 2026-08-03 — user response "approve stories"
+- **Queued amendment (NOT blocking)**: 2026-08-03 — custom telemetry, answered in
+  `inception/requirements/requirement-amendment-questions-telemetry.md` (Q1=A, Q2=C, Q3=B, Q4 free text).
+  Q3=B routes it to a **second Requirements → Stories pass** after v1 stories are approved, so
+  `requirements.md` and `stories.md` are unchanged by it and the v1 gate is no longer held.
+  Resolved shape: blueprints emit business-level usage metrics, dashboard displays them joined on
+  `cornell:deployment-id`; built inside `blueprints/dashboard/` with `observability/` as the eventual
+  home, due when a second blueprint emits metrics.
+- **Story Plan Approved**: 2026-08-03 — user response "approve plan"
+- **Requirements Approved**: 2026-08-03 — user response "requirements approved"
+
+## Workspace State
+- **Existing Code**: Yes — CloudFormation (YAML), Python (`pipeline/validate_stacks.py`), shell (`tools/check`)
+- **Programming Languages**: YAML (CloudFormation templates), Python
+- **Build System**: None (uv-fetched cfn-lint + pyyaml, no package manifest)
+- **Project Structure**: Single deploy-path repo with a `blueprints/<name>/` plugin structure (see `blueprints/README.md`)
+- **Workspace Root**: /Users/jpi6/ai-workshop/ai-dlc-workshop
+- **Reverse Engineering Needed**: No — see rationale below
+- **Reverse Engineering Rationale**: `README.md` and `CLAUDE.md` already document the architecture, conventions
+  (cornell:* tagging, stack naming, registry/pipeline wiring), and the target unit of work is a brand-new,
+  self-contained blueprint directory (per `blueprints/README.md`, a blueprint is self-contained) rather than a
+  modification of existing components. The only existing artifact under the target path
+  (`blueprints/dashboard/infra/hello-world.yml`) is an unfinished, unregistered copy-paste of `hello-world`
+  with no real logic to reverse-engineer. Full Reverse Engineering (business overview, API docs, component
+  inventory, interaction diagrams) is treated as low-value for this addition and is skipped per the Adaptive
+  Workflow Principle / "Simple changes may skip conditional INCEPTION stages". User may request it explicitly
+  at any time.
+
+## Code Location Rules
+- **Application Code**: Workspace root (NEVER in aidlc-docs/)
+- **Documentation**: aidlc-docs/ only
+- **Structure patterns**: See code-generation.md Critical Rules
+
+## Prior Decisions (made before formal AI-DLC invocation)
+- Blueprint scope: **Cost & usage dashboard** — surfaces `cornell:*` tag inventory and cost data (per
+  README.md/CLAUDE.md references to "the cost and usage dashboard").
+- Process: user explicitly opted into the formal AI-DLC workflow.
+
+## Extension Configuration
+| Extension | Enabled | Decided At |
+|---|---|---|
+| security-baseline | Yes | Requirements Analysis |
+| property-based-testing | Yes | Requirements Analysis |
+| resiliency-baseline | Yes | Requirements Analysis |
+
+Full rule files loaded for all three (deferred rule loading, Step 5.1): `security-baseline.md`
+(SECURITY-01..15), `property-based-testing.md` (PBT-01..10, full enforcement — answer A, not
+partial), `resiliency-baseline.md` (RESILIENCY-01..15). All are blocking constraints.
+
+### Resiliency decision points deferred to NFR/Application Design
+Per the resiliency extension's own scoping, these user decisions are asked at NFR Design rather
+than Requirements, and are NOT blocking requirements.md:
+- RESILIENCY-04: CI/CD tooling, rollback mechanism, deployment style
+- RESILIENCY-14: resiliency testing approach
+- RESILIENCY-15: incident response process
+
+## Execution Plan Summary
+See `inception/plans/execution-plan.md`. Risk level **Medium**; rollback Easy-to-Moderate; testing
+Moderate-to-Complex.
+- **Total stages**: 13 (incl. the Operations placeholder)
+- **Stages to execute**: Application Design, Units Generation, Functional Design, NFR Requirements,
+  NFR Design, Infrastructure Design, Code Generation, Build and Test
+- **Stages to skip**: Reverse Engineering only (rationale above). Every other conditional stage has
+  at least one blocking requirement that would otherwise have no home — a consequence of opting into
+  all three extensions.
+
+### Finding raised at Workflow Planning — SUPERSEDED 2026-08-03
+~~`pipeline/pipeline.yml` defines `ContainerRepository` and `ContainerBuildProject` but has only three
+stages (Source, PipelineDeploy, BlueprintDeploy); **no stage invokes the container build**.~~
+**No longer true** — see `inception/amendments/repo-baseline-2026-08-03.md` §A1.2. A branch rebase onto
+`main` landed a `Build` stage invoking `ArmContainerBuildProject`, and `builder-mcp` proves
+build → digest → deploy-by-digest end to end on arm64. The **x86** `ContainerBuildProject` is still
+uninvoked, which is why Lambda architecture became a new open question (Q8).
+
+Still true: US-15 does not cover adding the Build stage action or the Dockerfiles — a known
+story-coverage gap carried by Infrastructure Design and Code Generation rather than a story amendment.
+It is now cheaper to close, since the stage exists and the root `Dockerfile` target pattern is set.
+
+## ⚠️ Repo baseline amendment — 2026-08-03
+`origin/dashboard` was force-pushed (rebased onto `main`), pulling in 15 commits merged elsewhere. All
+inception artifacts survived byte-identical; pre-rebase tip `f9d4d57`. Four facts underpinning approved
+artifacts changed. Full record: **`inception/amendments/repo-baseline-2026-08-03.md`**.
+
+| § | What changed | Approved artifacts annotated |
+|---|---|---|
+| A1.1 | **No-self-approval rule removed.** Zero approving reviews required; `validate` is the only automated gate before a shared-account deploy | `requirements.md` §4.3 RESILIENCY-03 + §5 constraint 4; `execution-plan.md` success criteria |
+| A1.2 | **Container build now runs** (arm64, via `builder-mcp`). x86 still uninvoked | `application-design.md` §6.1; `services.md` deployment table; `execution-plan.md` risk reason 4 |
+| A1.3 | **New decision**: arm64 vs x86 Lambda architecture | none — asked as Q8 in `unit-of-work-plan.md` |
+| A1.4 | **`blueprint.yaml` is a parsed contract** (`builder_mcp/catalog.py`); needs `DeploymentName`, `state`, `data_classification`, `cost` values | none — asked as Q3/Q9 |
+| A1.5 | Risk stays **Medium** on a partly different reason set — container unknown shrank, change-control gate weakened | `execution-plan.md` |
+| A1.6 | `tools/check` now needs `terraform` **and** `uv`; neither installed here | — |
+
+Approved conclusions were **not** rewritten — each affected passage keeps its original wording and
+gains a pointer. No user decision was reopened. `CLAUDE.md`'s own closing paragraph still contradicts
+its `pipeline.yml` on the container build; flagged for its owner, not edited here.
+
+### Amendment A2 — monorepo reorganization, same day (27 commits, clean fast-forward, no rewrite)
+| § | What changed | Effect here |
+|---|---|---|
+| A2.1 | `aidlc-rules/`→`docs/aidlc-rules/`, `builder-mcp/`→`packages/builder-mcp/`, design docs→`docs/aidlc/dashboard/design/` | Reference fixed in the story map. **`aidlc-docs/` did not move.** |
+| A2.2 | **There is no root `Dockerfile`** — one per component directory, `CONTAINER_CONTEXT` + `CONTAINER_TARGET` | `unit-of-work.md` **corrected**: one `blueprints/dashboard/Dockerfile`, targets `collector` + `api`, context = blueprint root (forced, because both images need `core/`) |
+| A2.3 | New enforced rule: a `blueprint.yaml` must name a **registered** template | Manifest names `dashboard.yml`; `dashboard-storage.yml` is registered but not the entry point |
+| A2.4 | `observability/` exists — README only, "Nothing here yet" | Still not to be built. Its README names `cornell:deployment-id` as *the* join key, so this blueprint is the first consumer of a Track E contract |
+| A2.5 | New gotchas: `--list` must emit LF; `uv` may pick 32-bit Python without a `.python-version` pin | Relevant at Code Generation |
+
+**A2 changed no decision and no unit.** Path-and-packaging only. §6.4 still open — no commit touched the
+pipeline's stage order.
+
+## Functional Design U-01 — decisions and outputs
+`construction/plans/u-01-domain-core-functional-design-plan.md` Part A2 (Q1-Q9, all **A**).
+Artifacts: `construction/u-01-domain-core/functional-design/` — `domain-entities.md`,
+`business-rules.md`, `business-logic-model.md`.
+
+| Rule | Decision |
+|---|---|
+| BR-01 | Tag presence: exact key match **and** non-whitespace value. Empty or wrong-case ⇒ **missing**. One predicate, shared. |
+| BR-02 | Malformed item skipped, counted in `skipped_count` + `skipped_reasons` — never silently |
+| BR-03 | Global resources get region `"global"` |
+| BR-04 | Duplicate ARNs deduped, last wins, collisions counted |
+| BR-05 | Grouping: missing group `value=None`, omitted when empty; order count desc, value asc, missing last |
+| BR-06 | Gap report lists **which** tags are missing, in `REQUIRED_TAGS` order |
+| BR-07 | Freshness three-valued: FRESH / STALE / **INVALID**; `stale_after` = **3 × refresh_interval** |
+| BR-08 | JSON, sorted keys, deterministic bytes; read requires major-version match; unknown top-level keys **ignored** |
+
+**10 PBT properties identified** (P1-P10), up from 6. New: **P8** accounting identity
+(`raw_returned == len(resources) + skipped + duplicates`), **P9** grouping/classification agreement,
+**P10** freshness monotonic in `now`.
+
+### Corrections recorded at this stage
+1. **My Q1 text claimed skipping weakens FR-1.1. It does not.** Checked the approved text: FR-1.1 says
+   nothing about totality, and US-02 is phrased in terms of *silence* ("no resource is **silently**
+   omitted", "never presented as complete"). Q1 = A satisfies both exactly. **No amendment warranted** —
+   a fabricated amendment is as much a defect as a missing one.
+2. **Q9's option text was ambiguous ("preserved-or-ignored") — my error, resolved not re-asked.**
+   Resolved to **ignore**, because **no code path reads a snapshot and writes it back** (collector always
+   constructs fresh + single PutObject; API only reads), so key loss is unobservable by construction.
+   P1 is correspondingly **scoped to the same major version**, stated rather than hidden.
+
+### ⚠️ Cross-unit obligations flowing to U-02 — now four
+1. `Freshness.INVALID` needs a **sixth row** in C-03's degraded-state table: **503 / `error`**, not 200
+2. `skipped_count`, `duplicates_removed`, `raw_returned` must reach the UI, or Q1 = A's "surface the
+   count" half is never delivered
+3. C-01 must log enough at its own boundary to identify a skipped item — U-01 deliberately cannot (NFR-S1)
+4. **RESILIENCY-04 and -15 are ASSIGNED to U-02's NFR Design.** Deferral count: **2**
+   (Requirements Analysis → U-01 NFR Design → U-02 NFR Design). Recorded with the count so a third is
+   visible as a pattern rather than looking like a first.
+
+## NFR Design U-01 — outputs
+`construction/u-01-domain-core/nfr-design/` — `nfr-design-patterns.md`, `logical-components.md`.
+Q1-Q6 all **A**: `MappingProxyType` immutability · hashable, **no memoization** · `CoreError` hierarchy ·
+flat `__all__` surface · property suite **is** the RESILIENCY-14 test · RESILIENCY-04/-15 → U-02.
+
+**Nine patterns; zero infrastructure components** — eight mandated pattern families recorded N/A with
+reasons (retry/circuit-breaker presupposes a call that can fail; U-01 makes none).
+
+**Three implementation traps found in analysis, not restated from the answers:**
+1. `@dataclass(frozen=True, eq=True)` **auto-generates `__hash__`** from the field tuple, which would call
+   `hash()` on a `MappingProxyType` and raise `TypeError`. An **explicit `__hash__`** using
+   `frozenset(tags.items())` is required, and it must agree with `__eq__` or P1/P2/P6 break as what looks
+   like a serialization bug. Also: `__post_init__` needs `object.__setattr__`, and the `dict()` copy is
+   mandatory — wrapping the caller's mapping without copying leaves them a mutable reference into a
+   supposedly immutable object.
+2. **Q1's text named only `tags`; `Snapshot.skipped_reasons` has identical exposure.** Same treatment
+   extended to it.
+3. **`assert` is stripped under `python -O`**, so P8 — which NFR-R3 requires on a production read path —
+   must raise `InvalidSnapshot` explicitly. `assert` added to the forbidden-grep list.
+
+**Weakened claim recorded honestly**: RESILIENCY-14 is a *blocking* rule now discharged via NFR-T7
+(generator coverage), which is **review-only**. So a blocking rule rests on something no tool checks.
+NFR-T5 and NFR-T7 are the two review-only requirements carrying disproportionate weight.
+
+## Code Generation U-01 — outputs and honest verification status
+Code at `blueprints/dashboard/` (**never** in `aidlc-docs/`). Summary:
+`construction/u-01-domain-core/code/implementation-summary.md`.
+
+**Actually ran and passed here**: `py_compile` on all 8 files · `bash -n` on `tools/check` · the
+core-boundary grep (clean) · registry consistency (**no orphans, none registered-but-missing**) ·
+**~45 behavioural assertions** over the real core logic via an ad-hoc stdlib script — possible because
+Python 3.14 is present and **U-01 has no runtime dependencies**. NFR-P2 measured at **0.012 s for
+10,000 records** against a 10 s bound.
+
+**Did NOT run**: `pytest` (Hypothesis absent — so **the ten properties are written but never executed
+as properties**), `mypy --strict`, `cfn-lint` (not even a YAML parse — `pyyaml` absent), `tools/check`
+end to end, `uv.lock` generation.
+
+### 🐛 One real bug found by running the code
+`_resource_type` preferred `/` over `:` unconditionally, so
+`arn:aws:logs:...:log-group:/aws/lambda/x` yielded **`"log-group:"`** — colon attached — which is what
+would have shown in the dashboard's type column. Fixed to take the **earliest** separator; the case is
+now a permanent annotated regression row, and `conftest.py`'s duplicate derivation was updated in step.
+
+### Deviations from the approved plan
+1. **Step 11 was wrong — the template had to be registered.** `validate_stacks.py` fails on any
+   unregistered template found by its `AWSTemplateFormatVersion` scan, independent of pipeline actions.
+   Registered `dashboard-marker` as **`deployed_by: manual`** (which its own error text suggests), so
+   both invariants hold with no pipeline action. U-02 flips it to `pipeline` with the BlueprintDeploy
+   action. **Pre-existing finding: the stray `hello-world.yml` was also unregistered, so `tools/check`
+   and CI were ALREADY failing on this branch before this work.** This change fixes that.
+2. **`blueprint.yaml` deliberately absent** — U-02's per `unit-of-work.md`, and now *required* absent
+   for consistency, since a manifest must name a registered pipeline-deployable template.
+3. **`DeploymentName` parameter added** to the marker template, implementing Q9b's `singleton: false`
+   rather than leaving it a manifest field with no template support.
+
+## Build and Test U-01 — the Code Generation caveat is DISCHARGED
+`construction/build-and-test/` — `build-instructions.md`, `unit-test-instructions.md`,
+`build-and-test-summary.md`.
+
+Code Generation closed saying the ten properties were "written but never executed as properties".
+**They have now run.** `pip` and `venv` were available and U-01 has no runtime dependencies, so a
+throwaway `/tmp` virtualenv was enough for real `pytest` + `hypothesis` + `mypy`. No repo file was
+changed to enable it.
+
+| Check | Result |
+|---|---|
+| Property + example tests | **60 passed** (17 property, 43 example) |
+| Hypothesis | **100 examples/property**, `deadline=None`, profile verified loaded |
+| mypy strict over `dashboard.core` | **clean**, zero `# type: ignore` |
+| Boundary grep | clean |
+| NFR-P2 | 10,000 records in **~0.013 s** (bound 10 s) |
+| **Mutation testing** | **9/9 mutants killed** (after fixing the one survivor) |
+| **`tools/check` end to end** | ✅ **PASSES** (`uv` + terraform installed 2026-08-03) — incl. **first cfn-lint of `dashboard-marker.yml`: clean**, and `uv.lock` committed |
+
+### 🐛 Three defects found only by executing
+1. **`[tool.hypothesis]` in `pyproject.toml` did nothing** — Hypothesis has no pyproject config source.
+   NFR-T2 was satisfied *by coincidence* (its default is also 100). Profile moved into `conftest.py`
+   with `deadline=None`; verified loaded.
+2. **`mypy>=1.10` resolved to 2.3, where `disallow_untyped_defs` is ON by default** — a major
+   behavioural change inside the version floor. Pinned `mypy>=2,<3`; test modules relaxed per NFR-M3.
+   `dashboard.core` had **zero errors from the first run**.
+3. **A missing annotation plus a `draw()` inside a short-circuiting `and`.** The type error was a
+   *symptom of a real test-quality bug*: under short-circuiting the draw never fired when the list was
+   empty, so the Hypothesis choice-sequence shape varied with earlier values, degrading shrinking.
+
+### 🔬 Mutation testing found a vacuous property
+Breaking `sort_keys=True` killed **nothing**: P2 only serialized the *same object* twice, which a
+Python dict satisfies unsorted. Added a second arm comparing an **equal twin built with reversed tag
+insertion order** — now caught. **Side benefit: P5's oracle independence is now evidenced**, since
+breaking `group_by_tag`'s ordering made P5 fail, which a copied oracle could not do.
+
+**Harness honesty**: the first mutation sweep reported "NOTHING FAILED" nine times because it used
+`timeout`, which macOS lacks — a green-looking run that executed nothing. And `cp` is aliased to prompt,
+which hung and left a file mutated mid-run; recovered via `git checkout --` and verified against HEAD.
+Recorded because "all passed" and "never ran" look identical from a distance.
+
+## Functional Design U-02 — outputs
+`construction/u-02-dashboard-platform/functional-design/` — `domain-entities.md`, `business-rules.md`,
+`business-logic-model.md`, **`frontend-components.md`** (first appearance; U-01 had no UI).
+
+Q1-Q9 all **A**: 50-page bound · 1h interval → 3h stale · WAF CIDRs as a no-default parameter ·
+`useState` per view, no router/store/data-lib · **no colour encoding of group identity** ·
+`/api/inventory` + copy-URL · alarm on first failure, staleness at 3× · revert-to-rollback, all-at-once ·
+runbook in the README.
+
+**U-02 introduces no domain entities** — U-01 owns them all. It adds plumbing types only.
+**All four inherited obligations discharged by a named rule**: 1→AR-03 (the `INVALID`→503 sixth row),
+2→AR-05 (counts in *every* response), 3→CR-04 (C-01 logs the ARN, never a tag value), 4→DR-03+DR-04.
+
+### 🔍 Three findings from the analysis, two of them gaps in my own questions
+1. **The staleness alarm needs `TreatMissingData: breaching`** (OR-02). A collector that never *runs*
+   emits no metric and no error, so the failure alarm stays green — nothing failed, nothing ran. Default
+   `missing` would park the alarm in `INSUFFICIENT_DATA`, which looks green forever. This is the only
+   alarm covering that case.
+2. **GAP IN MY Q3: IPv6.** WAF IPSets are **per-address-family**; one set cannot hold IPv4 and IPv6. An
+   IPv4-only allowlist silently locks out IPv6-only clients — the exact outage-looking failure Q3 was
+   written to prevent, reintroduced through the question's blind spot. → Infrastructure Design.
+3. **The alarm destination already exists.** `blueprints/notify-topic/` is registered
+   `deployed_by: pipeline` and actively deployed; its `TopicArn` output is documented as "ARN to publish
+   to, **or to hand to another stack that needs to publish here**". C-09 reuses it (OR-05) rather than
+   creating a second topic. Caveat: **no `Export:`**, so `Fn::ImportValue` is unavailable → mechanism to
+   Infrastructure Design.
+
+### ⚠️ Q5 = A diverges from another team's file — needs relaying, not rewriting
+`blueprints/dashboard/docs/design-language.md` (written by others, ahead of the template) specifies a
+two-accent series with "Other" for charts. Q5 = A goes further: no colour encoding of group identity at
+all. That is **more conservative than the contract requires, not a violation** — but the file is not ours
+to silently rewrite. Its authors should decide whether the addendum changes or Q5 = A does.
+
+## NFR Requirements U-02 — outputs
+`construction/u-02-dashboard-platform/nfr-requirements/` — `nfr-requirements.md`,
+`tech-stack-decisions.md`. Q1-Q8 all **A**.
+
+Sizing 512 MB (collector 120 s / API 10 s) · cold starts accepted, **no provisioned concurrency** ·
+throttle 20 rps as a parameter · hashed assets immutable + `index.html` 60 s, **no invalidation** ·
+30-day retention everywhere · lifecycle on **both** buckets · **`Condition: HasImage`** on both Lambdas ·
+availability recorded, not engineered.
+
+**A third verification category was needed here that U-01 did not have: `deployed`.** 14 automated,
+19 review-only, **4 verifiable only against a running stack**, 12 N/A. Those four are the honest weak
+point — SEC-7 (the allowlist admits the right people), A-4 (failure degrades to *labelled stale*),
+P-6 (cache behaves), R-8 (metrics arrive). **U-01 finished with 60 executed tests and 9/9 mutation score;
+U-02 cannot reach that without a merge to `main`, which deploys to the shared account.** That asymmetry
+must not be smoothed over at U-02's Build and Test.
+
+### 🔍 Findings — two gaps in my own questions, one unlock
+1. **New requirement P-3.** Two bounds guard the collector — 50 pages and a 120 s timeout — and only one is
+   diagnosable. Past ~2.4 s/page the **timeout wins and the failure loses its name**, defeating Functional
+   Design Q1. The collector now raises `UPSTREAM_TOO_SLOW` on an internal ~100 s deadline, so no failure is
+   ever a bare platform timeout.
+2. **GAP IN MY Q6: the site bucket accumulates too.** Q6 asked about snapshot versions only, but hashed
+   assets pile up on every deploy. Added D-3 (30-day expiry) **and D-4: sync runs *without* `--delete`**,
+   because deleting immediately breaks a browser mid-rollout holding a cached `index.html`.
+3. **Q7 = A unblocks `blueprint.yaml`**, which Code Generation recorded as stuck. The chain was: no images →
+   no working deploy → no `pipeline` registration → no legal manifest target. `HasImage` breaks the first
+   link. Cost: a stack can exist with **no compute**, so "the stack deployed" stops implying "the dashboard
+   works" — covered by UI row 6 plus a new runbook entry.
+
+### ⚠️ Flagged for the user, not decided
+
+### Amendment A3 — layout superseded by `src/` conformance (2026-08-03)
+Not a repo change — a conformance correction found by checking `tiny-chatbot` and `aisei-site` empirically
+rather than reasoning from `CLAUDE.md`. Approved Q3 = A's flat layout is superseded by
+`blueprints/dashboard/src/dashboard/{core,collector,api}/` — one package, namespaced imports, no generic
+top-level `core`. `unit-of-work.md`'s layout block annotated, original preserved. **Independently confirms
+A2.2**: both real blueprints put the `Dockerfile` at their own root. No requirement, story, unit or
+property changed.
+
+## NFR Requirements U-01 — outputs
+`construction/u-01-domain-core/nfr-requirements/` — `nfr-requirements.md`, `tech-stack-decisions.md`.
+Decisions Q1-Q8 all **A**: `src/` layout · one blueprint-level `pyproject.toml` · properties gated in
+`tools/check` · mypy **strict scoped to `dashboard.core`** · `max_examples=100` · exceptions carry a
+**category only, never a tag value or ARN** (NetID privacy) · ARN parsed by `str.split`, no regex ·
+linear, verified at 10,000 records.
+
+**U-01 runtime dependencies: none — standard library only.** Consequences: the arm64 wheel risk flagged at
+Units Generation is **empty** for this blueprint; US-09/Q11 = B are nearly moot for U-01; and a runtime
+dependency appearing under `core/` is a boundary-violation signal, not a dependency decision.
+
+**Three corrections recorded at this stage, all mine**: (1) `tools/check` **already runs pytest** for
+builder-mcp, so Q3 = A adds a third block to an existing pattern rather than a new capability — my Q3
+preamble understated the script; (2) Q8's wording said the 10k check would be a "property test", which
+collides with `max_examples=100` — it is a **single example-based test**, oracle excluded; (3) Q1 = A's tree
+implied a generic top-level `core` importable, refined to one namespaced package.
+
+**⚠️ Specified but unexecuted**: `tools/check` needs `uv` **and** `terraform`, neither installed here, so
+every "automated" verification in `nfr-requirements.md` currently describes **intent, not observed
+behaviour**. Must not be blurred at Build and Test.
+
+## Inbound context — UI design language contract (2026-08-03, merged not authored by me)
+Three commits arrived while NFR Requirements U-01 was being written. **Nothing of mine is invalidated**
+— U-01 has no UI and accessibility/usability was already recorded N/A → U-02 — so this is recorded as
+binding context for U-02's passes rather than as an amendment.
+
+| New file | Bears on |
+|---|---|
+| `contracts/ui-design-language.md` | **Binding on C-06.** §2 accessibility (WCAG 2.2 AA) and §3 Cornell logo have **no exemption path**. Deviation is declarable only for §5 and below. |
+| `blueprints/dashboard/docs/design-language.md` | A dashboard addendum **already written by someone else** in this blueprint's directory, ahead of the template |
+| `.claude/skills/cornell-ui-compliance/` | A skill that triggers on UI work and blocks non-compliant output |
+| `docs/decisions/0001-ui-design-language-is-a-contract.md` | The decision record |
+
+**Convergence, not conflict**: the addendum's §8 position is "bundled SPA behind CloudFront, CSP with no
+`unsafe-inline`" — which is exactly Q4 = A (one distribution), Q9 = B (React + Vite) and US-01's strict CSP.
+It also says charts §9 exists *because of* this blueprint.
+
+**New constraint on C-06 that U-02 must honour**: a **two-accent series ceiling**. Once green/orange/red
+are reserved for status, Cornell's palette leaves only blue `#006699` and navy `#073949` plus dark gray for
+de-emphasis. That directly constrains US-03's grouping views, which group by `cornell:blueprint` and
+`cornell:owner` and will exceed two categories.
+
+**Verified against the frozen manifest contract** (`packages/builder-mcp/SPEC.md` §C1 — `blueprint.yaml` is
+**FROZEN**, no substantive change without mob agreement, and the dashboard is itself a listed consumer):
+all four keys chosen at Q9 — `data_classification`, `singleton`, `state`, `cost` — **exist in the frozen
+schema**, so Q9 set values rather than adding keys and no violation occurred. Two refinements noted:
+`state` entries take a `class:` key, and `data_classification` feeds a **review gate that blocks anything
+above the declared level** — an enforcement consequence of choosing `[internal]` that was not known when
+Q9a was answered. Also confirmed `singleton: false` is consistent with `deployment_create`, which forces
+`deployment_name = blueprint name` only for singletons.
+
+## Code Generation U-01 — outputs and honest verification status
+Code at `blueprints/dashboard/` (**never** in `aidlc-docs/`). Summary:
+`construction/u-01-domain-core/code/implementation-summary.md`.
+
+**Actually ran and passed here**: `py_compile` on all 8 files · `bash -n` on `tools/check` · the
+core-boundary grep (clean) · registry consistency (**no orphans, none registered-but-missing**) ·
+**~45 behavioural assertions** over the real core logic via an ad-hoc stdlib script — possible because
+Python 3.14 is present and **U-01 has no runtime dependencies**. NFR-P2 measured at **0.012 s for
+10,000 records** against a 10 s bound.
+
+**Did NOT run**: `pytest` (Hypothesis absent — so **the ten properties are written but never executed
+as properties**), `mypy --strict`, `cfn-lint` (not even a YAML parse — `pyyaml` absent), `tools/check`
+end to end, `uv.lock` generation.
+
+### 🐛 One real bug found by running the code
+`_resource_type` preferred `/` over `:` unconditionally, so
+`arn:aws:logs:...:log-group:/aws/lambda/x` yielded **`"log-group:"`** — colon attached — which is what
+would have shown in the dashboard's type column. Fixed to take the **earliest** separator; the case is
+now a permanent annotated regression row, and `conftest.py`'s duplicate derivation was updated in step.
+
+### Deviations from the approved plan
+1. **Step 11 was wrong — the template had to be registered.** `validate_stacks.py` fails on any
+   unregistered template found by its `AWSTemplateFormatVersion` scan, independent of pipeline actions.
+   Registered `dashboard-marker` as **`deployed_by: manual`** (which its own error text suggests), so
+   both invariants hold with no pipeline action. U-02 flips it to `pipeline` with the BlueprintDeploy
+   action. **Pre-existing finding: the stray `hello-world.yml` was also unregistered, so `tools/check`
+   and CI were ALREADY failing on this branch before this work.** This change fixes that.
+2. **`blueprint.yaml` deliberately absent** — U-02's per `unit-of-work.md`, and now *required* absent
+   for consistency, since a manifest must name a registered pipeline-deployable template.
+3. **`DeploymentName` parameter added** to the marker template, implementing Q9b's `singleton: false`
+   rather than leaving it a manifest field with no template support.
+
+## Build and Test U-01 — the Code Generation caveat is DISCHARGED
+`construction/build-and-test/` — `build-instructions.md`, `unit-test-instructions.md`,
+`build-and-test-summary.md`.
+
+Code Generation closed saying the ten properties were "written but never executed as properties".
+**They have now run.** `pip` and `venv` were available and U-01 has no runtime dependencies, so a
+throwaway `/tmp` virtualenv was enough for real `pytest` + `hypothesis` + `mypy`. No repo file was
+changed to enable it.
+
+| Check | Result |
+|---|---|
+| Property + example tests | **60 passed** (17 property, 43 example) |
+| Hypothesis | **100 examples/property**, `deadline=None`, profile verified loaded |
+| mypy strict over `dashboard.core` | **clean**, zero `# type: ignore` |
+| Boundary grep | clean |
+| NFR-P2 | 10,000 records in **~0.013 s** (bound 10 s) |
+| **Mutation testing** | **9/9 mutants killed** (after fixing the one survivor) |
+| **`tools/check` end to end** | ✅ **PASSES** (`uv` + terraform installed 2026-08-03) — incl. **first cfn-lint of `dashboard-marker.yml`: clean**, and `uv.lock` committed |
+
+### 🐛 Three defects found only by executing
+1. **`[tool.hypothesis]` in `pyproject.toml` did nothing** — Hypothesis has no pyproject config source.
+   NFR-T2 was satisfied *by coincidence* (its default is also 100). Profile moved into `conftest.py`
+   with `deadline=None`; verified loaded.
+2. **`mypy>=1.10` resolved to 2.3, where `disallow_untyped_defs` is ON by default** — a major
+   behavioural change inside the version floor. Pinned `mypy>=2,<3`; test modules relaxed per NFR-M3.
+   `dashboard.core` had **zero errors from the first run**.
+3. **A missing annotation plus a `draw()` inside a short-circuiting `and`.** The type error was a
+   *symptom of a real test-quality bug*: under short-circuiting the draw never fired when the list was
+   empty, so the Hypothesis choice-sequence shape varied with earlier values, degrading shrinking.
+
+### 🔬 Mutation testing found a vacuous property
+Breaking `sort_keys=True` killed **nothing**: P2 only serialized the *same object* twice, which a
+Python dict satisfies unsorted. Added a second arm comparing an **equal twin built with reversed tag
+insertion order** — now caught. **Side benefit: P5's oracle independence is now evidenced**, since
+breaking `group_by_tag`'s ordering made P5 fail, which a copied oracle could not do.
+
+**Harness honesty**: the first mutation sweep reported "NOTHING FAILED" nine times because it used
+`timeout`, which macOS lacks — a green-looking run that executed nothing. And `cp` is aliased to prompt,
+which hung and left a file mutated mid-run; recovered via `git checkout --` and verified against HEAD.
+Recorded because "all passed" and "never ran" look identical from a distance.
+
+## Functional Design U-02 — outputs
+`construction/u-02-dashboard-platform/functional-design/` — `domain-entities.md`, `business-rules.md`,
+`business-logic-model.md`, **`frontend-components.md`** (first appearance; U-01 had no UI).
+
+Q1-Q9 all **A**: 50-page bound · 1h interval → 3h stale · WAF CIDRs as a no-default parameter ·
+`useState` per view, no router/store/data-lib · **no colour encoding of group identity** ·
+`/api/inventory` + copy-URL · alarm on first failure, staleness at 3× · revert-to-rollback, all-at-once ·
+runbook in the README.
+
+**U-02 introduces no domain entities** — U-01 owns them all. It adds plumbing types only.
+**All four inherited obligations discharged by a named rule**: 1→AR-03 (the `INVALID`→503 sixth row),
+2→AR-05 (counts in *every* response), 3→CR-04 (C-01 logs the ARN, never a tag value), 4→DR-03+DR-04.
+
+### 🔍 Three findings from the analysis, two of them gaps in my own questions
+1. **The staleness alarm needs `TreatMissingData: breaching`** (OR-02). A collector that never *runs*
+   emits no metric and no error, so the failure alarm stays green — nothing failed, nothing ran. Default
+   `missing` would park the alarm in `INSUFFICIENT_DATA`, which looks green forever. This is the only
+   alarm covering that case.
+2. **GAP IN MY Q3: IPv6.** WAF IPSets are **per-address-family**; one set cannot hold IPv4 and IPv6. An
+   IPv4-only allowlist silently locks out IPv6-only clients — the exact outage-looking failure Q3 was
+   written to prevent, reintroduced through the question's blind spot. → Infrastructure Design.
+3. **The alarm destination already exists.** `blueprints/notify-topic/` is registered
+   `deployed_by: pipeline` and actively deployed; its `TopicArn` output is documented as "ARN to publish
+   to, **or to hand to another stack that needs to publish here**". C-09 reuses it (OR-05) rather than
+   creating a second topic. Caveat: **no `Export:`**, so `Fn::ImportValue` is unavailable → mechanism to
+   Infrastructure Design.
+
+### ⚠️ Q5 = A diverges from another team's file — needs relaying, not rewriting
+`blueprints/dashboard/docs/design-language.md` (written by others, ahead of the template) specifies a
+two-accent series with "Other" for charts. Q5 = A goes further: no colour encoding of group identity at
+all. That is **more conservative than the contract requires, not a violation** — but the file is not ours
+to silently rewrite. Its authors should decide whether the addendum changes or Q5 = A does.
+
+## NFR Requirements U-02 — outputs
+`construction/u-02-dashboard-platform/nfr-requirements/` — `nfr-requirements.md`,
+`tech-stack-decisions.md`. Q1-Q8 all **A**.
+
+Sizing 512 MB (collector 120 s / API 10 s) · cold starts accepted, **no provisioned concurrency** ·
+throttle 20 rps as a parameter · hashed assets immutable + `index.html` 60 s, **no invalidation** ·
+30-day retention everywhere · lifecycle on **both** buckets · **`Condition: HasImage`** on both Lambdas ·
+availability recorded, not engineered.
+
+**A third verification category was needed here that U-01 did not have: `deployed`.** 14 automated,
+19 review-only, **4 verifiable only against a running stack**, 12 N/A. Those four are the honest weak
+point — SEC-7 (the allowlist admits the right people), A-4 (failure degrades to *labelled stale*),
+P-6 (cache behaves), R-8 (metrics arrive). **U-01 finished with 60 executed tests and 9/9 mutation score;
+U-02 cannot reach that without a merge to `main`, which deploys to the shared account.** That asymmetry
+must not be smoothed over at U-02's Build and Test.
+
+### 🔍 Findings — two gaps in my own questions, one unlock
+1. **New requirement P-3.** Two bounds guard the collector — 50 pages and a 120 s timeout — and only one is
+   diagnosable. Past ~2.4 s/page the **timeout wins and the failure loses its name**, defeating Functional
+   Design Q1. The collector now raises `UPSTREAM_TOO_SLOW` on an internal ~100 s deadline, so no failure is
+   ever a bare platform timeout.
+2. **GAP IN MY Q6: the site bucket accumulates too.** Q6 asked about snapshot versions only, but hashed
+   assets pile up on every deploy. Added D-3 (30-day expiry) **and D-4: sync runs *without* `--delete`**,
+   because deleting immediately breaks a browser mid-rollout holding a cached `index.html`.
+3. **Q7 = A unblocks `blueprint.yaml`**, which Code Generation recorded as stuck. The chain was: no images →
+   no working deploy → no `pipeline` registration → no legal manifest target. `HasImage` breaks the first
+   link. Cost: a stack can exist with **no compute**, so "the stack deployed" stops implying "the dashboard
+   works" — covered by UI row 6 plus a new runbook entry.
+
+### ⚠️ Flagged for the user, not decided
+`CLAUDE.md` now says `docs/aidlc/` is "this repo's own AI-DLC record," and builder-mcp's record was
+relocated to `docs/aidlc/builder-mcp/`. By that convention this blueprint's record belongs at
+`docs/aidlc/dashboard/`. But **the vendored rules hardcode `aidlc-docs/` paths in every stage file**, so
+relocating puts the repo convention in direct conflict with the methodology. ~30 files. A decision, not a
+cleanup — deliberately not done.
+
+## NFR Design U-02 — outputs
+`construction/u-02-dashboard-platform/nfr-design/` — `nfr-design-patterns.md`, `logical-components.md`.
+Q1-Q6 all **A** ("choose defaults and proceed").
+
+Declarative `botocore.Config` retry/timeout → `UPSTREAM_THROTTLED` · **deadline derived from
+`get_remaining_time_in_millis()`** (knowledgebase.yml precedent) · stdlib `logging`+JSON, **no powertools** ·
+metrics via **EMF** (a log line, no API call) · API totality via **one outer error boundary** → generic 503 ·
+scheduled collector **`MaximumRetryAttempts: 0`, no DLQ**.
+
+**The mirror image of U-01's NFR Design.** U-01 recorded 8 pattern families N/A and zero infrastructure
+components; U-02 has a real 12-component inventory and every mandated category live. `logical-components.md`
+draws `notify-topic` and U-01's `dashboard.core` as **dependencies (inbound arrows), not owned boxes**, and
+has an explicit *no queue/cache/circuit-breaker* section with reasons.
+
+### ⚠️ TSD-8 REFINED (not reopened, not rewritten)
+Q2 = A refines TSD-8's internal-deadline **mechanism** from a guessed "≈100 s" constant to a value derived
+from `get_remaining_time_in_millis()` less a fixed margin — the 120 s timeout (P-1) becomes the single source
+of truth. **Numeric intent unchanged** at the default timeout. TSD-8's original wording is preserved in
+`tech-stack-decisions.md` with a ⚠️ REFINED pointer; this is an annotation, per the amendment discipline, not
+an in-place rewrite of an approved artifact.
+
+### RESILIENCY-04/-14/-15 were NOT re-deferred here
+U-01's NFR Design plan (Q6) routed -04/-15 to "U-02's NFR Design" as a 2nd deferral — but they were then
+**discharged one stage earlier, at U-02 NFR Requirements** (R-9 revert-to-rollback/deploy-by-digest, R-10
+runbook), so the deferral count stopped at 2. This stage confirmed they are closed and did **not** reopen
+them. -14 remains satisfied at U-01's NFR Design (the property suite).
+
+### Four findings (interactions), none reopening a prior decision
+1. **Q2 refines an approved artifact** — annotated above.
+2. **Q3 + Q4 compose into one stdout channel** — why EMF needs no extra IAM and cannot throttle; CR-04's
+   "never a tag value" rule extends to EMF **dimensions** (no NetID as a dimension).
+3. **Three named collector bounds** (page limit / deadline / retry exhaustion), ordered so the platform 120 s
+   timeout — the only *unnamed* bound — never wins. Every failure is attributable before the runtime kills it.
+4. **Q5 + Q6 are one discipline on two functions** — a failure must be named and visible, never papered over.
+
+**Carried to Infrastructure Design (unchanged):** §6.4 site-sync ordering · WAF IPv6 (2 IPSets or documented
+scope) · notify-topic ARN mechanism · API reserved-concurrency number (S-2) · exact CSP string · two-template
+split shape.
+
+## Infrastructure Design U-02 — outputs
+`construction/u-02-dashboard-platform/infrastructure-design/` — `infrastructure-design.md`,
+`deployment-architecture.md`. Q1-Q7 all **A** ("choose defaults and proceed"). All six routed items resolved.
+
+**Two templates** (Q1): `dashboard-storage.yml` (the two S3 buckets = stateful data) + `dashboard.yml` (everything
+else). Cross-refs by **naming convention** (`!Sub`), never `Fn::ImportValue` — the repo has **no exports**.
+
+**The whole serving layer is net-new to the repo.** No CloudFront, WAFv2, API Gateway HTTP API, OAC,
+ResponseHeadersPolicy, or `s3 sync` exists anywhere — only the Lambda/IAM/tag/`HasImage` skeleton copies from
+`tiny-chatbot.yml`. Each serving resource is specified from the AWS reference, not a local precedent.
+
+Resolutions: **Q2** site `BucketPolicy` in the *app* stack (breaks the OAC→distribution cycle with no export) ·
+**Q3** one net-new `SiteBuildProject` CodeBuild action, `npm build` + `s3 sync` **without `--delete`**, at
+`RunOrder 2` · **Q4** notify-topic ARN reconstructed via `!Sub` from the fixed convention name · **Q5** two WAF
+IPSets (IPv4 + IPv6, IPv6 may start empty) · **Q6** API reserved concurrency **10** · **Q7** strict CSP
+(`default-src 'none'`…, no `unsafe-inline`) + HSTS/nosniff/Referrer-Policy, imposing a no-inline-styles UI
+constraint on Code Generation.
+
+### The OAC cross-stack cycle (Q2) — a finding this stage surfaced, not a routed item
+OAC needs the site bucket to trust the distribution, but the bucket is in the storage stack and the distribution
+in the app stack, with no exports. Resolved by placing the (non-stateful) **bucket policy in the app stack**,
+referencing the convention-named bucket + the local distribution ARN.
+
+### Q2 ordering correction (recorded, not a rewrite of an approved doc)
+Q2-A's phrasing said the two stacks "deploy in parallel at `RunOrder 1`." Wrong: the app-stack site `BucketPolicy`
+calls `PutBucketPolicy` on the named bucket, so the bucket must exist first. **Correct ordering: `dashboard-storage`
+`RunOrder 1`; `dashboard` + site-sync `RunOrder 2`.** The decision is unchanged — only the deploy step is serialized
+by one `RunOrder`. Recorded in Part A2 finding 1 of the plan and `deployment-architecture.md` §1.
+
+### Marker flip queued for Code Generation (DR-02)
+`dashboard-marker` flips `deployed_by: manual` → `pipeline` in the **same PR** as its BlueprintDeploy action (legal
+only because `HasImage` makes a real deployable action possible). `stacks.yml` gains `dashboard-storage` + `dashboard`
+(both `pipeline`). `shared-infrastructure.md` **not warranted** — U-02 consumes shared infra, creates none.
+
+## Stage Progress
+### 🔵 INCEPTION PHASE
+- [x] Workspace Detection
+- [ ] Reverse Engineering (SKIPPED — see rationale above)
+- [x] Requirements Analysis
+- [x] User Stories
+- [x] Workflow Planning
+- [x] Application Design
+- [x] Units Generation (2 units: U-01 Domain Core, U-02 Dashboard Platform)
+
+**🔵 INCEPTION PHASE COMPLETE — 2026-08-03**
+
+### 🟢 CONSTRUCTION PHASE
+- [ ] Functional Design — **U-01 complete (awaiting approval)**; U-02 pass follows
+      - [x] U-01 Domain Core — 3 artifacts, BR-01..BR-08, **10 PBT properties** (PBT-01 satisfied) — **APPROVED 2026-08-03**
+      - [x] U-02 Dashboard Platform — **APPROVED 2026-08-03**. 4 artifacts incl. mandatory
+            `frontend-components.md`. 30 rules CR/SR/AR/ER/OR/DR. **All four inherited obligations
+            discharged by a named rule**; RESILIENCY-04 → DR-03, RESILIENCY-15 → DR-04
+- [ ] NFR Requirements — **U-01 complete (awaiting approval)**; U-02 pass follows
+      - [x] U-01 — 26 requirements (**15 automated, 11 review-only**), 7 tech-stack decisions — **APPROVED 2026-08-03**
+      - [x] U-02 — **APPROVED 2026-08-03**. **49 requirements: 14 automated, 19 review-only,
+            4 DEPLOYED-only, 12 N/A.** 8 tech-stack decisions (TSD-8..TSD-15)
+- [ ] NFR Design — **U-01 complete (awaiting approval)**; U-02 pass follows
+      - [x] U-01 — **APPROVED 2026-08-03** — 9 patterns, zero infrastructure components. **RESILIENCY-14 SATISFIED**;
+            **RESILIENCY-04/-15 ASSIGNED to U-02's NFR Design (2nd deferral)**
+      - [x] U-02 — **APPROVED 2026-08-04** — "approve and continue". Q1–Q6 all A. Two artifacts:
+            `nfr-design-patterns.md` (9 sections), `logical-components.md` (12-component inventory + 2
+            dependencies). **Note: RESILIENCY-04/-15 were NOT re-deferred to here** — they were already
+            discharged at U-02 NFR Requirements (R-9/R-10); deferral count stopped at 2. See below.
+- [ ] Infrastructure Design — **applicability to U-01 QUESTIONED, not assumed** (see
+      `construction/plans/u-01-infrastructure-design-applicability.md`). U-01 has **zero** infrastructure
+      components; the plan's own justification for this stage (SECURITY-01, -06, -14 SRI, RESILIENCY-08,
+      container build) is entirely U-02's. **First stage where the per-unit split does not fit** — both
+      container images contain U-01's code, so the infrastructure is indivisible where the logic was not.
+      - [x] U-01 — **SKIPPED 2026-08-03** (Q1 = A). Zero infrastructure components; packaging decisions
+            already in TSD-1/2/7; the stage's own justification is entirely U-02's. **2nd skip in the
+            workflow** (first: Reverse Engineering). `u-01-domain-core/infrastructure-design/` will not
+            exist — see `construction/plans/u-01-infrastructure-design-applicability.md`
+      - [x] U-02 — **COMPLETE 2026-08-04 (awaiting approval)**. Q1–Q7 all A. Two artifacts:
+            `infrastructure-design.md` (L-1..L-12 → CFN across two templates), `deployment-architecture.md`
+            (pipeline wiring). Resolved all six routed items; surfaced + resolved the OAC cross-stack cycle
+            (Q2). **The entire serving layer is net-new to the repo** (no CloudFront/WAFv2/HTTP API/OAC/s3-sync
+            precedent). See below.
+- [ ] Code Generation — **U-01 complete (awaiting approval)**; U-02 follows
+      - [x] U-01 — 8 Python files + README, `tools/check` extended, template repurposed & registered.
+            **~45 behavioural assertions actually executed and passing**; one real bug found and fixed
+      - [x] U-02 — **Part 1 + Part 2 COMPLETE 2026-08-04 (awaiting approval)**. collector (C-01) + read API
+            (C-03) + shared logging/EMF; Vite/React UI (C-06); two-target Dockerfile; `dashboard-storage.yml` +
+            `dashboard.yml`; `blueprint.yaml`; pipeline wiring (SiteBuildProject, 2 Build + 4 BlueprintDeploy
+            actions) + `stacks.yml` (marker flipped manual→pipeline, DR-02). **`tools/check` exit 0**: cfn-lint
+            clean on all 11 templates, **101 dashboard pytest** pass, mypy clean, boundary clean, terraform clean.
+            **UI**: 8 vitest pass, `npm run build` clean, **no inline script** in the bundle. **docker build NOT
+            run** (daemon down) — the one gap, closed at Build & Test. Four `deployed`-only reqs remain.
+- [ ] Build and Test — **U-01 complete (awaiting approval)**; U-02 follows
+      - [x] U-01 — **APPROVED 2026-08-03**. 60 tests passing (17 property, 43 example), mypy clean,
+            boundary clean, **mutation score 9/9**. Three defects found by running things.
+      - [x] U-02 — **COMPLETE 2026-08-04 (awaiting approval)**. `tools/check` exit 0: **101 Python
+            tests** (60 U-01 + 41 U-02), **8 UI vitest**, mypy clean, boundary clean, cfn-lint clean on
+            all 11 templates, contract (import boundary) clean. **Both arm64 images build + handlers
+            import**; UI bundle builds with no inline script. 3/3 targeted mutations caught. Residual:
+            four `deployed`-only reqs (SEC-7/A-4/P-6/R-8), closable only by a merge to `main`.
+
+### 🟡 OPERATIONS PHASE
+- [x] Operations — **PLACEHOLDER; workflow ends here (2026-08-04).** The vendored
+      `operations/operations.md` states plainly: "The AI-DLC workflow currently ends after the Build and
+      Test phase in CONSTRUCTION." There are **no defined OPERATIONS stages to execute**, and `CLAUDE.md`
+      forbids pre-building `observability/` or deployment/monitoring scaffolding unasked. So this phase is
+      acknowledged, not worked.
+      - **Real next step (NOT an AI-DLC stage, and the user's call):** open a PR and merge to `main`; the
+        pipeline's BlueprintDeploy stage deploys `dashboard-storage` → `dashboard` (+ site sync) → and the
+        flipped `dashboard-marker`, on the **shared account**. Set real `AllowedIpv4Cidrs` first, or the
+        WAF fails closed. That deploy is what finally verifies the four `deployed`-only requirements
+        (SEC-7, A-4, P-6, R-8).
+
+## 🏁 AI-DLC workflow status: COMPLETE (2026-08-04)
+Both units through every applicable CONSTRUCTION stage; OPERATIONS is a methodology placeholder.
+- **U-01 Domain Core** — complete end to end: 60 tests, 9/9 mutation, mypy strict clean.
+- **U-02 Dashboard Platform** — complete pre-deploy: collector/api/UI/edge/marker/observability built,
+  `tools/check` green, both images build, UI builds CSP-clean; 4 `deployed`-only reqs pending a merge.
+- **Still open, non-blocking (tracked, not part of this workflow's completion):**
+  - ~~Task #7 — telemetry amendment~~ → **IN PROGRESS 2026-08-07**, see the Round-2 section at the end
+    of this file. Did **not** in the end need team-d: `origin/team-d` still has no composition-id
+    decision recorded (checked at `e7edca0`), so there was nothing to coordinate with and the
+    `agent_id`-defaults-to-`deployment_id` design (T8) avoids depending on one.
+  - Q12/Q13 — whether `requirements.md` §4.6 gains a 5th exception, and whether US-09's 4th acceptance
+    criterion narrows to match Q11 = B (51 Dependabot findings context).
+
+## Application Design decisions (Q1–Q11, all resolved)
+See `inception/plans/application-design-plan.md` Part A2 (Q1–Q8) and Part A3 (Q9–Q11).
+
+| # | Decision | Answer |
+|---|---|---|
+| Q1 | Snapshot store | Single versioned encrypted JSON object in S3 |
+| Q2 | Aggregation timing | Read time; snapshot holds raw inventory only |
+| Q3 | API front door | API Gateway HTTP API |
+| Q4 | Distribution topology | One CloudFront distribution, two origins, `/api/*` to the API |
+| Q5 | API surface | Distinct path per view |
+| Q6 | Health endpoint | Same Lambda, same API |
+| Q7 | UI build | A framework with a build step |
+| Q8 | Degraded-state signalling | HTTP status code **and** body status field |
+| Q9 | Framework and bundler | React + Vite |
+| Q10 | How built files reach S3 | New Build stage action in the pipeline |
+| Q11 | SECURITY-10 over npm | Pinning yes; scanning and SBOM no |
+
+### Open but NOT blocking
+- **Q12/Q13** in `inception/plans/application-design-plan-clarification-2.md` — whether
+  `requirements.md` §4.6 gains a fifth accepted exception for Q11 = B, and whether US-09's fourth
+  acceptance criterion is narrowed to name the ecosystems it applies to. Both are **approved**
+  artifacts, so amending them is a user decision. The design is complete and consistent either way.
+
+### Deferred to Infrastructure Design by this stage
+- `aws s3 sync` targets the site bucket, but the Build stage precedes the stack that creates it.
+  Three resolutions exist (split the bucket into its own stack / sync after BlueprintDeploy / resolve
+  the name by convention). Recorded rather than guessed — `application-design.md` §6.4.
+
+## Current Status
+- **Lifecycle Phase**: INCEPTION
+- **Current Stage**: Units Generation — Parts 1 and 2 complete (Steps 1-15). All three mandatory
+  artifacts generated in `inception/application-design/`: `unit-of-work.md`,
+  `unit-of-work-dependency.md`, `unit-of-work-story-map.md`
+- **Next Stage**: **CONSTRUCTION** — Functional Design for U-01, after units are approved
+- **Status**: Awaiting explicit user approval of the units. This is the **last INCEPTION stage**.
+
+## Units of Work (approved decisions Q1-Q9, all "A")
+See `inception/plans/unit-of-work-plan.md` Part A2 and `inception/application-design/unit-of-work.md`.
+
+| Unit | Owns | Stories | Verifiable without AWS |
+|---|---|---|---|
+| **U-01 Domain Core** | C-04 Inventory Model, C-05 Aggregation Core | US-03, US-04, US-05, US-10 (4) | **Yes, entirely** |
+| **U-02 Dashboard Platform** | C-01, C-02, C-03, C-06, C-07, C-08, C-09, both templates, `blueprint.yaml`, pipeline/registry edits | the other 13 | No |
+
+One dependency edge: U-02 imports U-01 in-process. Acyclic. U-01 is on the critical path and nothing
+blocks it. Decisions: two units, enablers assigned with spillover recorded, group-by-kind layout with an
+enforceable no-`boto3` `core/` boundary, two CloudFormation templates, depth-first construction, human
+review requested though not required, **arm64**, and `blueprint.yaml` = `internal` /
+`singleton: false` + `DeploymentName` / snapshot `derived` / cost estimated (~$10-15/mo, WAF-dominated).
+
+### Correction recorded at this stage
+**Q4 = A does not resolve `application-design.md` §6.4, and my Q4 text wrongly said it would.** The
+pipeline order is `Source → PipelineDeploy → Build → BlueprintDeploy`, and `PipelineDeploy` deploys only
+the pipeline's own stack — so a storage stack registered as a BlueprintDeploy action still deploys after
+the Build stage's `s3 sync`. Splitting the template changes which stack owns the bucket, not when it
+exists. Q4 = A stands on its independent merit (stateful buckets stay out of the stack app updates
+replace). §6.4 remains **open, owner U-02, decided at Infrastructure Design**; likely resolution is Build
+emitting the bundle as a CodePipeline artifact with a `SiteSync` action at `RunOrder: 2` inside
+BlueprintDeploy. Options tabled in `unit-of-work-plan.md` Part A2 Interaction 1.
+
+### What Units Generation actually decides here
+This blueprint deploys as one CloudFormation stack behind one CloudFront distribution, so the
+vendored rules' "each unit becomes an independently deployable service" framing does not apply.
+The decomposition decides **how many times the CONSTRUCTION stages run** — Functional Design, NFR
+Requirements, NFR Design, Infrastructure Design, Code Generation, and Build and Test are per-unit.
+The one boundary that changes *how work is verified* rather than how it is organised: C-04 and C-05
+have empty dependency rows and no AWS SDK, so they can be property-tested on a laptop with no
+account and no pipeline. Everything else needs the never-yet-run container build.
+
+---
+
+## Round 2 (2026-08-07) — Telemetry + Cost amendment (FR-9 / FR-10)
+
+**Trigger**: user picked up the queued Task #7 and supplied a concrete metric list for two dashboards
+(Financial: platform costs, cost by model/application/department/agent/user, cost per completed task;
+Adoption: requests by model, token usage, error/timeout rate, human approval + prompt success rate),
+plus a question about reading metrics directly from AgentCore.
+
+**Stage re-entry, not restart.** `requirements.md`, `stories.md` and `personas.md` are **approved**
+artifacts, so per `common/workflow-changes.md` and the precedent in
+`amendments/repo-baseline-2026-08-03.md` none was rewritten in place. Each affected passage keeps its
+original text and gains a pointer. v1 (U-01 + U-02) is untouched and still complete.
+
+### The finding that reframed the request
+`blueprints/teams-bot` — the repo's only real LLM application — routes **all** generation through
+Cornell's **LiteLLM gateway, not Bedrock** (read from `src/handler.py` + `src/requirements.txt`, not
+assumed). So chat traffic emits **no `AWS/Bedrock` metrics in this account** and incurs **no Bedrock
+cost here**: a pull-based CloudWatch metrics source — which both `docs/aidlc/dashboard/design/`
+drafts proposed — would render **zeros** for exactly the requested metrics. The app *does* hold the
+numbers (`usage.input_tokens` / `output_tokens` on every response), so they are reachable by the
+**push** path only. Platform *infrastructure* cost is unaffected and works via Cost Explorer.
+**Consequence: platform cost and model cost are two domains with two sources.**
+
+### Decisions T1–T8
+| # | Decision | Answer |
+|---|---|---|
+| T1 | Cost source; un-defer FR-8? | **Yes — Cost Explorer** (`GetCostAndUsage`), **separate daily** schedule. CUR rejected: needs a payer/org-level export this account may not control. |
+| T2 | Cost by department | **Punt** — no `cornell:department` tag; a 5th required tag is a platform-wide change |
+| T3 | Cost by agent | Collapses to deployment today; per-agent dimension designed anyway (T8) |
+| T4 | Budget remaining | **Removed from scope** — no AWS Budgets dependency |
+| T5 | Cost by model (off-account) | **Both** — `tokens × configurable rate table` estimate now, labelled an estimate; LiteLLM API recorded as authoritative, still `BLOCKED` on the builder-credential problem |
+| T6 | Who emits | **Reader + spec only; no emitter.** `teams-bot` is Track C's and is not edited |
+| T7 | AgentCore direct vs CloudWatch | **CloudWatch only** — AgentCore publishes into CloudWatch; one `GetMetricData` read path. *Not re-verified against live docs (no web access this session) — treat exact namespaces as verify-before-build* |
+| T8 | deployment-id under composition | **Design the per-agent dimension now**: `agent_id`, **defaulting to `deployment_id`** — multi-agent becomes a change of values, not a schema migration |
+
+### Artifacts
+| File | Action |
+|---|---|
+| `inception/requirements/requirement-amendment-questions-telemetry-round-2.md` | **new** — decision record, the LiteLLM finding, CE caveats, cardinality/PII traps |
+| `inception/amendments/telemetry-fr9-2026-08-07.md` | **new** — FR-9 (9.1–9.7), FR-10 (10.1–10.9), NFR-T1–T7, 2 new documented exceptions |
+| `inception/requirements/requirements.md` | **pointers only** — FR-8 `⚠️ SUPERSEDED`, §6 `⚠️ AMENDED` |
+| `inception/user-stories/stories.md` | **appended** Round-2 section: US-16…US-23 + enablers US-24/US-25, own INVEST + coverage tables; US-D1/US-D2 marked superseded |
+| `inception/user-stories/personas.md` | **appended** amendment note — 2 goals added to P-01, **no new persona** (no identity layer, so nothing to differentiate) |
+| `docs/aidlc/dashboard/design/observability-contract.md` | **pointer only** — 4 of its open decisions now answered (teammate's doc, not rewritten) |
+| `docs/aidlc/dashboard/design/integration-note-fork-telemetry.md` | **pointer only** — its "port at U-02 Code Gen" recommendation overtaken; Bedrock-first framing holed by the LiteLLM finding |
+
+### What this pass will actually deliver when built (T6 consequence, stated not discovered)
+- **Real data day one**: platform cost today / month-to-date / YTD, and cost by blueprint + deployment
+  — *subject to* the manual Billing-console cost-allocation-tag activation (FR-10.5.1), which nothing
+  in this repo can perform, is not retroactive, and lags 24–48h.
+- **Empty state day one**: the entire Adoption dashboard, estimated model cost, and cost per completed
+  task — all push-only, and no blueprint is instrumented. So the empty state **is** the visible
+  deliverable, and FR-9.7.3/NFR-T7 make it a requirement to distinguish *not instrumented* /
+  *no data yet* / *cannot read* rather than showing a blank or a reassuring zero.
+
+### Not done, deliberately
+No code, no template, no manifest change, no UI. This pass is Requirements + Stories only — the
+stages after it (Application Design → NFR/Infrastructure Design → Code Generation → Build and Test)
+have **not** been run for FR-9/FR-10, so nothing is built and `tools/check` is unaffected.
+
+### Verify-before-build carried forward (FR-10.8)
+Bedrock per-model **usage-type strings**; whether `GetCostAndUsage` grouped by `USAGE_TYPE` splits per
+model in this account; current per-model **rates** for the estimator's table. None was verifiable this
+session — no live doc access, no account to query. Building against a guess here produces silently
+wrong money.
+
+---
+
+## Amendment A3 (2026-08-07, hours after A2) — FR-9/FR-10 measured against the real account
+
+**Trigger**: deploy-account credentials became available mid-session, so A2's FR-10.8
+verify-before-build items could be checked instead of carried. **Method**: read-only against
+`890349359349` (`cu-cit-aisei-prod-apps`) via SSO `sso-admin`; five `ce:GetCostAndUsage` calls at $0.01
+each (**~$0.05, real money, explicit user consent**), everything else free.
+
+**Detour worth remembering**: the local AWS profile named `ai-dlc-workshop` points at
+a different account (`cu-ornith-test`) — an unrelated Cornell account with production RDS. The real workshop
+account only surfaced by listing the SSO session's accounts. **Verify the account id, never the profile
+label**; trusting the name would have reported another team's spend as ours.
+
+| A2 statement | Verdict after measurement |
+|---|---|
+| FR-9.6 every Adoption counter is push-only | **WRONG** — `AWS/Bedrock` has 38 streams / 6 models incl. teams-bot's `claude-haiku-4-5`; requests, input/output tokens and errors are pull-able per `ModelId` with **no instrumentation**. But volume is **2 invocations / 14 tokens over 14 days** — live path, almost no real traffic. Reader must consume **both** routes. |
+| FR-9.7 everything renders empty | **SOFTENED** — US-20/US-21 get real (tiny) numbers; approval rate, success rate, completed tasks still empty. Makes NFR-T7's three-state distinction matter *more*. |
+| FR-10.5.1 tag activation is a manual console step | **UNDERSTATED** — `ListCostAllocationTags` → `AccessDenied: Linked account doesn't have access`. Impossible here at **any** privilege; the Organization **payer** must do it. FR-10.3 is blocked on another team. |
+| FR-10.5.4 CE denial presents as an error | **WRONG, and this is the important one** — tag grouping **succeeds** (HTTP 200) returning one group keyed `cornell:blueprint$` with **100% of spend**. Empty value = unattributed, but a naive reader renders "cornell:blueprint: $9.02" — one confident wrong attribution, undetectable by error-checking. → **new FR-10.3.6** + two US-17 criteria. |
+| FR-10.8 usage-type/model encoding unverified | **ANSWERED** — `USE1-<Model>-{input,output}-tokens` (NovaLite, NovaPro, TitanEmbeddingV2); `GROUP BY USAGE_TYPE` splits per model. Per-model cost works **without** the tag activation. No Claude usage types billed. Rates still open. |
+| FR-10.6 model cost must be estimated | **CONFIRMED BY BILLING** — in-account Bedrock spend is **$0.0000371** MTD. The LiteLLM inference now has independent evidence. |
+| T7 CloudWatch-only for AgentCore | **VALIDATED, stronger reason** — `AWS/Bedrock-AgentCore` has 13 metrics incl. `Sessions`, `ActiveSessionCount`, `CPUUsed-vCPUHours`. Adoption signals already there, uninstrumented. |
+| NFR-T4 don't become a material cost | **QUANTIFIED → NFR-T8** — account is **$9.02 MTD**; CloudWatch is already **18% of YTD spend**. Daily CE ≈ 3%/mo; 10 custom metrics ≈ **33%**/mo. Vindicates T1's daily schedule (hourly would be ~$7.20/mo) and the refusal of a per-user dimension. |
+
+**Measured baseline**: MTD $9.0232 — OpenSearch $6.44 (**71%**, the knowledgebase's vector store, new
+this month), Config $1.14, CodePipeline $0.41, CloudWatch $0.35, Secrets Manager $0.27, AgentCore
+$0.24, Bedrock $0.0000371.
+
+**Deployment state confirmed**: 8 `aidlc-*` stacks live (`account-bootstrap`, `pipeline`,
+`hello-world`, `notify-topic`, `knowledgebase`, `aisei-site`, `builder-mcp`, `teams-bot`); **no
+dashboard stacks** — the branch has never been merged, so SEC-7/A-4/P-6/R-8 remain unverified.
+
+**Still governing, unchanged**: T1–T8, FR-10.9, NFR-T1…T7. **Still open**: per-model rates (FR-10.8
+item 3 — pricing-page data, no web access this session).
+
+---
+
+## Application Design — FR-9/FR-10 pass (2026-08-07)
+
+**Plan**: `inception/plans/application-design-plan-fr9-fr10.md`. Extends the approved v1 design
+(C-01…C-09) without revisiting it.
+
+| # | Decision | Answer |
+|---|---|---|
+| Q1 | Snapshot layout | **A — three objects, one per section**, one owner each. A2's FR-9.5.3 could not be built: cost is daily vs hourly inventory/telemetry, so one object forces a **read-modify-write** that C-01 forbids and that loses updates. → **A4.1** |
+| Q2 | How the declaration reaches the reader | **A — build-time baked catalog (C-14) + fixed code-level AWS allowlist.** FR-9.4/9.5.2 had no middle: `blueprint.yaml` is in git, the reader is a Lambda. → **A4.2** |
+| Q3 | Cost collector packaging | **B — reuse the collector image**, new target + handler, own role (`ce:GetCostAndUsage`) + own daily schedule |
+| Q4 | Unit boundary | **A — extend both** on the purity line: pure into U-01, AWS-facing into U-02. Money arithmetic must be property-testable |
+| Q5–Q8 | Rate table in SSM; distinct route per view; two new UI tabs reusing `StateBoundary`; dashboard shows its own cost | defaults, unopposed |
+
+**Added**: C-10 Cost Collector (U-02), C-11 Telemetry Collector (U-02), C-12 Cost Model + Estimator
+(**U-01, pure**), C-13 Telemetry Model (**U-01, pure**), C-14 Declared-Counter Catalog.
+**Extended**: C-02 (3 keys/3 owners), C-03 (4 routes + composition + read-time estimation), C-06
+(Financial + Adoption tabs), C-09 (2 collectors' alarms; short retention — CloudWatch is already ~18%
+of account spend).
+
+**Design properties recorded once**: `collected_at` is **per section** (no single snapshot age — cost
+really is 24–48h stale, inventory an hour); **money is `Decimal`, never `float`** (CE returns decimal
+strings; `float` puts binary rounding into figures people act on); **estimation is read-time** so
+correcting a rate corrects history.
+
+**Two deliberately different failure policies**: cost **fails whole** (a partial cost object reads as
+zero spend), telemetry **degrades per counter** (failing the run would erase real AWS data because an
+uninstrumented namespace was empty).
+
+**Artifacts**: `components.md`, `component-methods.md`, `services.md`, `component-dependency.md`,
+`application-design.md` all extended with an FR-9/FR-10 section + a coverage table;
+`amendments/telemetry-a4-design-2026-08-07.md` new. **APPROVED 2026-08-07** — user response
+"approve and move to construction".
+
+**Not decided here, deliberately**: CE query shapes and call count, metric window/period, one
+EventBridge rule vs two, which template the new Lambdas live in, and the per-model rate values
+(FR-10.8 item 3 — pricing data, not design).
+
+---
+
+## CONSTRUCTION — FR-9/FR-10 increment (2026-08-07)
+
+**Plan**: `construction/plans/fr9-fr10-construction-plan.md`. Artifacts under
+`construction/fr9-fr10/` (**gitignored**, like all `construction/` docs — only the code they describe
+is committed).
+
+**Stage selection** (collapses stated, not silent): Units Generation **collapsed** (design Q4 already
+assigned every component to a unit); NFR Requirements **collapsed** (NFR-T1…T8 already exist at
+requirements level in A2/A3); NFR Design **folded** into Functional + Infrastructure Design (U-02's six
+patterns are inherited unchanged by same-shaped components). Functional Design, Infrastructure Design,
+Code Generation and Build and Test all **run**.
+
+### Functional Design — COMPLETE
+`business-rules.md`: **COST-01…14, TEL-01…10, CAT-01…05**, each citing its clause or criterion, plus
+five prohibitions verified by absence. `business-logic-model.md`: algorithms + property targets.
+Highlights:
+- **COST-05 is a failure, not a cap** — truncating at a call budget yields a *smaller* cost figure that
+  looks valid, the money-domain analogue of CR-01's refusal to truncate pagination.
+- **COST-07 vs TEL-05 are deliberately opposite**: cost fails whole (a partial cost object reads as zero
+  spend); telemetry degrades per counter (failing would erase real AWS data because an uninstrumented
+  namespace was empty). Recorded so it does not read as an inconsistency.
+- `is_unattributed` is a one-line pure predicate **on purpose** — it is the whole defence against A3.3's
+  trap, so it must be trivially reviewable and property-testable.
+- Property targets: money **additivity** (what makes per-agent/per-window totals trustworthy), the
+  attribution **partition + sum-preserved** identity, rate **re-aggregation** (which justifies TEL-06's
+  refusal to store ratios), and state **totality**.
+- `ACCESS_DENIED` is its own `CostReason` because it is *permanent*, unlike every other retry-shaped one.
+
+### Infrastructure Design — COMPLETE
+Everything lands in **`dashboard.yml`**; a separate stack was rejected because this repo has **no
+exports** and would need `!Sub` name reconstruction for no lifecycle gain. **`stacks.yml` unchanged** —
+no new template, so the three-file mirror does not apply.
+- **Q3 refined**: no new Dockerfile targets and **no new Build actions**. The `base` stage already
+  installs the whole package, so the two new functions reuse the **same `CollectorImageUri`** with
+  `ImageConfig.Command` overriding the entrypoint. One digest across four functions **cannot drift**;
+  four images built from one tree can.
+- One new parameter (`CostScheduleExpression`); SSM rates path derived by `!Sub`.
+- `ModelRatesParameter` ships **empty (`{}`)** on purpose — FR-10.8 item 3 is unresolved and a guessed
+  rate would be confident wrong money. Empty ⇒ COST-14 ⇒ *rate missing*.
+- **Per-key S3 write scoping in IAM** is what enforces A4.1's no-shared-writes property — a permission,
+  not a convention.
+- **NFR-T8 measured**: the increment costs **~$0.40–0.60/mo ≈ 5%** of the $9.02 account. This drove two
+  decisions rather than confirming them: **14-day** retention on the new log groups (not the 30 the
+  existing ones use — CloudWatch is already ~18% of spend), and `max_ce_calls` as config with the count
+  **emitted** so the estimate is measured rather than asserted. Rejected alternatives for scale: hourly
+  CE = **~$5.04/mo (over half the account)**; ten per-user metrics = ~33%.
+- **`CostAccessDeniedAlarm` is separate** because that condition is permanent and needs *the
+  Organization payer*, not a retry — one combined alarm would train its owner to ignore the only failure
+  that needs a human outside this team.
+
+**Open for Code Generation**: where C-14's catalog is generated — into the container build context (cannot
+drift) or committed as a generated file validated by `tools/check` (more inspectable, no pipeline change).
+Needs the buildspec in front of me.
+
+**`pipeline.yml` headroom**: 50,966 / 51,200 bytes — **234 free**, measured. The additions fit but would
+leave ~70; comment condensation is part of the work, not a contingency.
+
+**Awaiting approval before Code Generation** — the first stage in this pass that writes code.
+
+### Code Generation + Build and Test — FR-9/FR-10 — COMPLETE 2026-08-07
+**`tools/check` exit 0**, stable across three consecutive runs: **198 dashboard tests** (was 101),
+77 builder-mcp, 49 teams-bot; mypy clean on **52 source files**; core boundary clean; cfn-lint clean;
+catalog drift check green. **UI**: 15 vitest (was 8), `tsc` clean, `npm run build` clean, **0 inline
+script bodies** in the built HTML (verified after stripping comments — an earlier grep of mine matched
+the comment that documents the rule, so the check now parses instead).
+
+**Written** — U-01 pure: `core/money.py` (C-12), `core/telemetry.py` (C-13), `core/catalog.py` (C-14
+parser). U-02: `cost/` (config/errors/explorer/handler), `telemetry/`
+(config/metrics/catalog_loader/handler), `api/sections.py` + `api/section_views.py`, four new routes.
+UI: `SectionBoundary`, `FinancialView`, `AdoptionView`, `useSection`, two new tabs. Infra: 2 functions,
+2 roles, 2 schedules, 4 alarms, `ModelRatesParameter`. Tooling: `tools/gen_telemetry_catalog.py` +
+a `tools/check` drift gate.
+
+**Mutation spot-check: 6/6 caught** — `is_unattributed` always False (the A3.3 trap), missing rate
+priced as zero, no-tasks guard removed, `agent_id` default dropped, zero-denominator guard removed, CE
+call budget not enforced.
+
+**Three real defects found by building it**, each fixed and regression-tested:
+1. `parse_catalog` dropped non-emitting blueprints, so `not_instrumented` was always empty — the UI
+   would have shown an unexplained blank panel instead of naming the seven blueprints that report
+   nothing (FR-9.7.3). Added `Catalog.known`.
+2. The new CSS used `var(--muted)` and `.muted`, **neither of which existed**. Defined `--muted:
+   #6b6b6b` — measured 5.33:1 on white, 4.97:1 on `#f7f7f7`. Reusing `--border` (`#767676`) would have
+   been a quiet 1.4.3 failure at **4.24:1** on the gray surface.
+3. `test_api_routing.py`'s closed-allowlist property **failed**, because Hypothesis generated one of
+   the new paths and found it resolving while `_KNOWN` listed only the original five. The property
+   working exactly as intended; `_KNOWN` updated and two dispatch tests added.
+
+**Images verified — the residual gap is CLOSED (2026-08-07, daemon came up).** Both arm64 targets
+build. What mattered most was confirming the `ImageConfig.Command` premise rather than just that the
+build succeeds: **all four entrypoints import from the *collector* image**
+(`collector`/`api`/`cost`/`telemetry` handlers), which is what makes one digest across four functions
+correct. Also confirmed inside the image: the baked catalog loads and names all 7 blueprints,
+`boto3 1.43.66` is present from the `[aws]` extra, `arch: arm64`, and each image's baked `CMD` is its
+own handler. Then **ran both new collectors end to end inside the image** with fake clients: cost wrote
+`cost/current.json` with `covered_through` 2026-08-06 distinct from `collected_at` 2026-08-07, the
+unattributed bucket at 9.0231738003 with **zero attributed groups**, and `ce_calls: 7`; telemetry wrote
+`telemetry/current.json` with `aws_state: ok` (10 counters) beside `declared_state: not_instrumented`
+naming 7 blueprints — the two-different-states-side-by-side case NFR-T7 exists for. JSON logs and EMF
+envelopes emitted correctly. Check images removed afterwards.
+
+**`pipeline.yml`**: one parameter added, then **636 bytes reclaimed** by condensing teams-bot and
+knowledgebase comment prose (pointing at docs that already carry the detail, never deleting rationale).
+50,389 / 51,200 bytes — **811 free**, up from 234.
+
+**Still open, unchanged**: per-model rates (FR-10.8 item 3 — pricing data; the table ships empty on
+purpose), and cost attribution blocked on the Organization payer activating `cornell:*` (A3.3).

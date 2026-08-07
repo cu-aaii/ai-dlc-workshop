@@ -1,0 +1,956 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Cost & usage dashboard -- APPLICATION stack (U-02). The collector (C-01), read API (C-03), HTTP API, CloudFront edge (C-07), WAF, schedule, alarms and log groups (C-09). The two S3 buckets live in dashboard-storage.yml; this stack references them by naming convention and owns the site bucket policy (the OAC grant needs the distribution ARN, so it cannot live with the bucket).'
+
+Parameters:
+
+  # Metadata Parameters
+  Application:
+    Default: 'aidlc'
+    AllowedPattern: '[a-z0-9-]{1,10}'
+    Description: 'Name used for billing and other tracking/identification purposes'
+    Type: 'String'
+
+  Environment:
+    Default: 'main'
+    AllowedPattern: '[a-z0-9]{1,4}'
+    Description: 'Name of the deployment branch'
+    Type: 'String'
+
+  Owner:
+    Default: 'ai-sei'
+    AllowedPattern: '.{1,128}'
+    Description: 'Who owns this deployment (cornell:owner)'
+    Type: 'String'
+
+  BlueprintVersion:
+    Default: '0.1.0'
+    AllowedPattern: '[0-9]+\.[0-9]+\.[0-9]+'
+    Description: 'Version of the dashboard blueprint (cornell:blueprint-version)'
+    Type: 'String'
+
+  DeploymentName:
+    Default: 'dashboard'
+    AllowedPattern: '[a-z0-9-]{1,20}'
+    Description: 'Name of this deployment (part of cornell:deployment-id and the bucket names)'
+    Type: 'String'
+
+  # Container images -- one per Dockerfile target. Empty deploys the stack with no compute
+  # (Condition: HasImage, TSD-14), so day-one and hand deploys work before any image is built.
+  CollectorImageUri:
+    Default: ''
+    AllowedPattern: '.{0,512}'
+    Description: 'Collector image digest URI (#{DashboardCollectorContainer.CONTAINER_DIGEST}). Empty deploys no collector.'
+    Type: 'String'
+
+  ApiImageUri:
+    Default: ''
+    AllowedPattern: '.{0,512}'
+    Description: 'Read-API image digest URI (#{DashboardApiContainer.CONTAINER_DIGEST}). Empty deploys no API.'
+    Type: 'String'
+
+  # WAF allowlist (Q5). Two address families. Defaults are documentation ranges that match NO real
+  # client, so a deploy without explicit CIDRs fails CLOSED (deny-by-default holds) rather than open.
+  AllowedIpv4Cidrs:
+    Default: '192.0.2.0/24'
+    Description: 'IPv4 CIDRs allowed through the WAF (Cornell campus ranges). Default is TEST-NET-1 -- a placeholder that admits no one; set real ranges per environment.'
+    Type: 'CommaDelimitedList'
+
+  AllowedIpv6Cidrs:
+    Default: '::1/128'
+    Description: 'IPv6 CIDRs allowed through the WAF. Default is loopback -- a placeholder that admits no real client; the IPSet exists so real ranges are a parameter change, not a template change.'
+    Type: 'CommaDelimitedList'
+
+  SnapshotKey:
+    Default: 'snapshots/current.json'
+    AllowedPattern: '.{1,256}'
+    Description: 'S3 key of the current snapshot object'
+    Type: 'String'
+
+  PageLimit:
+    Default: '50'
+    AllowedPattern: '[0-9]{1,4}'
+    Description: 'Maximum pages the collector will fetch before failing PAGE_LIMIT_EXCEEDED (CR-01)'
+    Type: 'String'
+
+  StaleThresholdSeconds:
+    Default: '10800'
+    AllowedPattern: '[0-9]{1,8}'
+    Description: 'Age beyond which a snapshot is stale (R-4: 3x the 1h collection interval)'
+    Type: 'String'
+
+  ApiReservedConcurrency:
+    Default: '10'
+    MinValue: 1
+    MaxValue: 100
+    Description: 'Reserved concurrency for the read API (S-2, Q6)'
+    Type: 'Number'
+
+  CostKey:
+    Default: 'cost/current.json'
+    AllowedPattern: '.{1,256}'
+    Description: 'S3 key of the cost section. Its OWN key, not a section inside the snapshot: cost is collected daily while inventory is hourly, so one object would force a read-modify-write (A4.1).'
+    Type: 'String'
+
+  TelemetryKey:
+    Default: 'telemetry/current.json'
+    AllowedPattern: '.{1,256}'
+    Description: 'S3 key of the telemetry section (A4.1 -- one writer per key)'
+    Type: 'String'
+
+  CostScheduleExpression:
+    Default: 'rate(1 day)'
+    AllowedPattern: '(rate|cron)\(.{1,80}\)'
+    Description: 'Cost collection cadence. DAILY on purpose: ce:GetCostAndUsage bills $0.01 per request and its data only advances once a day, so hourly polling would cost ~$5/month against a ~$9/month account (NFR-T8).'
+    Type: 'String'
+
+  MaxCeCalls:
+    Default: '8'
+    AllowedPattern: '[0-9]{1,3}'
+    Description: 'Hard cap on Cost Explorer requests per run. Exceeding it FAILS the run rather than truncating (COST-05) -- a truncated cost figure looks valid and under-reports spend.'
+    Type: 'String'
+
+  LogLevel:
+    Default: 'INFO'
+    AllowedValues: ['DEBUG', 'INFO', 'WARNING', 'ERROR']
+    Description: 'Log level for both functions (SEC-4)'
+    Type: 'String'
+
+  SourceCommitId:
+    Default: 'unknown'
+    AllowedPattern: '.{1,64}'
+    Description: 'Commit the pipeline deployed, passed through as #{GitRepository.CommitId}'
+    Type: 'String'
+
+Conditions:
+  HasCollectorImage: !Not [!Equals [!Ref 'CollectorImageUri', '']]
+  HasApiImage: !Not [!Equals [!Ref 'ApiImageUri', '']]
+
+Resources:
+
+  # ---------------------------------------------------------------------------------------
+  # Log groups (D-5, D-6; 30-day retention, TSD-12). Explicit so they are tagged and removed
+  # with the stack rather than auto-created untagged by Lambda.
+  # ---------------------------------------------------------------------------------------
+  CollectorLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Application}-${Environment}-${DeploymentName}-collector'
+      RetentionInDays: 30
+
+  ApiLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Application}-${Environment}-${DeploymentName}-api'
+      RetentionInDays: 30
+
+  # 14 days, not the 30 above, and that is a cost decision rather than an oversight. CloudWatch is
+  # already ~18% of this account's total spend (measured), and neither of these groups is
+  # diagnostically useful after a fortnight: a failed cost run is retried the next day. Copying the
+  # 30-day default would have been the unexamined choice (NFR-T8).
+  CostLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Application}-${Environment}-${DeploymentName}-cost'
+      RetentionInDays: 14
+
+  TelemetryLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Application}-${Environment}-${DeploymentName}-telemetry'
+      RetentionInDays: 14
+
+  ApiAccessLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/aws/apigateway/${Application}-${Environment}-${DeploymentName}'
+      RetentionInDays: 30
+
+  # WAF logging requires a log group whose name starts with "aws-waf-logs-".
+  WafLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub 'aws-waf-logs-${Application}-${Environment}-${DeploymentName}'
+      RetentionInDays: 30
+
+  # ---------------------------------------------------------------------------------------
+  # IAM -- two least-privilege, key-scoped roles (SR-02, SEC-6). Neither is bucket-wide.
+  # ---------------------------------------------------------------------------------------
+  CollectorRole:
+    Type: 'AWS::IAM::Role'
+    Condition: 'HasCollectorImage'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-${DeploymentName}-collector-exec'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'lambda.${AWS::URLSuffix}'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'collector'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: ['logs:CreateLogStream', 'logs:PutLogEvents']
+                Resource: !GetAtt 'CollectorLogGroup.Arn'
+              - Effect: 'Allow'
+                # The Resource Groups Tagging API has no resource-level scoping for GetResources.
+                Action: ['tag:GetResources']
+                Resource: '*'
+              - Effect: 'Allow'
+                Action: ['s3:PutObject']
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-${DeploymentName}-snapshot-${AWS::AccountId}/${SnapshotKey}'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  ApiRole:
+    Type: 'AWS::IAM::Role'
+    Condition: 'HasApiImage'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-${DeploymentName}-api-exec'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'lambda.${AWS::URLSuffix}'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'api'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: ['logs:CreateLogStream', 'logs:PutLogEvents']
+                Resource: !GetAtt 'ApiLogGroup.Arn'
+              - Effect: 'Allow'
+                # Three enumerated keys, never bucket/*. Per-key scoping is what enforces A4.1's
+                # "one writer per object" as a permission rather than a convention.
+                Action: ['s3:GetObject']
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-${DeploymentName}-snapshot-${AWS::AccountId}/${SnapshotKey}'
+                  - !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-${DeploymentName}-snapshot-${AWS::AccountId}/${CostKey}'
+                  - !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-${DeploymentName}-snapshot-${AWS::AccountId}/${TelemetryKey}'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # ---------------------------------------------------------------------------------------
+  # Compute -- two arm64 container Lambdas (TSD-8, TSD-14).
+  # ---------------------------------------------------------------------------------------
+  CollectorFunction:
+    Type: 'AWS::Lambda::Function'
+    Condition: 'HasCollectorImage'
+    Properties:
+      FunctionName: !Sub '${Application}-${Environment}-${DeploymentName}-collector'
+      PackageType: 'Image'
+      Code:
+        ImageUri: !Ref 'CollectorImageUri'
+      Architectures: ['arm64']
+      Role: !GetAtt 'CollectorRole.Arn'
+      MemorySize: 512
+      Timeout: 120
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !Ref 'CollectorLogGroup'
+      Environment:
+        Variables:
+          LOG_LEVEL: !Ref 'LogLevel'
+          SNAPSHOT_BUCKET: !Sub '${Application}-${Environment}-${DeploymentName}-snapshot-${AWS::AccountId}'
+          SNAPSHOT_KEY: !Ref 'SnapshotKey'
+          PAGE_LIMIT: !Ref 'PageLimit'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  ApiFunction:
+    Type: 'AWS::Lambda::Function'
+    Condition: 'HasApiImage'
+    Properties:
+      FunctionName: !Sub '${Application}-${Environment}-${DeploymentName}-api'
+      PackageType: 'Image'
+      Code:
+        ImageUri: !Ref 'ApiImageUri'
+      Architectures: ['arm64']
+      Role: !GetAtt 'ApiRole.Arn'
+      MemorySize: 512
+      Timeout: 10
+      ReservedConcurrentExecutions: !Ref 'ApiReservedConcurrency'
+      LoggingConfig:
+        LogGroup: !Ref 'ApiLogGroup'
+      Environment:
+        Variables:
+          LOG_LEVEL: !Ref 'LogLevel'
+          SNAPSHOT_BUCKET: !Sub '${Application}-${Environment}-${DeploymentName}-snapshot-${AWS::AccountId}'
+          SNAPSHOT_KEY: !Ref 'SnapshotKey'
+          COST_KEY: !Ref 'CostKey'
+          TELEMETRY_KEY: !Ref 'TelemetryKey'
+          # Resolved at deploy time from SSM. Empty table => "rate missing", never a zero price.
+          MODEL_RATES: !Sub '{{resolve:ssm:/${Application}/${Environment}/dashboard/model-rates}}'
+          STALE_THRESHOLD_S: !Ref 'StaleThresholdSeconds'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # ---------------------------------------------------------------------------------------
+  # Schedule -- hourly, fail-clean: no retries, no DLQ (Q6). The alarm is the signal.
+  # ---------------------------------------------------------------------------------------
+  # --- FR-9 / FR-10: cost + telemetry collectors -------------------------------------------
+  #
+  # Both reuse the COLLECTOR IMAGE with a different entrypoint (ImageConfig.Command) instead of
+  # getting their own Dockerfile targets. The image's base stage installs the whole package, so every
+  # handler is already inside it; the targets differed only by CMD. One digest across four functions
+  # cannot drift, whereas four images built from one tree can if a build is retried -- and it needs no
+  # new Build action in the shared pipeline.
+
+  ModelRatesParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub '/${Application}/${Environment}/dashboard/model-rates'
+      Type: 'String'
+      # Ships EMPTY on purpose. Per-model prices are the one verify-before-build item that could not
+      # be settled (pricing-page data, not account data), and a guessed rate is confident wrong money.
+      # Empty means every model reports "rate missing" rather than a zero price (COST-09/COST-14).
+      Value: '{}'
+      Description: 'Per-model token rates for the cost ESTIMATE. Empty until real rates are supplied.'
+      # AWS::SSM::Parameter takes Tags as a MAP, unlike every other resource here.
+      Tags:
+        'cornell:owner': !Ref 'Owner'
+        'cornell:blueprint': 'dashboard'
+        'cornell:blueprint-version': !Ref 'BlueprintVersion'
+        'cornell:deployment-id': !Ref 'DeploymentName'
+
+  CostRole:
+    Type: 'AWS::IAM::Role'
+    Condition: 'HasCollectorImage'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-${DeploymentName}-cost-exec'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'lambda.${AWS::URLSuffix}'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'cost'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: ['logs:CreateLogStream', 'logs:PutLogEvents']
+                Resource: !GetAtt 'CostLogGroup.Arn'
+              - Effect: 'Allow'
+                # Cost Explorer has no resource-level scoping, exactly as tag:GetResources does not.
+                # A documented exception in the same shape, not an oversight.
+                Action: ['ce:GetCostAndUsage']
+                Resource: '*'
+              - Effect: 'Allow'
+                # Writes ONE key -- its own. It cannot touch the inventory or telemetry objects.
+                Action: ['s3:PutObject']
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-${DeploymentName}-snapshot-${AWS::AccountId}/${CostKey}'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Ref 'DeploymentName'
+
+  TelemetryRole:
+    Type: 'AWS::IAM::Role'
+    Condition: 'HasCollectorImage'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-${DeploymentName}-telemetry-exec'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'lambda.${AWS::URLSuffix}'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'telemetry'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: ['logs:CreateLogStream', 'logs:PutLogEvents']
+                Resource: !GetAtt 'TelemetryLogGroup.Arn'
+              - Effect: 'Allow'
+                # Neither action supports resource-level scoping. Read-only, and the metric SET is
+                # closed in code -- only ModelId dimension values are discovered (NFR-T5).
+                Action: ['cloudwatch:GetMetricData', 'cloudwatch:ListMetrics']
+                Resource: '*'
+              - Effect: 'Allow'
+                Action: ['s3:PutObject']
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-${DeploymentName}-snapshot-${AWS::AccountId}/${TelemetryKey}'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Ref 'DeploymentName'
+
+  CostFunction:
+    Type: 'AWS::Lambda::Function'
+    Condition: 'HasCollectorImage'
+    Properties:
+      FunctionName: !Sub '${Application}-${Environment}-${DeploymentName}-cost'
+      PackageType: 'Image'
+      Code:
+        ImageUri: !Ref 'CollectorImageUri'
+      ImageConfig:
+        Command: ['dashboard.cost.handler.handler']
+      Architectures: ['arm64']
+      Role: !GetAtt 'CostRole.Arn'
+      MemorySize: 512
+      Timeout: 60
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !Ref 'CostLogGroup'
+      Environment:
+        Variables:
+          LOG_LEVEL: !Ref 'LogLevel'
+          SNAPSHOT_BUCKET: !Sub '${Application}-${Environment}-${DeploymentName}-snapshot-${AWS::AccountId}'
+          COST_KEY: !Ref 'CostKey'
+          MAX_CE_CALLS: !Ref 'MaxCeCalls'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Ref 'DeploymentName'
+
+  TelemetryFunction:
+    Type: 'AWS::Lambda::Function'
+    Condition: 'HasCollectorImage'
+    Properties:
+      FunctionName: !Sub '${Application}-${Environment}-${DeploymentName}-telemetry'
+      PackageType: 'Image'
+      Code:
+        ImageUri: !Ref 'CollectorImageUri'
+      ImageConfig:
+        Command: ['dashboard.telemetry.handler.handler']
+      Architectures: ['arm64']
+      Role: !GetAtt 'TelemetryRole.Arn'
+      MemorySize: 512
+      Timeout: 120
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !Ref 'TelemetryLogGroup'
+      Environment:
+        Variables:
+          LOG_LEVEL: !Ref 'LogLevel'
+          SNAPSHOT_BUCKET: !Sub '${Application}-${Environment}-${DeploymentName}-snapshot-${AWS::AccountId}'
+          TELEMETRY_KEY: !Ref 'TelemetryKey'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Ref 'DeploymentName'
+
+  CostSchedule:
+    Type: 'AWS::Events::Rule'
+    Condition: 'HasCollectorImage'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-${DeploymentName}-cost-schedule'
+      Description: 'Daily trigger for the dashboard cost collector'
+      ScheduleExpression: !Ref 'CostScheduleExpression'
+      State: 'ENABLED'
+      Targets:
+        - Arn: !GetAtt 'CostFunction.Arn'
+          Id: 'cost'
+          RetryPolicy:
+            # No retry, no DLQ, same as the collector: a retry inside the day would spend another
+            # $0.01 per request on data that has not changed. Tomorrow's tick is the retry.
+            MaximumRetryAttempts: 0
+
+  CostSchedulePermission:
+    Type: 'AWS::Lambda::Permission'
+    Condition: 'HasCollectorImage'
+    Properties:
+      FunctionName: !Ref 'CostFunction'
+      Action: 'lambda:InvokeFunction'
+      Principal: !Sub 'events.${AWS::URLSuffix}'
+      SourceArn: !GetAtt 'CostSchedule.Arn'
+
+  TelemetrySchedule:
+    Type: 'AWS::Events::Rule'
+    Condition: 'HasCollectorImage'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-${DeploymentName}-telemetry-schedule'
+      Description: 'Hourly trigger for the dashboard telemetry collector'
+      ScheduleExpression: 'rate(1 hour)'
+      State: 'ENABLED'
+      Targets:
+        - Arn: !GetAtt 'TelemetryFunction.Arn'
+          Id: 'telemetry'
+          RetryPolicy:
+            MaximumRetryAttempts: 0
+
+  TelemetrySchedulePermission:
+    Type: 'AWS::Lambda::Permission'
+    Condition: 'HasCollectorImage'
+    Properties:
+      FunctionName: !Ref 'TelemetryFunction'
+      Action: 'lambda:InvokeFunction'
+      Principal: !Sub 'events.${AWS::URLSuffix}'
+      SourceArn: !GetAtt 'TelemetrySchedule.Arn'
+
+  CollectorSchedule:
+    Type: 'AWS::Events::Rule'
+    Condition: 'HasCollectorImage'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-${DeploymentName}-collector-schedule'
+      Description: 'Hourly trigger for the dashboard collector'
+      ScheduleExpression: 'rate(1 hour)'
+      State: 'ENABLED'
+      Targets:
+        - Arn: !GetAtt 'CollectorFunction.Arn'
+          Id: 'collector'
+          RetryPolicy:
+            MaximumRetryAttempts: 0
+
+  CollectorSchedulePermission:
+    Type: 'AWS::Lambda::Permission'
+    Condition: 'HasCollectorImage'
+    Properties:
+      FunctionName: !Ref 'CollectorFunction'
+      Action: 'lambda:InvokeFunction'
+      Principal: !Sub 'events.${AWS::URLSuffix}'
+      SourceArn: !GetAtt 'CollectorSchedule.Arn'
+
+  # ---------------------------------------------------------------------------------------
+  # HTTP API (L-4). The API owns the /api prefix, so CloudFront forwards /api/* verbatim.
+  # ---------------------------------------------------------------------------------------
+  HttpApi:
+    Type: 'AWS::ApiGatewayV2::Api'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-${DeploymentName}-api'
+      ProtocolType: 'HTTP'
+      Tags:
+        cornell:owner: !Ref 'Owner'
+        cornell:blueprint: 'dashboard'
+        cornell:blueprint-version: !Ref 'BlueprintVersion'
+        cornell:deployment-id: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  ApiIntegration:
+    Type: 'AWS::ApiGatewayV2::Integration'
+    Condition: 'HasApiImage'
+    Properties:
+      ApiId: !Ref 'HttpApi'
+      IntegrationType: 'AWS_PROXY'
+      IntegrationUri: !GetAtt 'ApiFunction.Arn'
+      PayloadFormatVersion: '2.0'
+
+  ApiRoute:
+    Type: 'AWS::ApiGatewayV2::Route'
+    Condition: 'HasApiImage'
+    Properties:
+      ApiId: !Ref 'HttpApi'
+      RouteKey: '$default'
+      Target: !Sub 'integrations/${ApiIntegration}'
+
+  ApiStage:
+    Type: 'AWS::ApiGatewayV2::Stage'
+    Properties:
+      ApiId: !Ref 'HttpApi'
+      StageName: '$default'
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingRateLimit: 20
+        ThrottlingBurstLimit: 40
+      AccessLogSettings:
+        DestinationArn: !GetAtt 'ApiAccessLogGroup.Arn'
+        Format: '{"requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","responseLatency":"$context.responseLatency"}'
+      Tags:
+        cornell:owner: !Ref 'Owner'
+        cornell:blueprint: 'dashboard'
+        cornell:blueprint-version: !Ref 'BlueprintVersion'
+        cornell:deployment-id: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  ApiPermission:
+    Type: 'AWS::Lambda::Permission'
+    Condition: 'HasApiImage'
+    Properties:
+      FunctionName: !Ref 'ApiFunction'
+      Action: 'lambda:InvokeFunction'
+      Principal: !Sub 'apigateway.${AWS::URLSuffix}'
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*'
+
+  # ---------------------------------------------------------------------------------------
+  # WAF (L-6, Q5) -- deny-by-default, two IPSets (per address family), CLOUDFRONT scope.
+  # ---------------------------------------------------------------------------------------
+  Ipv4AllowSet:
+    Type: 'AWS::WAFv2::IPSet'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-${DeploymentName}-ipv4'
+      Scope: 'CLOUDFRONT'
+      IPAddressVersion: 'IPV4'
+      Addresses: !Ref 'AllowedIpv4Cidrs'
+
+  Ipv6AllowSet:
+    Type: 'AWS::WAFv2::IPSet'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-${DeploymentName}-ipv6'
+      Scope: 'CLOUDFRONT'
+      IPAddressVersion: 'IPV6'
+      Addresses: !Ref 'AllowedIpv6Cidrs'
+
+  WebAcl:
+    Type: 'AWS::WAFv2::WebACL'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-${DeploymentName}-acl'
+      Scope: 'CLOUDFRONT'
+      DefaultAction:
+        Block: {}
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub '${Application}${Environment}${DeploymentName}acl'
+      Rules:
+        - Name: 'allow-cornell-cidrs'
+          Priority: 0
+          Action:
+            Allow: {}
+          Statement:
+            OrStatement:
+              Statements:
+                - IPSetReferenceStatement:
+                    Arn: !GetAtt 'Ipv4AllowSet.Arn'
+                - IPSetReferenceStatement:
+                    Arn: !GetAtt 'Ipv6AllowSet.Arn'
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub '${Application}${Environment}${DeploymentName}allow'
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  WebAclLogging:
+    Type: 'AWS::WAFv2::LoggingConfiguration'
+    Properties:
+      ResourceArn: !GetAtt 'WebAcl.Arn'
+      LogDestinationConfigs:
+        - !GetAtt 'WafLogGroup.Arn'
+
+  # ---------------------------------------------------------------------------------------
+  # CloudFront (L-5) -- two origins, /api/* no-cache (ER-03), strict CSP (Q7), WAF-fronted.
+  # ---------------------------------------------------------------------------------------
+  OriginAccessControl:
+    Type: 'AWS::CloudFront::OriginAccessControl'
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${Application}-${Environment}-${DeploymentName}-oac'
+        OriginAccessControlOriginType: 's3'
+        SigningBehavior: 'always'
+        SigningProtocol: 'sigv4'
+
+  ResponseHeadersPolicy:
+    Type: 'AWS::CloudFront::ResponseHeadersPolicy'
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub '${Application}-${Environment}-${DeploymentName}-headers'
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            Override: true
+            ContentSecurityPolicy: "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'"
+          StrictTransportSecurity:
+            Override: true
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Preload: true
+          ContentTypeOptions:
+            Override: true
+          ReferrerPolicy:
+            Override: true
+            ReferrerPolicy: 'no-referrer'
+
+  Distribution:
+    Type: 'AWS::CloudFront::Distribution'
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub '${Application}-${Environment}-${DeploymentName} dashboard'
+        DefaultRootObject: 'index.html'
+        HttpVersion: 'http2and3'
+        PriceClass: 'PriceClass_100'
+        WebACLId: !GetAtt 'WebAcl.Arn'
+        Origins:
+          - Id: 'site'
+            DomainName: !Sub '${Application}-${Environment}-${DeploymentName}-site-${AWS::AccountId}.s3.${AWS::Region}.amazonaws.com'
+            OriginAccessControlId: !GetAtt 'OriginAccessControl.Id'
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+          - Id: 'api'
+            DomainName: !Sub '${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+            CustomOriginConfig:
+              OriginProtocolPolicy: 'https-only'
+              OriginSSLProtocols: ['TLSv1.2']
+        DefaultCacheBehavior:
+          TargetOriginId: 'site'
+          ViewerProtocolPolicy: 'redirect-to-https'
+          AllowedMethods: ['GET', 'HEAD']
+          CachePolicyId: '658327ea-f89d-4fab-a63d-7e88639e58f6'  # Managed-CachingOptimized
+          ResponseHeadersPolicyId: !Ref 'ResponseHeadersPolicy'
+        CacheBehaviors:
+          - PathPattern: '/api/*'
+            TargetOriginId: 'api'
+            ViewerProtocolPolicy: 'redirect-to-https'
+            AllowedMethods: ['GET', 'HEAD', 'OPTIONS']
+            CachePolicyId: '4135ea2d-6df8-44a3-9df3-4b5a84be39ad'  # Managed-CachingDisabled (ER-03)
+            OriginRequestPolicyId: 'b689b0a8-53d0-40ab-baf2-68738e2966ac'  # Managed-AllViewerExceptHostHeader
+            ResponseHeadersPolicyId: !Ref 'ResponseHeadersPolicy'
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+      Tags:
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # The site bucket's policy lives HERE (Q2): it grants CloudFront (OAC) read on the
+  # convention-named bucket, scoped to THIS distribution's ARN, and denies non-TLS. One policy per
+  # bucket, so both statements share it. The bucket is created by dashboard-storage.yml, which
+  # deploys first (RunOrder 1), so it exists when this RunOrder-2 stack attaches the policy.
+  SiteBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Sub '${Application}-${Environment}-${DeploymentName}-site-${AWS::AccountId}'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: 'AllowCloudFrontOAC'
+            Effect: 'Allow'
+            Principal:
+              Service: 'cloudfront.amazonaws.com'
+            Action: 's3:GetObject'
+            Resource: !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-${DeploymentName}-site-${AWS::AccountId}/*'
+            Condition:
+              StringEquals:
+                'AWS:SourceArn': !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+          - Sid: 'DenyInsecureTransport'
+            Effect: 'Deny'
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-${DeploymentName}-site-${AWS::AccountId}'
+              - !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-${DeploymentName}-site-${AWS::AccountId}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+
+  # ---------------------------------------------------------------------------------------
+  # Alarms (L-9, C-09) -> the shared notify-topic, ARN reconstructed by convention (Q4).
+  # ---------------------------------------------------------------------------------------
+  CollectorNotRunningAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Condition: 'HasCollectorImage'
+    Properties:
+      AlarmName: !Sub '${Application}-${Environment}-${DeploymentName}-collector-not-running'
+      AlarmDescription: 'Collector produced no invocation in the last 2 hours (R-3/R-4). Missing data breaches: a collector that never runs IS the failure.'
+      Namespace: 'AWS/Lambda'
+      MetricName: 'Invocations'
+      Dimensions:
+        - Name: 'FunctionName'
+          Value: !Ref 'CollectorFunction'
+      Statistic: 'Sum'
+      Period: 7200
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: 'LessThanThreshold'
+      TreatMissingData: 'breaching'
+      AlarmActions:
+        - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${Application}-${Environment}-notify-topic'
+
+  CollectorErrorsAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Condition: 'HasCollectorImage'
+    Properties:
+      AlarmName: !Sub '${Application}-${Environment}-${DeploymentName}-collector-errors'
+      AlarmDescription: 'Collector invocation error (OR-01). Next tick retries; this is the signal.'
+      Namespace: 'AWS/Lambda'
+      MetricName: 'Errors'
+      Dimensions:
+        - Name: 'FunctionName'
+          Value: !Ref 'CollectorFunction'
+      Statistic: 'Sum'
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+      TreatMissingData: 'notBreaching'
+      AlarmActions:
+        - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${Application}-${Environment}-notify-topic'
+
+  ApiErrorsAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Condition: 'HasApiImage'
+    Properties:
+      AlarmName: !Sub '${Application}-${Environment}-${DeploymentName}-api-errors'
+      AlarmDescription: 'Read API function errors elevated (R-5).'
+      Namespace: 'AWS/Lambda'
+      MetricName: 'Errors'
+      Dimensions:
+        - Name: 'FunctionName'
+          Value: !Ref 'ApiFunction'
+      Statistic: 'Sum'
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+      TreatMissingData: 'notBreaching'
+      AlarmActions:
+        - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${Application}-${Environment}-notify-topic'
+
+  CostCollectorFailureAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Condition: 'HasCollectorImage'
+    Properties:
+      AlarmName: !Sub '${Application}-${Environment}-${DeploymentName}-cost-failed'
+      AlarmDescription: 'The daily cost collection run failed. Transient causes (throttling, timeout) clear on the next tick; check the reason in the logs.'
+      Namespace: 'Dashboard'
+      MetricName: 'CostCollectFailure'
+      Statistic: 'Sum'
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+      TreatMissingData: 'notBreaching'
+      AlarmActions:
+        - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${Application}-${Environment}-notify-topic'
+
+  # A SEPARATE alarm from the one above, and the distinction is operational rather than tidy. Every
+  # other cost failure is retry-shaped: the next daily tick may well succeed. This one is PERMANENT.
+  # The deployment sits in a LINKED account, and activating cornell:* as cost allocation tags is a
+  # payer/management-account capability -- measured, not assumed. Retrying tomorrow, and every
+  # tomorrow after, fails identically. Folding it into the generic alarm would train whoever owns
+  # that alarm to ignore the one condition that needs a human in another team.
+  CostAccessDeniedAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Condition: 'HasCollectorImage'
+    Properties:
+      AlarmName: !Sub '${Application}-${Environment}-${DeploymentName}-cost-access-denied'
+      AlarmDescription: 'Cost Explorer denied the request. This will NOT clear by retrying: the Organization payer account must activate cornell:* as cost allocation tags. Escalate rather than wait.'
+      Namespace: 'Dashboard'
+      MetricName: 'CostCollectFailure'
+      Dimensions:
+        - Name: 'outcome'
+          Value: 'access_denied'
+      Statistic: 'Sum'
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+      TreatMissingData: 'notBreaching'
+      AlarmActions:
+        - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${Application}-${Environment}-notify-topic'
+
+  TelemetryCollectorFailureAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Condition: 'HasCollectorImage'
+    Properties:
+      AlarmName: !Sub '${Application}-${Environment}-${DeploymentName}-telemetry-failed'
+      AlarmDescription: 'Both halves of the telemetry read were unreadable. A single half failing degrades that half only and does NOT alarm, by design.'
+      Namespace: 'Dashboard'
+      MetricName: 'TelemetryCollectFailure'
+      Statistic: 'Sum'
+      Period: 3600
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+      TreatMissingData: 'notBreaching'
+      AlarmActions:
+        - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${Application}-${Environment}-notify-topic'
+
+  # TreatMissingData: breaching -- "the cost collector never ran" must alarm, the same reasoning as
+  # CollectorNotRunningAlarm. Silence is the failure mode a cost dashboard cannot afford.
+  CostNotRunningAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Condition: 'HasCollectorImage'
+    Properties:
+      AlarmName: !Sub '${Application}-${Environment}-${DeploymentName}-cost-not-running'
+      AlarmDescription: 'No successful cost collection in 48 hours -- the figures on the dashboard are going stale silently.'
+      Namespace: 'Dashboard'
+      MetricName: 'CostCollectSuccess'
+      Statistic: 'Sum'
+      Period: 172800
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: 'LessThanThreshold'
+      TreatMissingData: 'breaching'
+      AlarmActions:
+        - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${Application}-${Environment}-notify-topic'
+
+Outputs:
+
+  DistributionDomainName:
+    Description: 'CloudFront domain the dashboard is served from (the URL to open)'
+    Value: !GetAtt 'Distribution.DomainName'
+
+  ApiEndpoint:
+    Description: 'HTTP API endpoint (behind CloudFront /api/*; not opened directly)'
+    Value: !GetAtt 'HttpApi.ApiEndpoint'
+
+  DeploymentId:
+    Description: 'Value of the cornell:deployment-id tag on every resource in this stack'
+    Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  DeployedCommitId:
+    Description: 'Commit this application stack was deployed from (passed through from the pipeline)'
+    Value: !Ref 'SourceCommitId'

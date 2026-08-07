@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Cost & usage dashboard -- STATEFUL storage stack (U-02). The snapshot store (C-02) and the site bucket (C-06 host), deliberately in a separate stack from dashboard.yml so an application-stack update that replaces a resource can never threaten the data. Cross-referenced by naming convention, not exports (this repo has none).'
+
+Parameters:
+
+  # Metadata Parameters
+  Application:
+    Default: 'aidlc'
+    AllowedPattern: '[a-z0-9-]{1,10}'
+    Description: 'Name used for billing and other tracking/identification purposes'
+    Type: 'String'
+
+  Environment:
+    Default: 'main'
+    AllowedPattern: '[a-z0-9]{1,4}'
+    Description: 'Name of the deployment branch'
+    Type: 'String'
+
+  # Tagging Convention Parameters
+  Owner:
+    Default: 'ai-sei'
+    AllowedPattern: '.{1,128}'
+    Description: 'Who owns this deployment (cornell:owner)'
+    Type: 'String'
+
+  BlueprintVersion:
+    Default: '0.1.0'
+    AllowedPattern: '[0-9]+\.[0-9]+\.[0-9]+'
+    Description: 'Version of the dashboard blueprint (cornell:blueprint-version)'
+    Type: 'String'
+
+  DeploymentName:
+    Default: 'dashboard'
+    AllowedPattern: '[a-z0-9-]{1,20}'
+    Description: 'Name of this deployment (part of cornell:deployment-id and the bucket names)'
+    Type: 'String'
+
+Resources:
+
+  # C-02 snapshot store. Versioned so a bad snapshot can be inspected/rolled back; non-current
+  # versions expire after 30 days (TSD-13) since the snapshot is state:derived and rebuildable.
+  # The collector's single PutObject writes one key here (SR-01/02); the API reads that one key.
+  SnapshotBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub '${Application}-${Environment}-${DeploymentName}-snapshot-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      VersioningConfiguration:
+        Status: 'Enabled'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: 'BucketOwnerEnforced'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: 'expire-noncurrent-snapshots'
+            Status: 'Enabled'
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+          - Id: 'abort-incomplete-uploads'
+            Status: 'Enabled'
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 's3-bucket-dashboard-snapshot'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+  # TLS-only. This policy references nothing outside the storage stack, so unlike the SITE bucket's
+  # policy (which needs the CloudFront distribution ARN and therefore lives in dashboard.yml) it can
+  # stay here with the bucket it governs.
+  SnapshotBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref 'SnapshotBucket'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: 'DenyInsecureTransport'
+            Effect: 'Deny'
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt 'SnapshotBucket.Arn'
+              - !Sub '${SnapshotBucket.Arn}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+
+  # C-06 host. Private (BPA on) -- served only through CloudFront OAC, never public. Objects not
+  # touched for 30 days expire (TSD-13, D-4): old content-hashed assets age out after a rollout,
+  # while index.html is rewritten on every deploy so its clock resets. The site bucket's policy
+  # (OAC grant + TLS-only) is in dashboard.yml, because it must name the distribution.
+  SiteBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub '${Application}-${Environment}-${DeploymentName}-site-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      VersioningConfiguration:
+        Status: 'Enabled'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: 'BucketOwnerEnforced'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: 'expire-stale-objects'
+            Status: 'Enabled'
+            ExpirationInDays: 30
+          - Id: 'expire-noncurrent-objects'
+            Status: 'Enabled'
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 7
+          - Id: 'abort-incomplete-uploads'
+            Status: 'Enabled'
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 's3-bucket-dashboard-site'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+        - Key: 'cornell:blueprint'
+          Value: 'dashboard'
+        - Key: 'cornell:blueprint-version'
+          Value: !Ref 'BlueprintVersion'
+        - Key: 'cornell:deployment-id'
+          Value: !Sub '${Application}-${Environment}-${DeploymentName}'
+
+Outputs:
+
+  # Plain outputs, NOT Export:ed -- this repo has no cross-stack exports. dashboard.yml and the
+  # site-sync action reconstruct these names by the same convention.
+  SnapshotBucketName:
+    Description: 'Name of the snapshot store bucket'
+    Value: !Ref 'SnapshotBucket'
+
+  SiteBucketName:
+    Description: 'Name of the static-site bucket'
+    Value: !Ref 'SiteBucket'

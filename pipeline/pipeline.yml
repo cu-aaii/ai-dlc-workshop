@@ -35,12 +35,8 @@ Parameters:
 
 Resources:
 
-  # Container Build
-  #
-  # Defined and ready, but no stage runs it yet -- the hello-world blueprint is pure
-  # CloudFormation with no image to build. Wiring a blueprint's container build is a Build
-  # stage action plus a Dockerfile; see pipeline/README.md. Kept here rather than removed
-  # so the known-good mechanics are on hand when a blueprint needs a Lambda image.
+  # Container build (x86). Wiring a blueprint image = a Build action + a Dockerfile target; see
+  # pipeline/README.md. The arm64 sibling below is what Lambda/AgentCore images actually use.
 
   ContainerBuildRole:
     Type: 'AWS::IAM::Role'
@@ -233,10 +229,8 @@ Resources:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
 
-  # ARM container build -- same mechanics as ContainerBuildProject, aarch64 compute.
-  # Bedrock AgentCore runtimes require linux/arm64 images, which the x86 reference project
-  # cannot produce natively. Added alongside rather than modifying the reference project,
-  # so its known-good definition stays untouched for future x86 Lambda images.
+  # ARM container build -- same mechanics as ContainerBuildProject, aarch64 compute. Lambda
+  # (arm64) and AgentCore runtimes need linux/arm64, which the x86 project cannot produce.
 
   ArmContainerBuildLogs:
     Type: 'AWS::Logs::LogGroup'
@@ -299,29 +293,135 @@ Resources:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
 
-  # Terraform Runner
-  #
-  # Non-AWS resources (Azure/Entra only) are Terraform executed from CodeBuild. One project
-  # serves every blueprint: the pipeline action supplies TF_WORKING_DIR and TF_STATE_KEY, the
-  # same way CONTAINER_TARGET parameterizes ContainerBuildProject. Adding a module is a
-  # Terraform stage action plus a directory of .tf -- see pipeline/README.md.
+  # Static-site builder (U-02 dashboard C-06): builds the Vite bundle, syncs to the site bucket
+  # WITHOUT --delete. Detail in blueprints/dashboard aidlc-docs deployment-architecture.md.
+  SiteBuildLogs:
+    Type: 'AWS::Logs::LogGroup'
+    DeletionPolicy: 'Delete'
+    UpdateReplacePolicy: 'Delete'
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${Application}-${Environment}-site'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'log-group-build-project-site'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
 
-  # Credentials for the Azure/Entra tenant.
-  #
-  # The value is injected once out of band (`aws secretsmanager put-secret-value`) and is
-  # never in this repository -- it is public and has no secret scanning.
-  #
-  # GenerateSecretString rather than SecretString, and this is load-bearing rather than a
-  # style choice. SecretString is a template property CloudFormation enforces on every stack
-  # update, and the PipelineDeploy stage redeploys this stack on every merge -- so a
-  # placeholder there would silently reset the credential to the placeholder several times a
-  # day. GenerateSecretString is evaluated only at create, so the injected value survives.
-  # Editing the GenerateSecretString block below DOES regenerate and clobber it.
-  #
-  # The generated placeholder carries all three keys on purpose. The CodeBuild environment
-  # variables below resolve a json-key each, and a missing key fails the build with an opaque
-  # CodeBuild error; with the shape correct from the start, an uninjected secret instead fails
-  # where you would expect it to, as an Azure authentication error.
+  SiteBuildRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${Application}-${Environment}-site-build'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - !Sub 'codebuild.${AWS::URLSuffix}'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'site-build'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Application}-${Environment}-site*'
+              - Effect: 'Allow'
+                Action:
+                  - 's3:GetObject'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::deployment-artifacts-${AWS::AccountId}-*/*'
+              - Effect: 'Allow'
+                # Write to any dashboard site bucket in this account; no DeleteObject (no --delete).
+                Action:
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-*-site-${AWS::AccountId}/*'
+              - Effect: 'Allow'
+                Action:
+                  - 's3:ListBucket'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${Application}-${Environment}-*-site-${AWS::AccountId}'
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'iam-role-build-project-site-build'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  SiteBuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: !Sub '${Application}-${Environment}-site'
+      Description: !Sub 'Builds and syncs the dashboard static site for the ${Application}-${Environment} pipeline'
+      ServiceRole: !GetAtt 'SiteBuildRole.Arn'
+      TimeoutInMinutes: 20
+      Visibility: 'PRIVATE'
+      Artifacts:
+        Type: 'CODEPIPELINE'
+      Cache:
+        Type: 'NO_CACHE'
+      Environment:
+        ComputeType: 'BUILD_GENERAL1_SMALL'
+        Image: 'aws/codebuild/amazonlinux2-x86_64-standard:5.0'
+        ImagePullCredentialsType: 'CODEBUILD'
+        Type: 'LINUX_CONTAINER'
+        EnvironmentVariables:
+          - Name: 'APPLICATION'
+            Value: !Ref 'Application'
+          - Name: 'ENVIRONMENT'
+            Value: !Ref 'Environment'
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref 'SiteBuildLogs'
+          Status: 'ENABLED'
+      Source:
+        Type: 'CODEPIPELINE'
+        GitCloneDepth: 0
+        # Build the Vite bundle, sync to the site bucket WITHOUT --delete.
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 20
+              commands:
+                - cd blueprints/dashboard/ui
+                - npm ci
+            build:
+              commands:
+                - npm run build
+                - aws s3 sync dist/ "s3://${SITE_BUCKET}/" --no-progress
+      Tags:
+        - Key: 'Application'
+          Value: !Ref 'Application'
+        - Key: 'Environment'
+          Value: !Ref 'Environment'
+        - Key: 'Resource'
+          Value: 'codebuild-project-site'
+        - Key: 'cornell:owner'
+          Value: !Ref 'Owner'
+
+  # Terraform Runner: Azure/Entra only, executed from one CodeBuild project (the action supplies
+  # TF_WORKING_DIR + TF_STATE_KEY). Adding a module = a Terraform action + a .tf dir; see README.
+
+  # Azure/Entra credentials, injected out of band (never in this public repo). Uses
+  # GenerateSecretString, NOT SecretString -- load-bearing: PipelineDeploy redeploys this stack
+  # every merge, and a SecretString placeholder would reset the credential each time (editing the
+  # GenerateSecretString block below also clobbers it). The placeholder carries all three keys so
+  # an uninjected secret fails as an Azure auth error, not an opaque CodeBuild error. See CLAUDE.md.
 
   AzureCredentialsSecret:
     Type: 'AWS::SecretsManager::Secret'
@@ -345,17 +445,8 @@ Resources:
         - Key: 'cornell:owner'
           Value: !Ref 'Owner'
 
-  # Terraform state.
-  #
-  # Deliberately its own bucket, and deliberately without a LifecycleConfiguration. The
-  # pipeline artifact bucket expires objects after 30 days
-  # (bootstrap/account-bootstrap.yml), which would delete Terraform state and leave every
-  # managed resource orphaned. Versioning is on so a corrupted or truncated state push can be
-  # rolled back to the previous version.
-  #
-  # Retained on stack delete: losing this bucket means losing the record of what Terraform
-  # owns in the tenant, which is far worse than an orphaned bucket.
-
+  # Terraform state: its own bucket, no lifecycle (the artifact bucket's 30-day expiry would
+  # orphan state), versioned, and Retain-on-delete (losing it loses the record of tenant state).
   TerraformStateBucket:
     Type: 'AWS::S3::Bucket'
     DeletionPolicy: 'Retain'
@@ -404,9 +495,8 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              # Exactly one secret, by exact ARN. !Ref on a Secret returns the full ARN
-              # including the random suffix Secrets Manager appends, so this needs no
-              # wildcard and cannot widen to a second secret later by accident.
+              # Exactly one secret, by exact ARN (!Ref returns the full ARN incl. the random
+              # suffix), so this cannot widen to another secret by accident.
               - Effect: 'Allow'
                 Action:
                   - 'secretsmanager:GetSecretValue'
@@ -622,9 +712,8 @@ Resources:
           Value: !Ref 'Owner'
       Stages:
 
-        # Tracks the branch named by Environment. DetectChanges registers a webhook, so a
-        # merge to that branch starts the pipeline within seconds. Branch protection on the
-        # GitHub side is what makes "a merge" mean "an approved PR".
+        # Tracks the branch named by Environment; DetectChanges registers a webhook. Branch
+        # protection is what makes "a merge" mean "an approved PR".
         - Name: 'Source'
           Actions:
             - Name: 'GitRepository'
@@ -643,9 +732,8 @@ Resources:
                 OutputArtifactFormat: 'CODE_ZIP'
                 DetectChanges: 'true'
 
-        # The pipeline deploys itself first, so a PR that edits pipeline.yml takes effect
-        # on merge without anyone touching the console. RestartExecutionOnUpdate then
-        # reruns the pipeline from the top under the new definition.
+        # The pipeline deploys itself first, so a PR editing pipeline.yml takes effect on merge;
+        # RestartExecutionOnUpdate then reruns from the top under the new definition.
         - Name: 'PipelineDeploy'
           Actions:
             - Name: 'PipelineCloudFormation'
@@ -671,10 +759,9 @@ Resources:
                   "RemoteGitRepository": "${RemoteGitRepository}"
                   }
 
-        # Container images, built before anything deploys. One action per component
-        # Dockerfile (CONTAINER_CONTEXT is the component directory, CONTAINER_TARGET its
-        # named target); CONTAINER_DIGEST is exported so the deploy action below can
-        # pin by digest rather than tag (see pipeline/codebuild.yml).
+        # Container images, built before anything deploys. One action per Dockerfile target
+        # (CONTAINER_CONTEXT + CONTAINER_TARGET); CONTAINER_DIGEST is exported so the deploy
+        # action pins by digest (see pipeline/codebuild.yml).
         - Name: 'Build'
           Actions:
             - Name: 'BuilderMcpContainer'
@@ -692,6 +779,43 @@ Resources:
                   [
                   {"name": "CONTAINER_TARGET", "value": "builder-mcp", "type": "PLAINTEXT"},
                   {"name": "CONTAINER_CONTEXT", "value": "packages/builder-mcp", "type": "PLAINTEXT"},
+                  {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
+                  ]
+
+            # Dashboard (U-02): two arm64 images from one Dockerfile (targets collector, api).
+            - Name: 'DashboardCollectorContainer'
+              Namespace: 'DashboardCollectorContainer'
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'ArmContainerBuildProject'
+                EnvironmentVariables: >-
+                  [
+                  {"name": "CONTAINER_TARGET", "value": "collector", "type": "PLAINTEXT"},
+                  {"name": "CONTAINER_CONTEXT", "value": "blueprints/dashboard", "type": "PLAINTEXT"},
+                  {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
+                  ]
+
+            - Name: 'DashboardApiContainer'
+              Namespace: 'DashboardApiContainer'
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'ArmContainerBuildProject'
+                EnvironmentVariables: >-
+                  [
+                  {"name": "CONTAINER_TARGET", "value": "api", "type": "PLAINTEXT"},
+                  {"name": "CONTAINER_CONTEXT", "value": "blueprints/dashboard", "type": "PLAINTEXT"},
                   {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
                   ]
 
@@ -734,9 +858,8 @@ Resources:
                   {"name": "DATE_TAG", "value": "#{GitRepository.AuthorDate}", "type": "PLAINTEXT"}
                   ]
 
-        # One action per blueprint stack. Register the template in pipeline/stacks.yml and
-        # add an action here; the stack name convention is <application>-<environment>-<name>
-        # so it stays inside the BuildPipelineRole's CloudFormation resource scope.
+        # One action per blueprint stack; register the template in pipeline/stacks.yml too. Stack
+        # names are <application>-<environment>-<name> (inside BuildPipelineRole's CFN scope).
         - Name: 'BlueprintDeploy'
           Actions:
             - Name: 'HelloWorldCloudFormation'
@@ -836,17 +959,10 @@ Resources:
                 RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
                 StackName: !Sub '${Application}-${Environment}-builder-mcp'
                 TemplatePath: 'GitRepositoryArtifact::packages/builder-mcp/infra/builder-mcp.yml'
-                # ContainerImageUri arrives as the digest the Build stage just pushed, so
-                # the runtime always runs exactly the image this commit produced.
-                # TESTING PHASE: "AuthMode": "open" masks the Entra inbound authorizer
-                # (open = AgentCore's default AWS IAM SigV4 -- never anonymous). The two
-                # stashed Entra overrides, to re-add when flipping AuthMode to "entra":
-                #   "EntraTenantId": "<raw tenant id>",
-                #   "EntraClientId": "<raw client id>"
-                # or restore the stashed SSM-valued parameter form in
-                # packages/builder-mcp/infra/builder-mcp.yml and pass the /entra/builder-mcp/*
-                # parameter names instead. Restore steps: packages/builder-mcp/deploy/HANDOFF.md,
-                # section "Testing phase: AuthMode=open".
+                # ContainerImageUri is the digest the Build stage pushed. TESTING PHASE:
+                # AuthMode "open" = AgentCore's default AWS IAM SigV4 (never anonymous), masking
+                # the Entra authorizer. Flipping to "entra" + the EntraTenantId/EntraClientId
+                # overrides: packages/builder-mcp/deploy/HANDOFF.md, "Testing phase: AuthMode=open".
                 ParameterOverrides: !Sub >-
                   {
                   "Application": "${Application}",
@@ -858,10 +974,8 @@ Resources:
                   "AuthMode": "open"
                   }
 
-            # The knowledge base ingests and then verifies its own contents inside the deploy,
-            # so this action is slow (minutes, not seconds) and it goes red when the knowledge
-            # base cannot answer the smoke query. That redness is the intended acceptance
-            # signal, not a flaky deploy -- see blueprints/knowledgebase/docs/warnings.md.
+            # This action ingests then verifies inside the deploy, so it is slow and goes red when
+            # the KB cannot answer the smoke query -- the intended acceptance signal, not a flake.
 
             - Name: 'KnowledgeBaseCloudFormation'
               Namespace: 'KnowledgeBaseCloudFormation'
@@ -879,30 +993,9 @@ Resources:
                 RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
                 StackName: !Sub '${Application}-${Environment}-knowledgebase'
                 TemplatePath: 'GitRepositoryArtifact::blueprints/knowledgebase/infra/knowledgebase.yml'
-                # Every parameter the blueprint needs is passed explicitly rather than left
-                # to template defaults, so a stack deploys the same way by hand or by pipeline.
-                # BlueprintVersion is duplicated from the template's default on purpose: bump
-                # both in the same PR, or the cornell:blueprint-version tag will lie.
-                #
-                # EnableSharePointSource is "true": this stack indexes the ECE 4960 handouts in
-                # sites/kb alongside the S3 syllabus. Rehearsed as Environment=test before the flag
-                # flipped -- 25 of 25 documents, zero failures, SharePoint-only smoke query answered.
-                #
-                # So every merge to main, by every track, now depends on the Entra app's consent, the
-                # per-site grant and an unexpired certificate. When one lapses the verifier fails the
-                # stack and BlueprintDeploy is red for everyone. The Entra side is managed by hand by
-                # the platform team. To roll back, set this to "false": the SharePoint resources all
-                # hang off one Condition and the stack renders exactly as it did before.
-                #
-                # None of the SharePoint values is a secret -- a tenant id, a site URL, a bucket, an
-                # object key and a secret ARN are references. The certificate and its password live
-                # in the secret and in S3.
-                #
-                # EnableScheduledSync is also "false". It creates EventBridge Scheduler schedules
-                # that start ingestion jobs between deploys -- fire-and-forget, because Scheduler
-                # cannot call the read APIs needed to check a result. It keeps the index fresh and
-                # proves nothing, so a green deploy stays the only evidence the knowledge base
-                # answers. See blueprints/knowledgebase/docs/warnings.md.
+                # Params explicit; BlueprintVersion in lockstep with the template. SharePoint on =>
+                # merges depend on the Entra app's consent/cert; roll back with "false" (one
+                # Condition). No value here is a secret. See blueprints/knowledgebase/docs/warnings.md.
                 ParameterOverrides: !Sub >-
                   {
                   "Application": "${Application}",
@@ -924,32 +1017,11 @@ Resources:
                   "SourceCommitId": "#{GitRepository.CommitId}"
                   }
 
-            # Track C's Microsoft Teams chatbot blueprint -- "Chatbots (incl. Microsoft
-            # Teams-fronted)" in the participant brief's catalog. Generic by design: what any
-            # deployment of it does is set by SystemPrompt, not by this template.
-            #
-            # KnowledgeBaseId is empty here, so this instance answers from its system prompt with
-            # no retrieval. To ground it, put a real id in (retrieval is optional by design):
-            #   aws ssm get-parameter --name /aidlc/main/knowledgebase/knowledge-base-id \
-            #     --query Parameter.Value --output text
-            #
-            # The two Bot* values identify the Azure Bot
-            # registration this deployment fronts: they are one-time-per-bot onboarding rather
-            # than per-deployment configuration, and neither is a credential -- the app id
-            # ships inside every Teams manifest distributed to users, and the tenant id appears
-            # in every serviceUrl. The matching client secret is injected into Secrets Manager
-            # by CLI and appears nowhere in this repository.
-            #
-            # Deploying this needs two secret values put in place once, or the bot answers
-            # nothing: <app>/<env>/teams-bot/bot-client-secret and .../gateway-api-key.
-            # Both resources are created here with GenerateSecretString placeholders.
-
+            # Track C's Teams chatbot. Behaviour from SystemPrompt; KnowledgeBaseId empty => no
+            # retrieval. Bot* values are not secrets; the client secret + gateway key are injected by
+            # CLI and the bot answers nothing until they are. See blueprints/teams-bot/README.md.
             - Name: 'TeamsBotCloudFormation'
               Namespace: 'TeamsBotCloudFormation'
-              # RunOrder 1, like everything else in this stage. This was briefly RunOrder 2, when
-              # the knowledge base id resolved at deploy time from another blueprint's SSM
-              # parameter. That coupling is gone -- retrieval is an optional plain parameter now --
-              # so there is no ordering dependency left to respect.
               RunOrder: 1
               InputArtifacts:
                 - Name: 'GitRepositoryArtifact'
@@ -989,12 +1061,109 @@ Resources:
                   "SourceCommitId": "#{GitRepository.CommitId}"
                   }
 
-        # Non-AWS resources (Azure/Entra). One action per Terraform module, each supplying its
-        # own working directory and state key so a single CodeBuild project serves all of them.
-        #
-        # Runs after BlueprintDeploy because Azure/Entra resources are expected to reference
-        # AWS ones, not the reverse. Applies unattended -- there is no approval action here, so
-        # a merge reaches the tenant with whatever rights the stored service principal holds.
+            # Dashboard (U-02): storage + marker at RunOrder 1, app (by digest) + site sync at
+            # RunOrder 2 (both need the bucket to exist first). See deployment-architecture.md.
+            - Name: 'DashboardStorageCloudFormation'
+              Namespace: 'DashboardStorageCloudFormation'
+              RunOrder: 1
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-dashboard-storage'
+                TemplatePath: 'GitRepositoryArtifact::blueprints/dashboard/infra/dashboard-storage.yml'
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "BlueprintVersion": "0.1.0"
+                  }
+
+            - Name: 'DashboardMarkerCloudFormation'
+              Namespace: 'DashboardMarkerCloudFormation'
+              RunOrder: 1
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-dashboard-marker'
+                TemplatePath: 'GitRepositoryArtifact::blueprints/dashboard/infra/dashboard-marker.yml'
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "BlueprintVersion": "0.1.0",
+                  "SourceCommitId": "#{GitRepository.CommitId}"
+                  }
+
+            - Name: 'DashboardCloudFormation'
+              Namespace: 'DashboardCloudFormation'
+              RunOrder: 2
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'CloudFormation'
+                Version: '1'
+              Configuration:
+                ActionMode: 'CREATE_UPDATE'
+                Capabilities: 'CAPABILITY_NAMED_IAM'
+                RoleArn: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudformation-deploy-role'
+                StackName: !Sub '${Application}-${Environment}-dashboard'
+                TemplatePath: 'GitRepositoryArtifact::blueprints/dashboard/infra/dashboard.yml'
+                # Digests from the Build stage. AllowedIpv4Cidrs MUST be real campus ranges or the
+                # WAF fails closed (template default admits no one).
+                ParameterOverrides: !Sub >-
+                  {
+                  "Application": "${Application}",
+                  "Environment": "${Environment}",
+                  "Owner": "${Owner}",
+                  "BlueprintVersion": "0.1.0",
+                  "CollectorImageUri": "#{DashboardCollectorContainer.CONTAINER_DIGEST}",
+                  "ApiImageUri": "#{DashboardApiContainer.CONTAINER_DIGEST}",
+                  "AllowedIpv4Cidrs": "192.0.2.0/24",
+                  "LogLevel": "INFO",
+                  "CostScheduleExpression": "rate(1 day)",
+                  "SourceCommitId": "#{GitRepository.CommitId}"
+                  }
+
+            - Name: 'DashboardSiteSync'
+              Namespace: 'DashboardSiteSync'
+              RunOrder: 2
+              InputArtifacts:
+                - Name: 'GitRepositoryArtifact'
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'SiteBuildProject'
+                EnvironmentVariables: !Sub >-
+                  [
+                  {"name": "SITE_BUCKET", "value": "${Application}-${Environment}-dashboard-site-${AWS::AccountId}", "type": "PLAINTEXT"}
+                  ]
+
+        # Non-AWS resources (Azure/Entra): one action per Terraform module (its own TF_WORKING_DIR
+        # + TF_STATE_KEY, one shared CodeBuild project). Runs after BlueprintDeploy and applies
+        # UNATTENDED -- no approval action, so a merge reaches the tenant with the SP's rights.
         - Name: 'Terraform'
           Actions:
             - Name: 'EntraProbeTerraform'
