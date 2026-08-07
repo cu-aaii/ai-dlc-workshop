@@ -900,8 +900,70 @@ uninstrumented namespace was empty).
 
 **Artifacts**: `components.md`, `component-methods.md`, `services.md`, `component-dependency.md`,
 `application-design.md` all extended with an FR-9/FR-10 section + a coverage table;
-`amendments/telemetry-a4-design-2026-08-07.md` new. **Awaiting approval.**
+`amendments/telemetry-a4-design-2026-08-07.md` new. **APPROVED 2026-08-07** — user response
+"approve and move to construction".
 
 **Not decided here, deliberately**: CE query shapes and call count, metric window/period, one
 EventBridge rule vs two, which template the new Lambdas live in, and the per-model rate values
 (FR-10.8 item 3 — pricing data, not design).
+
+---
+
+## CONSTRUCTION — FR-9/FR-10 increment (2026-08-07)
+
+**Plan**: `construction/plans/fr9-fr10-construction-plan.md`. Artifacts under
+`construction/fr9-fr10/` (**gitignored**, like all `construction/` docs — only the code they describe
+is committed).
+
+**Stage selection** (collapses stated, not silent): Units Generation **collapsed** (design Q4 already
+assigned every component to a unit); NFR Requirements **collapsed** (NFR-T1…T8 already exist at
+requirements level in A2/A3); NFR Design **folded** into Functional + Infrastructure Design (U-02's six
+patterns are inherited unchanged by same-shaped components). Functional Design, Infrastructure Design,
+Code Generation and Build and Test all **run**.
+
+### Functional Design — COMPLETE
+`business-rules.md`: **COST-01…14, TEL-01…10, CAT-01…05**, each citing its clause or criterion, plus
+five prohibitions verified by absence. `business-logic-model.md`: algorithms + property targets.
+Highlights:
+- **COST-05 is a failure, not a cap** — truncating at a call budget yields a *smaller* cost figure that
+  looks valid, the money-domain analogue of CR-01's refusal to truncate pagination.
+- **COST-07 vs TEL-05 are deliberately opposite**: cost fails whole (a partial cost object reads as zero
+  spend); telemetry degrades per counter (failing would erase real AWS data because an uninstrumented
+  namespace was empty). Recorded so it does not read as an inconsistency.
+- `is_unattributed` is a one-line pure predicate **on purpose** — it is the whole defence against A3.3's
+  trap, so it must be trivially reviewable and property-testable.
+- Property targets: money **additivity** (what makes per-agent/per-window totals trustworthy), the
+  attribution **partition + sum-preserved** identity, rate **re-aggregation** (which justifies TEL-06's
+  refusal to store ratios), and state **totality**.
+- `ACCESS_DENIED` is its own `CostReason` because it is *permanent*, unlike every other retry-shaped one.
+
+### Infrastructure Design — COMPLETE
+Everything lands in **`dashboard.yml`**; a separate stack was rejected because this repo has **no
+exports** and would need `!Sub` name reconstruction for no lifecycle gain. **`stacks.yml` unchanged** —
+no new template, so the three-file mirror does not apply.
+- **Q3 refined**: no new Dockerfile targets and **no new Build actions**. The `base` stage already
+  installs the whole package, so the two new functions reuse the **same `CollectorImageUri`** with
+  `ImageConfig.Command` overriding the entrypoint. One digest across four functions **cannot drift**;
+  four images built from one tree can.
+- One new parameter (`CostScheduleExpression`); SSM rates path derived by `!Sub`.
+- `ModelRatesParameter` ships **empty (`{}`)** on purpose — FR-10.8 item 3 is unresolved and a guessed
+  rate would be confident wrong money. Empty ⇒ COST-14 ⇒ *rate missing*.
+- **Per-key S3 write scoping in IAM** is what enforces A4.1's no-shared-writes property — a permission,
+  not a convention.
+- **NFR-T8 measured**: the increment costs **~$0.40–0.60/mo ≈ 5%** of the $9.02 account. This drove two
+  decisions rather than confirming them: **14-day** retention on the new log groups (not the 30 the
+  existing ones use — CloudWatch is already ~18% of spend), and `max_ce_calls` as config with the count
+  **emitted** so the estimate is measured rather than asserted. Rejected alternatives for scale: hourly
+  CE = **~$5.04/mo (over half the account)**; ten per-user metrics = ~33%.
+- **`CostAccessDeniedAlarm` is separate** because that condition is permanent and needs *the
+  Organization payer*, not a retry — one combined alarm would train its owner to ignore the only failure
+  that needs a human outside this team.
+
+**Open for Code Generation**: where C-14's catalog is generated — into the container build context (cannot
+drift) or committed as a generated file validated by `tools/check` (more inspectable, no pipeline change).
+Needs the buildspec in front of me.
+
+**`pipeline.yml` headroom**: 50,966 / 51,200 bytes — **234 free**, measured. The additions fit but would
+leave ~70; comment condensation is part of the work, not a contingency.
+
+**Awaiting approval before Code Generation** — the first stage in this pass that writes code.

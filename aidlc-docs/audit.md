@@ -762,3 +762,55 @@ design answer because it is pricing data — NFR-T2's configurable table is the 
 green throughout; no code was written."
 **Context**: INCEPTION — Application Design for FR-9/FR-10 complete; **awaiting approval**. Next would
 be Units Generation / per-unit CONSTRUCTION for the new components.
+
+## Application Design FR-9/FR-10 (APPROVED) → CONSTRUCTION
+**Timestamp**: 2026-08-07T00:00:00Z
+**User Input**: "approve and move to construction"
+**Decision**: **APPROVED** — the FR-9/FR-10 Application Design and amendment A4 are approved.
+Q1–Q4 and the deferred FR-9.2.3 namespace decision are closed.
+**Context**: Entering CONSTRUCTION for the FR-9/FR-10 increment across both existing units. **This is
+the first stage in this pass that writes real code and template changes.**
+
+## CONSTRUCTION — FR-9/FR-10: Functional Design + Infrastructure Design
+**Timestamp**: 2026-08-07T00:00:00Z
+**Files Generated**: `construction/plans/fr9-fr10-construction-plan.md`;
+`construction/fr9-fr10/functional-design/{business-rules,business-logic-model}.md`;
+`construction/fr9-fr10/infrastructure-design/infrastructure-design.md`. (All gitignored, per the
+existing `construction/` convention — only code is committed.)
+**AI Response**: "Collapsed three of the seven CONSTRUCTION stages and said so rather than skipping
+quietly: Units Generation (design Q4 already assigned every component), NFR Requirements (NFR-T1…T8
+already exist at requirements level), and NFR Design (folded — U-02's six patterns are inherited
+unchanged by same-shaped components).
+
+Functional Design produced COST-01…14, TEL-01…10, CAT-01…05. The two rules I would defend hardest:
+**COST-05 makes exceeding the Cost Explorer call budget a failure rather than a cap**, because
+truncating produces a *smaller* cost figure that looks valid — the money-domain analogue of CR-01's
+refusal to truncate pagination, and worse because someone may act on it financially. And **COST-07 and
+TEL-05 are deliberately opposite**: cost fails whole because a partially-written cost object reads as
+zero spend, while telemetry degrades per counter because failing the run would erase real AWS data
+merely because an uninstrumented namespace returned nothing. Same component shape, opposite upstream
+economics; recorded explicitly so a reviewer does not read it as inconsistency.
+
+Also made `ACCESS_DENIED` its own `CostReason`, because unlike every other failure here it is
+**permanent** — A3.3 established that only the Organization payer can fix it — and gave it its own
+alarm in Infrastructure Design for the same reason: one combined 'cost collector failed' alarm would
+train its owner to ignore the single condition that needs a human outside this team.
+
+Infrastructure Design **refined Q3 for the better** after measuring `pipeline.yml`'s headroom (234
+bytes, not estimated). The `base` Docker stage already installs the whole package, so the two new
+functions need **no new targets and no new Build actions** — they reuse the same `CollectorImageUri`
+with `ImageConfig.Command` overriding the entrypoint. The real argument isn't size: one digest across
+four functions **cannot drift**, whereas four images built from one tree can if a build is retried.
+
+Applied NFR-T8 with real numbers instead of treating it as a caution: the increment costs
+**~$0.40–0.60/month against the measured $9.02 account (~5%)**, and that analysis *changed* two
+decisions — 14-day retention on the new log groups rather than copying the existing 30-day default
+(CloudWatch is already ~18% of spend), and making the CE call count an emitted metric so the estimate
+is measurable rather than asserted. Also shipped `ModelRatesParameter` **empty** on purpose: FR-10.8
+item 3 is still unresolved and a guessed rate is confident wrong money.
+
+One thing left open honestly: where C-14's catalog is generated — into the container build context, or
+committed as a generated file validated by `tools/check`. Deciding it needs the buildspec in front of
+me, which is Code Generation's first task."
+**Context**: CONSTRUCTION — design stages complete; **awaiting approval before Code Generation**, the
+first stage in this pass that writes code and templates.
