@@ -416,6 +416,16 @@ Requirements → Stories pass that the 2026-08-03 telemetry amendment queued (Q3
 dependency markers, requirement IDs kept out of story text. Persona is still `P-01` — the pass adds
 goals, not an audience (see the amendment note in `personas.md`).
 
+> **⚠️ PARTLY AMENDED same day — see `amendments/telemetry-a3-measured-2026-08-07.md`.** Measurement
+> against the real account changed two things here. **US-20 and US-21 get real data on delivery after
+> all** — `AWS/Bedrock` supplies requests-by-model, input/output tokens and error counts per model with
+> no instrumentation, so their data-present criteria are testable against the account rather than only
+> against fixtures (volume is tiny: 2 invocations / 14 days). **US-17 needs one more criterion**: a
+> Cost Explorer tag grouping *succeeds* and returns 100% of spend under an empty-value key
+> (`cornell:blueprint$`), which a naive reader would render as a real attributed group — see the added
+> criterion in that story. US-18, US-19, US-22 and US-23 are unchanged and still render
+> *not instrumented*.
+
 **One thing to hold in mind while reading these.** Decision T6 means **no blueprint is instrumented
 in this pass**, so US-19 … US-22 have no live emitter and will render their empty state on delivery.
 That does **not** make them TBD placeholders the way US-D1/US-D2 were: their criteria are fully
@@ -467,6 +477,13 @@ in each story.
   unattributable rather than shown as zero spend.
 - **Given** several agents run inside one deployment, **when** I view infrastructure cost, **then** it
   is **not** split per agent, because the underlying billing cannot support that split.
+- **Given** the upstream returns a tag grouping in which the tag value is empty — a successful response,
+  not an error — **when** that group is read, **then** it is treated as the unattributed bucket and is
+  **never** rendered as a named tag value. *(Added by A3: measured against the real account, grouping
+  by `cornell:blueprint` returns HTTP 200 with a single group keyed `cornell:blueprint$` holding 100%
+  of spend. A reader that trusts the response shape would display one confident, wrong attribution.)*
+- **Given** the unattributed bucket accounts for all spend in the period, **when** I open the
+  breakdown, **then** I see the attribution-unavailable state rather than a breakdown with one group.
 
 ## US-18 — See estimated model cost, clearly marked as an estimate
 

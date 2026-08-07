@@ -831,3 +831,39 @@ Bedrock per-model **usage-type strings**; whether `GetCostAndUsage` grouped by `
 model in this account; current per-model **rates** for the estimator's table. None was verifiable this
 session — no live doc access, no account to query. Building against a guess here produces silently
 wrong money.
+
+---
+
+## Amendment A3 (2026-08-07, hours after A2) — FR-9/FR-10 measured against the real account
+
+**Trigger**: deploy-account credentials became available mid-session, so A2's FR-10.8
+verify-before-build items could be checked instead of carried. **Method**: read-only against
+`890349359349` (`cu-cit-aisei-prod-apps`) via SSO `sso-admin`; five `ce:GetCostAndUsage` calls at $0.01
+each (**~$0.05, real money, explicit user consent**), everything else free.
+
+**Detour worth remembering**: the local AWS profile named `ai-dlc-workshop` points at
+a different account (`cu-ornith-test`) — an unrelated Cornell account with production RDS. The real workshop
+account only surfaced by listing the SSO session's accounts. **Verify the account id, never the profile
+label**; trusting the name would have reported another team's spend as ours.
+
+| A2 statement | Verdict after measurement |
+|---|---|
+| FR-9.6 every Adoption counter is push-only | **WRONG** — `AWS/Bedrock` has 38 streams / 6 models incl. teams-bot's `claude-haiku-4-5`; requests, input/output tokens and errors are pull-able per `ModelId` with **no instrumentation**. But volume is **2 invocations / 14 tokens over 14 days** — live path, almost no real traffic. Reader must consume **both** routes. |
+| FR-9.7 everything renders empty | **SOFTENED** — US-20/US-21 get real (tiny) numbers; approval rate, success rate, completed tasks still empty. Makes NFR-T7's three-state distinction matter *more*. |
+| FR-10.5.1 tag activation is a manual console step | **UNDERSTATED** — `ListCostAllocationTags` → `AccessDenied: Linked account doesn't have access`. Impossible here at **any** privilege; the Organization **payer** must do it. FR-10.3 is blocked on another team. |
+| FR-10.5.4 CE denial presents as an error | **WRONG, and this is the important one** — tag grouping **succeeds** (HTTP 200) returning one group keyed `cornell:blueprint$` with **100% of spend**. Empty value = unattributed, but a naive reader renders "cornell:blueprint: $9.02" — one confident wrong attribution, undetectable by error-checking. → **new FR-10.3.6** + two US-17 criteria. |
+| FR-10.8 usage-type/model encoding unverified | **ANSWERED** — `USE1-<Model>-{input,output}-tokens` (NovaLite, NovaPro, TitanEmbeddingV2); `GROUP BY USAGE_TYPE` splits per model. Per-model cost works **without** the tag activation. No Claude usage types billed. Rates still open. |
+| FR-10.6 model cost must be estimated | **CONFIRMED BY BILLING** — in-account Bedrock spend is **$0.0000371** MTD. The LiteLLM inference now has independent evidence. |
+| T7 CloudWatch-only for AgentCore | **VALIDATED, stronger reason** — `AWS/Bedrock-AgentCore` has 13 metrics incl. `Sessions`, `ActiveSessionCount`, `CPUUsed-vCPUHours`. Adoption signals already there, uninstrumented. |
+| NFR-T4 don't become a material cost | **QUANTIFIED → NFR-T8** — account is **$9.02 MTD**; CloudWatch is already **18% of YTD spend**. Daily CE ≈ 3%/mo; 10 custom metrics ≈ **33%**/mo. Vindicates T1's daily schedule (hourly would be ~$7.20/mo) and the refusal of a per-user dimension. |
+
+**Measured baseline**: MTD $9.0232 — OpenSearch $6.44 (**71%**, the knowledgebase's vector store, new
+this month), Config $1.14, CodePipeline $0.41, CloudWatch $0.35, Secrets Manager $0.27, AgentCore
+$0.24, Bedrock $0.0000371.
+
+**Deployment state confirmed**: 8 `aidlc-*` stacks live (`account-bootstrap`, `pipeline`,
+`hello-world`, `notify-topic`, `knowledgebase`, `aisei-site`, `builder-mcp`, `teams-bot`); **no
+dashboard stacks** — the branch has never been merged, so SEC-7/A-4/P-6/R-8 remain unverified.
+
+**Still governing, unchanged**: T1–T8, FR-10.9, NFR-T1…T7. **Still open**: per-model rates (FR-10.8
+item 3 — pricing-page data, no web access this session).

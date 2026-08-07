@@ -653,3 +653,63 @@ approved requirements; stories US-16…US-25 are approved. US-D1/US-D2 are forma
 **Context**: INCEPTION second pass closed. Next stage is **Application Design for FR-9/FR-10** —
 nothing is built yet. The four `deployed`-only v1 requirements (SEC-7, A-4, P-6, R-8) are unaffected
 and still pending a merge to `main`.
+
+---
+
+## Amendment A3 — FR-9/FR-10 measured against the deploy account
+**Timestamp**: 2026-08-07T00:00:00Z
+**Request**: user asked what account access was missing, then authenticated twice, then approved the
+paid Cost Explorer calls ("yes to 1. then run the amendment now").
+**Impact Assessment**: A2 is approved and was written without account access. Measurement corrected
+four of its statements, so A2 keeps its text and gains a pointer; A3 carries the corrections. No
+downstream stage is invalidated — Application Design for FR-9/FR-10 has not run.
+**Cost incurred**: 5 × `ce:GetCostAndUsage` @ $0.01 = **~$0.05**, on the shared production account,
+with explicit consent. All other calls free and read-only. No mutation, no deploy.
+**Artifacts Affected**: `amendments/telemetry-a3-measured-2026-08-07.md` (new),
+`amendments/telemetry-fr9-2026-08-07.md` (pointer), `stories.md` (Round-2 pointer + 2 new US-17
+criteria), `aidlc-state.md`, `audit.md`.
+
+**AI Response**: "Nearly reported another team's spend as ours: the local profile named
+`ai-dlc-workshop` resolves to a different account (`cu-ornith-test`), an unrelated Cornell account holding
+production RDS databases, with **zero** `aidlc-*` stacks. Only listing the SSO session's accounts
+surfaced the real one — `890349359349` (`cu-cit-aisei-prod-apps`), where all eight `aidlc-*` stacks
+live. Verified the account id before spending anything; had I trusted the profile label every figure
+would have been confidently wrong.
+
+Four A2 statements corrected. **FR-9.6's 'all push-only' is wrong**: `AWS/Bedrock` carries 38 metric
+streams across 6 models here — including teams-bot's default `claude-haiku-4-5` — with `Invocations`,
+`InputTokenCount`, `OutputTokenCount` and `InvocationClientErrors` per `ModelId`, so three of the
+Adoption metrics need **no instrumentation at all**. I also overcorrected mid-investigation and had to
+walk that back: volume is **2 invocations, 14 input tokens, 4 output tokens over 14 days** — the pull
+path is mechanically live but captures almost none of the real traffic, so A2's underlying LiteLLM
+finding holds and only its absolute phrasing was wrong. Worth building anyway: it needs no other
+track's cooperation and lights up automatically when `course-chatbot` (direct Bedrock) or teams-bot's
+planned AgentCore move lands.
+
+**The most consequential finding is a trap A2 did not anticipate.** A2 expected a cost-allocation-tag
+problem to surface as a denial the code could detect. Instead `ce list-cost-allocation-tags` is denied
+(**linked account — payer-only, impossible here at any privilege, so FR-10.3 is blocked on another
+team**) while `get-cost-and-usage --group-by Type=TAG` **succeeds**: HTTP 200, one group keyed
+`cornell:blueprint$`, holding **100% of the $9.02**. The empty value after `$` means unattributed, but
+a reader that trusts the response shape renders 'cornell:blueprint: $9.02' — a single confident, wrong
+attribution, undetectable by error-checking. Added **FR-10.3.6** and two US-17 criteria.
+
+FR-10.8 answered: usage types **do** encode the model — `USE1-NovaLite-input-tokens`,
+`USE1-NovaPro-output-tokens`, `USE1-TitanEmbeddingV2-Text-input-tokens` — so per-model cost works via
+`USAGE_TYPE` **without** the blocked tag activation. FR-10.6's estimate is confirmed necessary by
+billing rather than by code reading: in-account Bedrock spend is **$0.0000371** MTD. T7 validated —
+`AWS/Bedrock-AgentCore` has 13 metrics including `Sessions` and `ActiveSessionCount`, real adoption
+signal already present.
+
+NFR-T4 stopped being a caution and became arithmetic: the account is **$9.02/month** and CloudWatch is
+already **18% of YTD spend**. Daily Cost Explorer is ~3% of the account; ten custom metrics would be
+~33%. A cost dashboard that becomes a top-three line item in the account it observes has failed at its
+own purpose — so T1's separate daily schedule (hourly would be ~$7.20/mo, comparable to everything
+else combined) and the refusal of a per-user metric dimension are both retroactively vindicated. Added
+**NFR-T8** requiring the dashboard's own operating cost be estimated against the observed total before
+FR-9/FR-10 are built.
+
+Confirmed no dashboard stacks are deployed, so SEC-7/A-4/P-6/R-8 remain unverified. One item stays
+open: per-model rates for the estimator table — pricing-page data, and web access was unavailable."
+**Context**: INCEPTION — A3 amends the approved A2. Next stage remains **Application Design for
+FR-9/FR-10**, now with measured inputs instead of quarantined unknowns.

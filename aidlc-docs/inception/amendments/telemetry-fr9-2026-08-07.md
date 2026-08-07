@@ -7,6 +7,26 @@
 `requirements/requirement-amendment-questions-telemetry-round-2.md`
 **Depth**: Standard, consistent with the first pass
 
+> **⚠️ AMENDED HOURS LATER — see `telemetry-a3-measured-2026-08-07.md` (A3).** Credentials for the
+> deploy account (`890349359349`) became available in the same session, so FR-10.8's
+> verify-before-build items were actually measured. **Four statements below are corrected**, and
+> reading them as current will mislead:
+> - **FR-9.6's "all push-only" is wrong** — `AWS/Bedrock` has 38 metric streams across 6 models here;
+>   requests-by-model, input/output tokens and error counts are pull-able with **no instrumentation**
+>   (A3.1). The underlying LiteLLM finding still holds: volume is 2 invocations / 14 days, so the
+>   pull path is live but captures almost none of the real traffic.
+> - **FR-10.5.1 understates the tag blocker** — this is a *linked* account and cannot activate cost
+>   allocation tags **at any privilege level**; only the Organization payer can (A3.3).
+> - **FR-10.5.4 is wrong about how CE denial presents** — tag grouping **succeeds** and returns 100%
+>   of spend under an empty-value key that a naive reader would render as a real attribution. New
+>   **FR-10.3.6** handles it (A3.3).
+> - **FR-10.8 items 1–2 are answered** — usage types *do* encode the model
+>   (`USE1-<Model>-{input,output}-tokens`) (A3.4). Rates remain open.
+>
+> **Confirmed rather than changed**: FR-10.6's estimate is necessary (in-account Bedrock spend is
+> `$0.0000371` MTD — A3.5); T7 is validated (A3.2); NFR-T4 is now quantified and promoted to
+> **NFR-T8** (A3.6). Every T1–T8 decision still governs.
+
 ## Why this document rather than edits to `requirements.md`
 
 `requirements.md` is **approved** (2026-08-03). Rewriting an approved conclusion in place destroys
